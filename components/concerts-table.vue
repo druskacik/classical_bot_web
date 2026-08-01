@@ -8,8 +8,9 @@
                     <div class="lg:hidden flex flex-col gap-2">
                         <span class="text-sm text-gray-900">{{ formatDate(concert.date) }}</span>
                         <div class="flex flex-wrap gap-2">
-                            <NuxtLink :to="`/${concert.city}`">
-                                <TableBadge :label="concert.city" variant="outline" />
+                            <TableBadge :label="concert.city" variant="outline" />
+                            <NuxtLink :to="countryPath(concert.country_code)">
+                                <TableBadge :label="getCountryName(concert.country_code)" variant="outline" />
                             </NuxtLink>
                             <TableBadge :label="concert.source"/>
                         </div>
@@ -19,9 +20,12 @@
                             </a>
                             <span v-for="(composer, index) in concert.composers" :key="composer.id" class="inline-block">
                             <span v-if="index > 0" class="text-gray-500">, </span>
-                                <span class="text-sm text-gray-500 font-medium hover:underline cursor-pointer" @click="addComposer(composer.name)">
+                                <NuxtLink
+                                    :to="composerPath(composer.name)"
+                                    class="text-sm text-gray-500 font-medium hover:underline"
+                                >
                                     {{ formatComposerName(composer.name) }}
-                                </span>
+                                </NuxtLink>
                             </span>
                         </div>
                     </div>
@@ -35,15 +39,19 @@
                     <a :href="concert.url" target="_blank" rel="noopener noreferrer" class="text-sm text-gray-900 font-medium hover:underline">
                         {{ concert.title }}
                     </a>
-                    <span @click="selectCity(concert.city)" class="ml-2 cursor-pointer">
-                        <TableBadge :label="concert.city" variant="outline" />
-                    </span>
+                    <TableBadge class="ml-2" :label="concert.city" variant="outline" />
+                    <NuxtLink :to="countryPath(concert.country_code)" class="ml-2">
+                        <TableBadge :label="getCountryName(concert.country_code)" variant="outline" />
+                    </NuxtLink>
                     <TableBadge class="ml-2 mr-2" :label="concert.source"/>
                     <span v-for="(composer, index) in concert.composers" :key="composer.id" class="inline-block">
                       <span v-if="index > 0" class="text-gray-500">, </span>
-                        <span class="text-sm text-gray-500 font-medium hover:underline cursor-pointer" @click="addComposer(composer.name)">
+                        <NuxtLink
+                            :to="composerPath(composer.name)"
+                            class="text-sm text-gray-500 font-medium hover:underline"
+                        >
                             {{ formatComposerName(composer.name) }}
-                        </span>
+                        </NuxtLink>
                     </span>
                 </td>
             </tr>
@@ -54,23 +62,17 @@
   
   <script setup>
 
+  import { getCountryName } from '~/utils/countries.js'
+
   const route = useRoute()
-  const props = defineProps({
+  defineProps({
     concerts: {
       type: Array,
-      required: true
-    },
-    addComposer: {
-      type: Function,
-      required: true
-    },
-    selectCity: {
-      type: Function,
       required: true
     }
   })  
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('sk-SK', {
+    return new Date(dateString).toLocaleDateString('en-GB', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -78,22 +80,36 @@
     })
   }
 
+  const countryPath = countryCode => `/countries/${countryCode.toLowerCase()}`
+
+  const composerPath = composer => ({
+    path: route.path,
+    query: {
+      ...route.query,
+      composers: Array.from(new Set([
+        ...selectedComposers.value,
+        composer,
+      ])).join(','),
+    },
+  })
+
+  const selectedComposers = computed(() => {
+    const value = Array.isArray(route.query.composers)
+      ? route.query.composers[0]
+      : route.query.composers
+
+    return typeof value === 'string'
+      ? value.split(',').map(item => item.trim()).filter(Boolean)
+      : []
+  })
+
   const formatComposerName = (composerName) => {
     const parts = composerName.split(' ')
     return parts[parts.length - 1]
   }
   
-  const formatTime = (timeFrom, timeTo) => {
-      if (timeFrom && timeTo) {
-          return timeFrom.slice(0, 5) + ' - ' + timeTo.slice(0, 5)
-      } else if (timeFrom) {
-          return timeFrom.slice(0, 5)
-      } else if (timeTo) {
-          return timeTo.slice(0, 5)
-      }
-  }
   </script>
   
   <style>
   /* Add custom styles if needed */
-  </style> 
+  </style>

@@ -1,7 +1,7 @@
 <template>
     <!-- Composer Filter Section -->
     <div class="px-6 pt-2 pb-6">
-        <h3 class="text-lg font-serif mb-4">Filtrovať podľa skladateľa</h3>
+        <h3 class="text-lg font-serif mb-4">Filter by composer</h3>
         <div class="mt-4">
             <div class="w-full lg:w-3/5 relative composer-filter" ref="composerFilterRef">
                 <div class="flex flex-wrap gap-2 p-2 border border-gray-200 rounded-lg min-h-[42px] focus-within:border-blue-500">
@@ -17,7 +17,7 @@
                     <input 
                         v-model="searchQuery" 
                         type="text" 
-                        placeholder="Hľadať..." 
+                        placeholder="Search..."
                         class="flex-grow outline-none min-w-[120px]"
                         @focus="showDropdown = true"
                     />
@@ -50,7 +50,7 @@ const props = defineProps({
   }
 })
 const emit = defineEmits(['update:composers'])
-const value = ref(props.selectedComposers)
+const value = ref([...props.selectedComposers])
 
 const searchQuery = ref('')
 const showDropdown = ref(false)
@@ -89,9 +89,15 @@ const handleOutsideClick = (event) => {
 watch(value, (newValue) => {
     emit('update:composers', newValue)
 }, { deep: true })
+
+watch(() => props.selectedComposers, (newValue) => {
+    if (newValue.join('\u0000') !== value.value.join('\u0000')) {
+        value.value = [...newValue]
+    }
+}, { deep: true })
   
   </script>
   
   <style>
   /* Add custom styles if needed */
-  </style> 
+  </style>

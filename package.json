@@ -8,10 +8,10 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "migrations": "knex migrate:latest"
+    "migrations": "knex migrate:latest",
+    "db:query": "node agent_utils/search_db.js"
   },
   "dependencies": {
-    "@nuxt/content": "^3.4.0",
     "@nuxt/fonts": "^0.11.0",
     "@nuxt/ui": "^3.0.0",
     "knex": "^3.1.0",

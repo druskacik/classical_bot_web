@@ -1,50 +1,70 @@
 import ClassicalConcert from '../models/ClassicalConcert.cjs'
+import { normalizeCountryCode } from '../utils/countries.js'
+
+const parseCommaSeparatedValues = (value) => {
+  if (typeof value !== 'string') return []
+
+  return value
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean)
+}
 
 export default defineEventHandler(async (event) => {
   try {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
     const query = getQuery(event)
-    const composers = query.composers ? query.composers.split(',') : []
-    const city = query.city || null
+    const composers = parseCommaSeparatedValues(query.composers)
+    const country = query.country ? normalizeCountryCode(query.country) : null
+
+    if (query.country && !country) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Country must be an ISO 3166-1 alpha-2 code',
+      })
+    }
     
-    // Start building the query
     let concertQuery = ClassicalConcert.query()
-      .where('date', '>=', today)
-      .where('country_code', 'SK')
+      .whereRaw('date >= CURRENT_DATE')
       .orderBy('date', 'asc')
       .orderBy('time_from', 'asc')
       .withGraphFetched('composers')
-      .select('url', 'title', 'date', 'city', 'source', 'venue', 'composers')
+      .select(
+        'id',
+        'url',
+        'title',
+        'date',
+        'time_from',
+        'time_to',
+        'city',
+        'country_code',
+        'source',
+        'venue',
+      )
     
-    // Apply city filter if provided
-    if (city) {
-      concertQuery = concertQuery.where('city', city)
+    if (country) {
+      concertQuery = concertQuery.where('country_code', country)
     }
-    
-    // Get the concerts
-    let concerts = await concertQuery
-    
-    // Filter by composers if provided
+
     if (composers.length > 0) {
-      concerts = concerts.filter(concert => {
-        return concert.composers.some(composer => 
-          composers.includes(composer.name)
-        )
-      })
+      concertQuery = concertQuery.whereExists(
+        ClassicalConcert.relatedQuery('composers')
+          .whereIn('composers.name', composers),
+      )
     }
+
+    const concerts = await concertQuery
 
     return concerts.map(concert => ({
       ...concert,
-      // Hotfix - this should be fixed in the database
       title: concert.title.replace(/\s+/g, ' '),
     }))
   } catch (error) {
+    if (error.statusCode) throw error
+
     console.error('Error fetching concerts:', error)
-    return {
+    throw createError({
       statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to fetch concerts' })
-    }
+      statusMessage: 'Failed to fetch concerts',
+    })
   }
 })

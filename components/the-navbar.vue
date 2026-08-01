@@ -3,9 +3,9 @@
         <div class="container mx-auto px-4">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center">
-                    <a href="/" class="text-xl font-semibold text-gray-800">
-                        classical.sk
-                    </a>
+                    <NuxtLink to="/" class="text-xl font-semibold text-gray-800">
+                        ClassicalBot
+                    </NuxtLink>
                 </div>
                 <!-- Desktop menu -->
                 <UNavigationMenu
@@ -52,7 +52,7 @@
                                     {{ item.label }}
                                 </a>
                             </template>
-                            <template #cities="{ item }">
+                            <template #countries="{ item }">
                                 <a :href="item.href" class="block px-4 py-2 text-gray-800 hover:text-gray-900">
                                     <div class="flex items-center">
                                         {{ item.label }}
@@ -85,17 +85,21 @@ watch(
 )
 
 
-const cities = useState('cities')
+const { data: countries } = await useAsyncData(
+    'countries',
+    () => $fetch('/api/get-countries'),
+)
 
-const items = ref([
+const items = computed(() => [
     {
-        label: 'Mestá',
-        children: cities.value.map(city => ({ label: city.city, href: `/${city.city}` })),
-        slot: 'cities'
+        label: 'Countries',
+        children: (countries.value || []).map(country => ({
+            label: country.name,
+            href: `/countries/${country.code.toLowerCase()}`,
+        })),
+        slot: 'countries'
     },
-    { label: 'Zdroje', href: '/zdroje' },
-    // { label: 'Blog', href: '/blog' },
-    { label: 'O projekte', href: '/blog/o-projekte' },
-    { label: 'Kontakt', href: '/kontakt' },
+    { label: 'Sources', href: '/sources' },
+    { label: 'Contact', href: '/contact' },
 ]);
 </script>
