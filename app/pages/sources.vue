@@ -6,7 +6,7 @@
     </p>
 
     <div v-if="status === 'pending'">
-      <UProgress indeterminate animation="swing" />
+      <UProgress animation="swing" />
     </div>
     <UAlert v-else-if="status === 'error'" color="error" title="Sources could not be loaded">
       Please try again later.

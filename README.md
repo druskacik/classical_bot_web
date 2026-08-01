@@ -1,12 +1,25 @@
 # ClassicalBot Web
 
-English-language Nuxt 3 frontend for discovering upcoming classical-music concerts around the world.
+English-language Nuxt 4 frontend for discovering upcoming classical-music concerts around the world.
 
 Concert data is collected and maintained by the separate crawler project:
 
 https://github.com/druskacik/classical_bot
 
-Run the application with `npm run dev` and create a production build with `npm run build`.
+Use Node.js 24 LTS, install dependencies with `npm ci`, and run the application with:
+
+```bash
+npm run dev
+```
+
+Validate the application and create a production build with:
+
+```bash
+npm run typecheck
+npm run build
+```
+
+Run the built application with `node .output/server/index.mjs`.
 
 For read-only database inspection, use:
 

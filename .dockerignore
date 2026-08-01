@@ -1,0 +1,15 @@
+.data
+.env
+.env.*
+.git
+.gitignore
+.nuxt
+.output
+.cache
+node_modules
+logs
+*.log
+.DS_Store
+.fleet
+.idea
+.vscode

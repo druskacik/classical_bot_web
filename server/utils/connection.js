@@ -1,6 +1,7 @@
 import knex from 'knex';
+import dotenv from 'dotenv'
 
-import 'dotenv/config'
+dotenv.config({ quiet: true })
 
 const environment = process.env.NODE_ENV || 'development';
 

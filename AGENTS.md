@@ -1,6 +1,6 @@
 # ClassicalBot Web
 
-Nuxt 3 frontend for discovering upcoming classical-music concerts worldwide. Concert ingestion and database migrations live in a separate project, `classical_bot`; this repository reads the shared PostgreSQL database.
+Nuxt 4 frontend for discovering upcoming classical-music concerts worldwide. Concert ingestion and database migrations live in a separate project, `classical_bot`; this repository reads the shared PostgreSQL database.
 
 ## Technical notes
 

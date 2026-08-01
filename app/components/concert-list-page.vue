@@ -9,7 +9,7 @@
     />
 
     <div v-if="concertStatus === 'pending'">
-      <UProgress indeterminate animation="swing" />
+      <UProgress animation="swing" />
     </div>
     <div v-else-if="concertStatus === 'error'">
       <UAlert color="error" title="Concerts could not be loaded">
