@@ -4,14 +4,14 @@ import { getCountryName } from '../utils/countries.js'
 export default defineEventHandler(async () => {
   try {
     const countries = await knex('classical_concert')
-      .select('country_code')
+      .select('country_code_resolved')
       .whereRaw('date >= CURRENT_DATE')
-      .whereNotNull('country_code')
+      .whereNotNull('country_code_resolved')
       .count('* as count')
-      .groupBy('country_code')
+      .groupBy('country_code_resolved')
 
     return countries
-      .map(({ country_code: code, count }) => ({
+      .map(({ country_code_resolved: code, count }) => ({
         code,
         name: getCountryName(code),
         count: Number(count),

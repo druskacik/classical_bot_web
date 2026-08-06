@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
       .orderBy('count', 'desc')
 
     if (country) {
-      composerQuery.where('classical_concert.country_code', country)
+      composerQuery.where('classical_concert.country_code_resolved', country)
     }
 
     const composers = await composerQuery
