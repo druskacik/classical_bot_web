@@ -34,6 +34,12 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+      ],
+      meta: [
+        { name: 'theme-color', content: '#ffffff' },
+      ],
       script: [
         {
           src: 'https://umami.cr.bswatcher.com/script.js',
