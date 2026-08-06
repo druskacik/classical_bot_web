@@ -81,6 +81,8 @@
 
 <script setup>
 
+import { getCountryPath } from '~/utils/countries.js'
+
 const isMenuOpen = ref(false)
 
 const router = useRouter()
@@ -104,7 +106,7 @@ const items = computed(() => [
         label: 'Countries',
         children: (countries.value || []).map(country => ({
             label: country.name,
-            href: `/countries/${country.code.toLowerCase()}`,
+            href: getCountryPath(country.code),
         })),
         slot: 'countries'
     },

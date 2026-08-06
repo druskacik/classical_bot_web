@@ -36,7 +36,7 @@
       >
         <div v-for="(concertGroup, month) in groupedConcerts" :key="month" class="mt-9">
           <h2 class="mb-4 font-serif text-2xl capitalize text-gray-900">{{ month }}</h2>
-          <ConcertsTable :concerts="concertGroup" />
+          <ConcertsTable :concerts="concertGroup" :show-country="!countryCode" />
         </div>
 
         <nav v-if="concertPage.totalPages > 1" class="mt-10 flex items-center justify-center gap-1" aria-label="Concert pages">

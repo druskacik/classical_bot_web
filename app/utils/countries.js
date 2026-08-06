@@ -19,3 +19,25 @@ export const getCountryName = (value) => {
     return code
   }
 }
+
+export const getCountrySlug = (name) => {
+  if (typeof name !== 'string') return null
+
+  const slug = name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[’']/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return slug || null
+}
+
+export const getCountryPath = (value) => {
+  const code = normalizeCountryCode(value)
+  if (!code) return null
+
+  const slug = getCountrySlug(getCountryName(code))
+  return slug ? `/${slug}` : null
+}

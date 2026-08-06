@@ -6,17 +6,19 @@
 </template>
 
 <script setup>
-import { normalizeCountryCode } from '~/utils/countries.js'
+import { getCountrySlug } from '~/utils/countries.js'
 
 const route = useRoute()
-const requestedCode = normalizeCountryCode(route.params.code)
+const requestedSlug = typeof route.params.country === 'string'
+  ? route.params.country
+  : null
 
 const { data: countries } = await useAsyncData(
   'countries',
   () => $fetch('/api/get-countries'),
 )
 
-const country = countries.value?.find(item => item.code === requestedCode)
+const country = countries.value?.find(item => getCountrySlug(item.name) === requestedSlug)
 
 if (!country) {
   throw createError({

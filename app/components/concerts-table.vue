@@ -9,7 +9,7 @@
                         <span class="text-sm text-gray-900">{{ formatDate(concert.date) }}</span>
                         <div class="flex flex-wrap gap-2">
                             <TableBadge :label="concert.city" variant="outline" />
-                            <NuxtLink :to="countryPath(concert.country_code)">
+                            <NuxtLink v-if="showCountry" :to="getCountryPath(concert.country_code)">
                                 <TableBadge :label="getCountryName(concert.country_code)" variant="outline" />
                             </NuxtLink>
                             <TableBadge :label="concert.source"/>
@@ -40,7 +40,7 @@
                         {{ concert.title }}
                     </a>
                     <TableBadge class="ml-2" :label="concert.city" variant="outline" />
-                    <NuxtLink :to="countryPath(concert.country_code)" class="ml-2">
+                    <NuxtLink v-if="showCountry" :to="getCountryPath(concert.country_code)" class="ml-2">
                         <TableBadge :label="getCountryName(concert.country_code)" variant="outline" />
                     </NuxtLink>
                     <TableBadge class="ml-2 mr-2" :label="concert.source"/>
@@ -62,14 +62,18 @@
   
   <script setup>
 
-  import { getCountryName } from '~/utils/countries.js'
+  import { getCountryName, getCountryPath } from '~/utils/countries.js'
 
   const route = useRoute()
   defineProps({
     concerts: {
       type: Array,
       required: true
-    }
+    },
+    showCountry: {
+      type: Boolean,
+      default: true
+    },
   })  
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-GB', {
@@ -79,8 +83,6 @@
       day: 'numeric'
     })
   }
-
-  const countryPath = countryCode => `/countries/${countryCode.toLowerCase()}`
 
   const composerPath = composer => ({
     path: route.path,
