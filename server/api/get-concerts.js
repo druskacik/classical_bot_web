@@ -54,17 +54,32 @@ const parseCity = (value) => {
   if (typeof queryValue !== 'string' || !queryValue.trim()) return null
 
   const city = queryValue.trim()
-  if (city.length > 120) {
+  if (city.length > 160) {
     throw createError({ statusCode: 400, statusMessage: 'City is too long' })
   }
 
-  if (!/^\d+$/.test(city)) return { id: null, name: city }
+  if (!/^\d+$/.test(city)) {
+    const separator = city.lastIndexOf(',')
+    if (separator === -1) return { id: null, name: city, country: null }
+
+    const name = city.slice(0, separator).trim()
+    const countryValue = city.slice(separator + 1).trim()
+    const country = normalizeCountryCode(countryValue)
+    if (!country) return { id: null, name: city, country: null }
+    if (!name) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'City must use "City name,CC" with an ISO country code',
+      })
+    }
+    return { id: null, name, country }
+  }
 
   const id = Number(city)
   if (!Number.isSafeInteger(id) || id < 1) {
     throw createError({ statusCode: 400, statusMessage: 'City ID must be a positive integer' })
   }
-  return { id, name: null }
+  return { id, name: null, country: null }
 }
 
 const applyFilters = (builder, filters) => {
@@ -73,11 +88,23 @@ const applyFilters = (builder, filters) => {
   if (filters.country) builder.where('cc.country_code_resolved', filters.country)
   if (filters.city?.id) builder.where('cc.city_id', filters.city.id)
   else if (filters.city?.name) {
+    if (filters.city.country) {
+      builder.whereRaw(
+        'COALESCE(canonical_city.country_code, cc.country_code_resolved, cc.country_code_raw) = ?',
+        [filters.city.country],
+      )
+    }
     builder.where((cityFilter) => {
       cityFilter
-        .where('canonical_city.english_name', filters.city.name)
-        .orWhere('canonical_city.local_name', filters.city.name)
-        .orWhere('cc.city_raw', filters.city.name)
+        .whereILike('canonical_city.english_name', filters.city.name)
+        .orWhereILike('canonical_city.local_name', filters.city.name)
+      if (filters.city.country) {
+        cityFilter.orWhere(unresolvedCity => unresolvedCity
+          .whereNull('cc.city_id')
+          .whereILike('cc.city_raw', filters.city.name))
+      } else {
+        cityFilter.orWhereILike('cc.city_raw', filters.city.name)
+      }
     })
   }
   if (filters.dateFrom) builder.where('cc.date', '>=', filters.dateFrom)
@@ -124,9 +151,17 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: 'End date must not be before start date' })
     }
 
+    const city = parseCity(query.city)
+    if (country && city?.country && country !== city.country) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'City country must match the selected country',
+      })
+    }
+
     const filters = {
       country,
-      city: parseCity(query.city),
+      city,
       dateFrom,
       dateTo,
       composers: parseCommaSeparatedValues(query.composers),

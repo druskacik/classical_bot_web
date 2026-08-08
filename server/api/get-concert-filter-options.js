@@ -1,5 +1,5 @@
 import knex from '../utils/connection.js'
-import { normalizeCountryCode } from '../utils/countries.js'
+import { getCountryName, normalizeCountryCode } from '../utils/countries.js'
 
 const OPTION_LIMIT = 20
 const OPTION_TYPES = new Set(['city', 'composer', 'work'])
@@ -12,6 +12,23 @@ const parseSelected = value => {
     : []
 }
 
+const parseCityValue = (value) => {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const city = value.trim()
+  if (/^\d+$/.test(city)) {
+    const id = Number(city)
+    return Number.isSafeInteger(id) && id > 0 ? { id, name: null, country: null } : null
+  }
+
+  const separator = city.lastIndexOf(',')
+  if (separator === -1) return { id: null, name: city, country: null }
+
+  const name = city.slice(0, separator).trim()
+  const country = normalizeCountryCode(city.slice(separator + 1).trim())
+  if (!country) return { id: null, name: city, country: null }
+  return name ? { id: null, name, country } : null
+}
+
 const applyConcertScope = (builder, country) => {
   builder.whereRaw('cc.date >= CURRENT_DATE')
   if (country) builder.where('cc.country_code_resolved', country)
@@ -19,20 +36,31 @@ const applyConcertScope = (builder, country) => {
 }
 
 const cityQuery = (country, search, selectedOnly, selected) => {
+  const selectedCity = selectedOnly ? parseCityValue(selected) : null
   const query = applyConcertScope(
     knex('classical_concert as cc')
       .join('city as canonical_city', 'canonical_city.id', 'cc.city_id')
       .select(
-        knex.raw('canonical_city.id::text as value'),
-        knex.raw('COALESCE(canonical_city.english_name, canonical_city.local_name) as label'),
+        selectedOnly
+          ? knex.raw('?::text as value', [selected])
+          : knex.raw("canonical_city.english_name || ',' || canonical_city.country_code as value"),
+        knex.raw('canonical_city.english_name as label'),
+        'canonical_city.country_code',
       )
       .count('* as count')
-      .groupBy('canonical_city.id', 'canonical_city.english_name', 'canonical_city.local_name'),
+      .groupBy('canonical_city.english_name', 'canonical_city.country_code'),
     country,
   )
 
   if (selectedOnly) {
-    query.whereIn('canonical_city.id', selected.map(Number).filter(Number.isSafeInteger))
+    if (!selectedCity) return null
+    if (selectedCity.id) query.where('canonical_city.id', selectedCity.id)
+    else {
+      if (selectedCity.country) query.where('canonical_city.country_code', selectedCity.country)
+      query.where(cityMatch => cityMatch
+        .whereILike('canonical_city.english_name', selectedCity.name)
+        .orWhereILike('canonical_city.local_name', selectedCity.name))
+    }
   } else if (search) {
     query.where((citySearch) => {
       citySearch
@@ -101,17 +129,26 @@ export default defineEventHandler(async (event) => {
 
     const searchValue = firstQueryValue(query.q)
     const search = typeof searchValue === 'string' ? searchValue.trim().slice(0, 100) : ''
-    const selected = parseSelected(query.selected)
+    const selected = type === 'city'
+      ? (typeof firstQueryValue(query.selected) === 'string' ? firstQueryValue(query.selected).trim() : '')
+      : parseSelected(query.selected)
     const factory = type === 'city' ? cityQuery : type === 'composer' ? composerQuery : workQuery
 
+    const selectedQuery = type === 'city'
+      ? (selected ? factory(country, '', true, selected) : null)
+      : (selected.length ? factory(country, '', true, selected) : null)
     const [suggestions, selectedItems] = await Promise.all([
       factory(country, search, false, selected),
-      selected.length ? factory(country, '', true, selected) : [],
+      selectedQuery || [],
     ])
 
     const items = [...selectedItems, ...suggestions].reduce((unique, item) => {
       if (!unique.some(candidate => candidate.value === item.value)) {
-        unique.push({ ...item, count: Number(item.count) })
+        unique.push({
+          ...item,
+          count: Number(item.count),
+          secondaryLabel: type === 'city' && !country ? getCountryName(item.country_code) : item.secondaryLabel,
+        })
       }
       return unique
     }, [])

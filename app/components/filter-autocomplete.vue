@@ -94,9 +94,10 @@ const availableOptions = computed(() => options.value.filter(
   option => !props.modelValue.includes(String(option.value)),
 ))
 
-const optionChipLabel = option => option.secondaryLabel
-  ? `${option.secondaryLabel} — ${option.label}`
-  : option.label
+const optionChipLabel = (option) => {
+  if (props.type === 'city') return option.label
+  return option.secondaryLabel ? `${option.secondaryLabel} — ${option.label}` : option.label
+}
 
 const loadOptions = async () => {
   const sequence = ++requestSequence.value

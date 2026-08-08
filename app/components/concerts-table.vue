@@ -145,7 +145,7 @@
     path: route.path,
     query: {
       ...route.query,
-      city: concert.city_id ? String(concert.city_id) : concert.city,
+      city: concert.country_code ? `${concert.city},${concert.country_code}` : concert.city,
       page: undefined,
     },
   })
