@@ -1,5 +1,5 @@
 <template>
-  <section aria-label="Concert filters" class="border-y border-gray-200 py-5">
+  <section aria-label="Concert filters" class="py-5">
     <div class="grid gap-x-6 gap-y-5 md:grid-cols-2 lg:grid-cols-4">
       <label v-if="!fixedCountry" class="block">
         <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Country</span>
