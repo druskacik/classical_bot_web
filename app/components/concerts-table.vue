@@ -6,7 +6,16 @@
                 <td class="px-6 py-4">
                     <!-- Mobile layout (flex column) -->
                     <div class="lg:hidden flex flex-col gap-2">
-                        <span class="text-sm text-gray-900">{{ formatDate(concert.date) }}</span>
+                        <div>
+                            <span class="text-sm text-gray-900">{{ formatDate(concert.date) }}</span>
+                            <time
+                                v-if="formatTime(concert.time_from)"
+                                :datetime="formatDateTime(concert.date, concert.time_from)"
+                                class="ml-2 text-sm tabular-nums text-gray-500"
+                            >
+                                {{ formatTime(concert.time_from) }}
+                            </time>
+                        </div>
                         <div class="flex flex-wrap gap-2">
                             <TableBadge :label="concert.city" variant="outline" />
                             <NuxtLink v-if="showCountry" :to="getCountryPath(concert.country_code)">
@@ -18,14 +27,17 @@
                             <a :href="concert.url" target="_blank" rel="noopener noreferrer" class="text-sm text-gray-900 font-medium hover:underline mr-2">
                                 {{ concert.title }}
                             </a>
-                            <span v-for="(composer, index) in concert.composers" :key="composer.id" class="inline-block">
-                            <span v-if="index > 0" class="text-gray-500">, </span>
+                            <span
+                                v-for="(composer, index) in concert.composers"
+                                :key="composer.id"
+                                :class="['inline-block', index < concert.composers.length - 1 && 'mr-1']"
+                            >
                                 <NuxtLink
                                     :to="composerPath(composer.name)"
                                     class="text-sm text-gray-500 font-medium hover:underline"
                                 >
-                                    {{ formatComposerName(composer.name) }}
-                                </NuxtLink>
+                                    {{ composer.name }}
+                                </NuxtLink><span v-if="index < concert.composers.length - 1" class="text-gray-500">,</span>
                             </span>
                         </div>
                     </div>
@@ -33,6 +45,13 @@
                     <!-- Desktop layout (original) -->
                     <div class="hidden lg:block">
                         <span class="text-sm text-gray-900">{{ formatDate(concert.date) }}</span>
+                        <time
+                            v-if="formatTime(concert.time_from)"
+                            :datetime="formatDateTime(concert.date, concert.time_from)"
+                            class="mt-1 block text-sm tabular-nums text-gray-500"
+                        >
+                            {{ formatTime(concert.time_from) }}
+                        </time>
                     </div>
                 </td>
                 <td class="px-6 py-4 hidden lg:table-cell">
@@ -44,14 +63,17 @@
                         <TableBadge :label="getCountryName(concert.country_code)" variant="outline" />
                     </NuxtLink>
                     <TableBadge class="ml-2 mr-2" :label="concert.source"/>
-                    <span v-for="(composer, index) in concert.composers" :key="composer.id" class="inline-block">
-                      <span v-if="index > 0" class="text-gray-500">, </span>
+                    <span
+                        v-for="(composer, index) in concert.composers"
+                        :key="composer.id"
+                        :class="['inline-block', index < concert.composers.length - 1 && 'mr-1']"
+                    >
                         <NuxtLink
                             :to="composerPath(composer.name)"
                             class="text-sm text-gray-500 font-medium hover:underline"
                         >
-                            {{ formatComposerName(composer.name) }}
-                        </NuxtLink>
+                            {{ composer.name }}
+                        </NuxtLink><span v-if="index < concert.composers.length - 1" class="text-gray-500">,</span>
                     </span>
                 </td>
             </tr>
@@ -84,6 +106,18 @@
     })
   }
 
+  const formatTime = (timeString) => {
+    if (typeof timeString !== 'string') return null
+
+    const match = timeString.match(/^(\d{2}):(\d{2})/)
+    return match ? `${match[1]}:${match[2]}` : null
+  }
+
+  const formatDateTime = (dateString, timeString) => {
+    const time = formatTime(timeString)
+    return time ? `${dateString.slice(0, 10)}T${time}` : undefined
+  }
+
   const composerPath = composer => ({
     path: route.path,
     query: {
@@ -105,11 +139,6 @@
       : []
   })
 
-  const formatComposerName = (composerName) => {
-    const parts = composerName.split(' ')
-    return parts[parts.length - 1]
-  }
-  
   </script>
   
   <style>
