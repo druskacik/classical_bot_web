@@ -16,6 +16,7 @@
       </label>
 
       <FilterAutocomplete
+        :class="fixedCountry && 'lg:col-span-2'"
         type="city"
         label="City"
         placeholder="Any city"
