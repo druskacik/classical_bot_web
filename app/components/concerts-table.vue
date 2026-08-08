@@ -17,11 +17,22 @@
                             </time>
                         </div>
                         <div class="flex flex-wrap gap-2">
-                            <TableBadge :label="concert.city" variant="outline" />
+                            <NuxtLink :to="cityPath(concert)">
+                                <TableBadge :label="concert.city" variant="outline" />
+                            </NuxtLink>
                             <NuxtLink v-if="showCountry" :to="getCountryPath(concert.country_code)">
                                 <TableBadge :label="getCountryName(concert.country_code)" variant="outline" />
                             </NuxtLink>
-                            <TableBadge :label="concert.source"/>
+                            <a
+                                v-if="concert.source_url"
+                                :href="concert.source_url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                :aria-label="`Visit ${concert.source} website`"
+                            >
+                                <TableBadge :label="concert.source" />
+                            </a>
+                            <TableBadge v-else :label="concert.source" />
                         </div>
                         <div class="flex flex-wrap items-baseline">
                             <a :href="concert.url" target="_blank" rel="noopener noreferrer" class="text-sm text-gray-900 font-medium hover:underline mr-2">
@@ -58,11 +69,23 @@
                     <a :href="concert.url" target="_blank" rel="noopener noreferrer" class="text-sm text-gray-900 font-medium hover:underline">
                         {{ concert.title }}
                     </a>
-                    <TableBadge class="ml-2" :label="concert.city" variant="outline" />
+                    <NuxtLink :to="cityPath(concert)" class="ml-2">
+                        <TableBadge :label="concert.city" variant="outline" />
+                    </NuxtLink>
                     <NuxtLink v-if="showCountry" :to="getCountryPath(concert.country_code)" class="ml-2">
                         <TableBadge :label="getCountryName(concert.country_code)" variant="outline" />
                     </NuxtLink>
-                    <TableBadge class="ml-2 mr-2" :label="concert.source"/>
+                    <a
+                        v-if="concert.source_url"
+                        :href="concert.source_url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="ml-2 mr-2 inline-block"
+                        :aria-label="`Visit ${concert.source} website`"
+                    >
+                        <TableBadge :label="concert.source" />
+                    </a>
+                    <TableBadge v-else class="ml-2 mr-2" :label="concert.source" />
                     <span
                         v-for="(composer, index) in concert.composers"
                         :key="composer.id"
@@ -117,6 +140,15 @@
     const time = formatTime(timeString)
     return time ? `${dateString.slice(0, 10)}T${time}` : undefined
   }
+
+  const cityPath = concert => ({
+    path: route.path,
+    query: {
+      ...route.query,
+      city: concert.city_id ? String(concert.city_id) : concert.city,
+      page: undefined,
+    },
+  })
 
   const composerPath = composer => ({
     path: route.path,
