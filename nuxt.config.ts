@@ -43,7 +43,7 @@ export default defineNuxtConfig({
       script: [
         {
           src: 'https://umami.cr.bswatcher.com/script.js',
-          'data-website-id': 'f1439093-e84e-4c8b-92d8-0db2e3d7f2e4',
+          'data-website-id': '80e40b8a-37ec-46e1-ae9d-3749dc235c46',
           async: true,
           defer: true,
         }
