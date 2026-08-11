@@ -111,6 +111,7 @@ const items = computed(() => [
         slot: 'countries'
     },
     { label: 'Sources', href: '/sources' },
+    { label: 'About', href: '/about' },
     { label: 'Contact', href: '/contact' },
 ]);
 </script>

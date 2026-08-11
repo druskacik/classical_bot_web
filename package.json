@@ -16,8 +16,10 @@
     "db:query": "node agent_utils/search_db.js"
   },
   "dependencies": {
+    "@nuxt/content": "^3.15.2",
     "@nuxt/fonts": "^0.14.0",
     "@nuxt/ui": "^4.10.0",
+    "better-sqlite3": "^12.11.1",
     "dotenv": "^17.4.2",
     "knex": "^3.1.0",
     "nuxt": "^4.5.1",
