@@ -26,6 +26,7 @@ export default defineEventHandler(async () => {
         'cc.source_url',
       )
       .whereRaw('cc.date >= CURRENT_DATE')
+      .where('cc.inclusion_status', 'included')
       .whereNotNull('cc.source')
       .whereNotNull('cc.source_url')
       .whereRaw('COALESCE(direct_source.country_code, alias_source.country_code, cc.country_code_resolved) IS NOT NULL')

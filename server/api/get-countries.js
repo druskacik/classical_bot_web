@@ -6,6 +6,7 @@ export default defineEventHandler(async () => {
     const countries = await knex('classical_concert')
       .select('country_code_resolved')
       .whereRaw('date >= CURRENT_DATE')
+      .where('inclusion_status', 'included')
       .whereNotNull('country_code_resolved')
       .count('* as count')
       .groupBy('country_code_resolved')

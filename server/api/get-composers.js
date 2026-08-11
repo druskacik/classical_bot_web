@@ -18,6 +18,7 @@ export default defineEventHandler(async (event) => {
       .join('classical_concert_composer', 'composer.id', '=', 'classical_concert_composer.composer_id')
       .join('classical_concert', 'classical_concert.id', '=', 'classical_concert_composer.classical_concert_id')
       .whereRaw('classical_concert.date >= CURRENT_DATE')
+      .where('classical_concert.inclusion_status', 'included')
       .count('classical_concert_composer.composer_id as count')
       .groupBy('composer.name')
       .orderBy('count', 'desc')

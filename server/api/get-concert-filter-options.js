@@ -31,6 +31,7 @@ const parseCityValue = (value) => {
 
 const applyConcertScope = (builder, country) => {
   builder.whereRaw('cc.date >= CURRENT_DATE')
+  builder.where('cc.inclusion_status', 'included')
   if (country) builder.where('cc.country_code_resolved', country)
   return builder
 }
