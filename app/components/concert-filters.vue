@@ -47,7 +47,7 @@
       </label>
     </div>
 
-    <div class="mt-6 grid gap-6 border-t border-gray-100 pt-5 md:grid-cols-2">
+    <div class="mt-10 grid gap-6 md:grid-cols-2">
       <FilterAutocomplete
         type="composer"
         label="Composer"
