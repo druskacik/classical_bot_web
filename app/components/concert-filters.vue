@@ -68,7 +68,7 @@
 
     <div v-if="activeFilterCount" class="mt-8 flex items-center justify-between">
       <p class="text-xs text-gray-500">{{ activeFilterCount }} active {{ activeFilterCount === 1 ? 'filter' : 'filters' }}</p>
-      <button type="button" class="text-sm text-primary hover:underline" @click="$emit('clear')">Clear filters</button>
+      <button type="button" class="cursor-pointer text-sm text-primary hover:underline" @click="$emit('clear')">Clear filters</button>
     </div>
   </section>
 </template>
