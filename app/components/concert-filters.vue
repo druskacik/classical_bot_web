@@ -5,7 +5,7 @@
         <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Country</span>
         <select
           :value="country || ''"
-          class="h-11 w-full border-b border-gray-300 bg-transparent text-sm text-gray-900 outline-none focus:border-blue-600"
+          class="h-11 w-full border-b border-gray-300 bg-transparent text-sm text-gray-900 outline-none focus:border-primary"
           @change="update('country', $event.target.value || null)"
         >
           <option value="">All countries</option>
@@ -30,7 +30,7 @@
         <input
           type="date"
           :value="dateFrom || ''"
-          class="h-11 w-full border-b border-gray-300 bg-transparent text-sm text-gray-900 outline-none focus:border-blue-600"
+          class="h-11 w-full border-b border-gray-300 bg-transparent text-sm text-gray-900 outline-none focus:border-primary"
           @change="update('dateFrom', $event.target.value || null)"
         >
       </label>
@@ -41,7 +41,7 @@
           type="date"
           :min="dateFrom || undefined"
           :value="dateTo || ''"
-          class="h-11 w-full border-b border-gray-300 bg-transparent text-sm text-gray-900 outline-none focus:border-blue-600"
+          class="h-11 w-full border-b border-gray-300 bg-transparent text-sm text-gray-900 outline-none focus:border-primary"
           @change="update('dateTo', $event.target.value || null)"
         >
       </label>
@@ -68,7 +68,7 @@
 
     <div v-if="activeFilterCount" class="mt-8 flex items-center justify-between">
       <p class="text-xs text-gray-500">{{ activeFilterCount }} active {{ activeFilterCount === 1 ? 'filter' : 'filters' }}</p>
-      <button type="button" class="text-sm text-blue-700 hover:underline" @click="$emit('clear')">Clear filters</button>
+      <button type="button" class="text-sm text-primary hover:underline" @click="$emit('clear')">Clear filters</button>
     </div>
   </section>
 </template>

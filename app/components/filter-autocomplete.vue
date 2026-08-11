@@ -5,17 +5,17 @@
     </label>
 
     <div
-      class="flex min-h-11 flex-wrap items-center gap-1.5 border-b border-gray-300 bg-transparent py-1.5 focus-within:border-blue-600"
+      class="flex min-h-11 flex-wrap items-center gap-1.5 border-b border-gray-300 bg-transparent py-1.5 focus-within:border-primary"
     >
       <span
         v-for="option in selectedOptions"
         :key="option.value"
-        class="inline-flex max-w-full items-center rounded-full bg-blue-50 py-0.5 pl-2.5 pr-0.5 text-xs text-blue-800"
+        class="inline-flex max-w-full items-center rounded-full bg-primary/10 py-0.5 pl-2.5 pr-0.5 text-xs text-primary"
       >
         <span class="truncate">{{ optionChipLabel(option) }}</span>
         <button
           type="button"
-          class="ml-1 inline-flex size-7 shrink-0 items-center justify-center rounded-full text-base leading-none text-blue-500 transition-colors hover:bg-blue-100 hover:text-blue-800 focus:outline-none focus-visible:bg-blue-100 focus-visible:text-blue-800 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1 focus-visible:ring-offset-blue-50 active:bg-blue-200 [@media(pointer:coarse)]:size-11"
+          class="ml-1 inline-flex size-7 shrink-0 items-center justify-center rounded-full text-base leading-none text-primary/70 transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none focus-visible:bg-primary/10 focus-visible:text-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-white active:bg-primary/20 [@media(pointer:coarse)]:size-11"
           :aria-label="`Remove ${optionChipLabel(option)} filter`"
           @click="remove(option.value)"
         >

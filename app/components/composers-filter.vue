@@ -4,10 +4,10 @@
         <h3 class="text-lg font-serif mb-4">Filter by composer</h3>
         <div class="mt-4">
             <div class="w-full lg:w-3/5 relative composer-filter" ref="composerFilterRef">
-                <div class="flex flex-wrap gap-2 p-2 border border-gray-200 rounded-lg min-h-[42px] focus-within:border-blue-500">
-                    <div v-for="(composer, index) in value" :key="index" class="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-sm flex items-center">
+                <div class="flex flex-wrap gap-2 p-2 border border-gray-200 rounded-lg min-h-[42px] focus-within:border-primary">
+                    <div v-for="(composer, index) in value" :key="index" class="bg-primary/10 text-primary px-2 py-1 rounded-full text-sm flex items-center">
                         {{ composer }}
-                        <button @click="removeComposer(index)" class="ml-1 text-blue-500 hover:text-blue-700">
+                        <button @click="removeComposer(index)" class="ml-1 text-primary/70 hover:text-primary">
                             <span class="sr-only">Remove</span>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
