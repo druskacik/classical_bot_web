@@ -10,13 +10,13 @@
       <span
         v-for="option in selectedOptions"
         :key="option.value"
-        class="inline-flex max-w-full items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs text-blue-800"
+        class="inline-flex max-w-full items-center rounded-full bg-blue-50 py-0.5 pl-2.5 pr-0.5 text-xs text-blue-800"
       >
         <span class="truncate">{{ optionChipLabel(option) }}</span>
         <button
           type="button"
-          class="shrink-0 text-blue-500 hover:text-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-          :aria-label="`Remove ${optionChipLabel(option)}`"
+          class="ml-1 inline-flex size-7 shrink-0 items-center justify-center rounded-full text-base leading-none text-blue-500 transition-colors hover:bg-blue-100 hover:text-blue-800 focus:outline-none focus-visible:bg-blue-100 focus-visible:text-blue-800 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1 focus-visible:ring-offset-blue-50 active:bg-blue-200 [@media(pointer:coarse)]:size-11"
+          :aria-label="`Remove ${optionChipLabel(option)} filter`"
           @click="remove(option.value)"
         >
           <span aria-hidden="true">×</span>
