@@ -5,14 +5,12 @@ export default defineNuxtConfig({
   nitro: { compressPublicAssets: true },
   modules: ['@nuxt/ui', '@nuxt/content'],
   css: ['~/assets/css/main.css'],
-  colorMode: {
-    preference: 'light'
-  },
   ui: {
+    colorMode: false,
     theme: {
       colors: [
         'primary',
-        'secondary',  
+        'error',
         'red',
         'orange',
         'amber',
@@ -31,6 +29,9 @@ export default defineNuxtConfig({
         'pink',
         'rose',
       ]
+    },
+    experimental: {
+      componentDetection: true
     }
   },
   app: {
