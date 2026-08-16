@@ -19,6 +19,24 @@ npm run typecheck
 npm run build
 ```
 
+## Local Lighthouse audits
+
+Run Lighthouse against a production build of the current checkout:
+
+```bash
+npm run lighthouse
+```
+
+Audit a specific application route with:
+
+```bash
+npm run lighthouse -- --path=/slovakia
+```
+
+The command builds the application once, starts the production server locally, and runs three mobile and three desktop measurements. Complete JSON and HTML reports are written to `lighthouse-reports/mobile/` and `lighthouse-reports/desktop/`. The command reports collection failures, but it does not fail because of low scores.
+
+These are repeatable local lab measurements for troubleshooting code changes. They do not include the real-user Chrome UX Report data shown by PageSpeed Insights, and scores can vary slightly between runs.
+
 Run the built application with `node .output/server/index.mjs`.
 
 For read-only database inspection, use:

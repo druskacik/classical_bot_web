@@ -9,6 +9,7 @@
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
+    "lighthouse": "node agent_utils/run_lighthouse.mjs",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "typecheck": "nuxt prepare && vue-tsc -b --noEmit",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.121",
+    "@lhci/cli": "0.15.1",
     "typescript": "^6.0.3",
     "vue-tsc": "^3.3.9"
   },
