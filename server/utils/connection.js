@@ -14,6 +14,7 @@ const config = (environment) => {
         password: process.env.NUXT_DB_PASS,
         database: process.env.NUXT_DB_NAME,
         port: process.env.NUXT_DB_PORT,
+        application_name: 'classical-bot-web',
     },
     migrations: {
       directory: 'db/migrations'
