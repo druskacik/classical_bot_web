@@ -4,100 +4,60 @@
             <tbody class="divide-y divide-gray-200">
             <tr v-for="concert in concerts" :key="concert.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4">
-                    <!-- Mobile layout (flex column) -->
-                    <div class="lg:hidden flex flex-col gap-2">
-                        <div>
+                    <div class="grid gap-2 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-0">
+                        <div class="flex items-baseline gap-2 lg:block">
                             <span class="text-sm text-gray-900">{{ formatDate(concert.date) }}</span>
                             <time
                                 v-if="formatTime(concert.time_from)"
                                 :datetime="formatDateTime(concert.date, concert.time_from)"
-                                class="ml-2 text-sm tabular-nums text-gray-500"
+                                class="text-sm tabular-nums text-gray-500 lg:mt-1 lg:block"
                             >
                                 {{ formatTime(concert.time_from) }}
                             </time>
                         </div>
-                        <div class="flex flex-wrap gap-2">
-                            <NuxtLink :to="cityPath(concert)">
-                                <TableBadge :label="concert.city" variant="outline" />
-                            </NuxtLink>
-                            <NuxtLink v-if="showCountry" :to="getCountryPath(concert.country_code)">
-                                <TableBadge :label="getCountryName(concert.country_code)" variant="outline" />
-                            </NuxtLink>
+                        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-2">
                             <a
-                                v-if="concert.source_url"
-                                :href="concert.source_url"
+                                :href="concert.url"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                :aria-label="`Visit ${concert.source} website`"
+                                class="order-2 text-sm text-gray-900 font-medium hover:underline lg:order-1"
                             >
-                                <TableBadge :label="concert.source" />
-                            </a>
-                            <TableBadge v-else :label="concert.source" />
-                        </div>
-                        <div class="flex flex-wrap items-baseline">
-                            <a :href="concert.url" target="_blank" rel="noopener noreferrer" class="text-sm text-gray-900 font-medium hover:underline mr-2">
                                 {{ concert.title }}
                             </a>
-                            <span
-                                v-for="(composer, index) in concert.composers"
-                                :key="composer.id"
-                                :class="['inline-block', index < concert.composers.length - 1 && 'mr-1']"
-                            >
-                                <NuxtLink
-                                    :to="composerPath(composer.name)"
-                                    class="text-sm text-gray-500 font-medium hover:underline"
+                            <div class="order-1 flex w-full flex-wrap gap-2 lg:order-2 lg:w-auto">
+                                <NuxtLink :to="cityPath(concert)">
+                                    <TableBadge :label="concert.city" variant="outline" />
+                                </NuxtLink>
+                                <NuxtLink v-if="showCountry" :to="getCountryPath(concert.country_code)">
+                                    <TableBadge :label="getCountryName(concert.country_code)" variant="outline" />
+                                </NuxtLink>
+                                <a
+                                    v-if="concert.source_url"
+                                    :href="concert.source_url"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    :aria-label="`Visit ${concert.source} website`"
                                 >
-                                    {{ composer.name }}
-                                </NuxtLink><span v-if="index < concert.composers.length - 1" class="text-gray-500">,</span>
-                            </span>
+                                    <TableBadge :label="concert.source" />
+                                </a>
+                                <TableBadge v-else :label="concert.source" />
+                            </div>
+                            <div class="order-3 flex flex-wrap items-baseline">
+                                <span
+                                    v-for="(composer, index) in concert.composers"
+                                    :key="composer.id"
+                                    :class="['inline-block', index < concert.composers.length - 1 && 'mr-1']"
+                                >
+                                    <NuxtLink
+                                        :to="composerPath(composer.name)"
+                                        class="text-sm text-gray-500 font-medium hover:underline"
+                                    >
+                                        {{ composer.name }}
+                                    </NuxtLink><span v-if="index < concert.composers.length - 1" class="text-gray-500">,</span>
+                                </span>
+                            </div>
                         </div>
                     </div>
-
-                    <!-- Desktop layout (original) -->
-                    <div class="hidden lg:block">
-                        <span class="text-sm text-gray-900">{{ formatDate(concert.date) }}</span>
-                        <time
-                            v-if="formatTime(concert.time_from)"
-                            :datetime="formatDateTime(concert.date, concert.time_from)"
-                            class="mt-1 block text-sm tabular-nums text-gray-500"
-                        >
-                            {{ formatTime(concert.time_from) }}
-                        </time>
-                    </div>
-                </td>
-                <td class="px-6 py-4 hidden lg:table-cell">
-                    <a :href="concert.url" target="_blank" rel="noopener noreferrer" class="text-sm text-gray-900 font-medium hover:underline">
-                        {{ concert.title }}
-                    </a>
-                    <NuxtLink :to="cityPath(concert)" class="ml-2">
-                        <TableBadge :label="concert.city" variant="outline" />
-                    </NuxtLink>
-                    <NuxtLink v-if="showCountry" :to="getCountryPath(concert.country_code)" class="ml-2">
-                        <TableBadge :label="getCountryName(concert.country_code)" variant="outline" />
-                    </NuxtLink>
-                    <a
-                        v-if="concert.source_url"
-                        :href="concert.source_url"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="ml-2 mr-2 inline-block"
-                        :aria-label="`Visit ${concert.source} website`"
-                    >
-                        <TableBadge :label="concert.source" />
-                    </a>
-                    <TableBadge v-else class="ml-2 mr-2" :label="concert.source" />
-                    <span
-                        v-for="(composer, index) in concert.composers"
-                        :key="composer.id"
-                        :class="['inline-block', index < concert.composers.length - 1 && 'mr-1']"
-                    >
-                        <NuxtLink
-                            :to="composerPath(composer.name)"
-                            class="text-sm text-gray-500 font-medium hover:underline"
-                        >
-                            {{ composer.name }}
-                        </NuxtLink><span v-if="index < concert.composers.length - 1" class="text-gray-500">,</span>
-                    </span>
                 </td>
             </tr>
             </tbody>
