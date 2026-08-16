@@ -8,12 +8,6 @@
   </UApp>
 </template>
 
-<style>
-#app {
-font-family: 'Lato', sans-serif;
-}
-</style>
-
 <script setup lang="ts">
 useHead({
   htmlAttrs: {

@@ -75,7 +75,7 @@
       </div>
       <div v-else class="py-16 text-center">
         <p class="font-serif text-xl text-gray-800">No upcoming concerts match these filters.</p>
-        <button type="button" class="mt-3 cursor-pointer text-sm text-primary hover:underline" @click="clearFilters">Clear filters</button>
+        <button type="button" class="mt-3 cursor-pointer text-sm text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="clearFilters">Clear filters</button>
       </div>
     </div>
   </main>

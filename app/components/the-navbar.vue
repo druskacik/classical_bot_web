@@ -1,5 +1,5 @@
 <template>
-    <nav class="bg-white">
+    <nav class="bg-white" aria-label="Primary navigation">
         <div class="container mx-auto px-4">
             <div class="flex justify-between items-center h-16">
                 <NuxtLink
@@ -19,17 +19,28 @@
                 />
                 <!-- Mobile hamburger menu -->
                 <div class="md:hidden">
-                    <UButton 
-                        class="p-2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                    <UButton
+                        ref="menuButton"
+                        class="p-2 text-gray-500 hover:text-gray-700 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         @click="isMenuOpen = !isMenuOpen"
                         variant="link"
-                        aria-label="Menu"
+                        aria-label="Open menu"
+                        :aria-expanded="isMenuOpen"
+                        aria-controls="mobile-menu"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </UButton>
-                    <div v-if="isMenuOpen" class="fixed inset-0 bg-white z-50 overflow-y-auto">
+                    <div
+                        v-if="isMenuOpen"
+                        id="mobile-menu"
+                        class="fixed inset-0 z-50 overflow-y-auto bg-white"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Navigation menu"
+                        @keydown.escape="closeMenu"
+                    >
                         <div class="flex items-center justify-between border-b border-gray-100 p-4">
                             <NuxtLink
                                 to="/"
@@ -39,8 +50,9 @@
                                 <BrandLogo />
                             </NuxtLink>
                             <UButton
-                                class="text-gray-500 hover:text-gray-700 focus:outline-none"
-                                @click="isMenuOpen = false"
+                                ref="closeButton"
+                                class="text-gray-500 hover:text-gray-700 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                @click="closeMenu"
                                 variant="link"
                                 aria-label="Close menu"
                             >
@@ -84,16 +96,31 @@
 import { getCountryPath } from '~/utils/countries.js'
 
 const isMenuOpen = ref(false)
+const menuButton = ref(null)
+const closeButton = ref(null)
 
 const router = useRouter()
+const closeMenu = (restoreFocus = true) => {
+  isMenuOpen.value = false
+  if (restoreFocus) nextTick(() => menuButton.value?.$el?.focus())
+}
 
 // Close mobile menu when route changes
 watch(
   () => router.currentRoute.value.path,
   () => {
-    isMenuOpen.value = false
+    closeMenu(false)
   }
 )
+
+watch(isMenuOpen, (open) => {
+  document.body.style.overflow = open ? 'hidden' : ''
+  if (open) nextTick(() => closeButton.value?.$el?.focus())
+})
+
+onUnmounted(() => {
+  document.body.style.overflow = ''
+})
 
 
 const { data: countries } = await useAsyncData(

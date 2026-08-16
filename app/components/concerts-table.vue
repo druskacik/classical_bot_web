@@ -22,7 +22,7 @@
             :href="concert.url"
             target="_blank"
             rel="noopener noreferrer"
-            class="order-2 text-sm font-medium text-gray-900 hover:underline lg:order-1"
+            class="order-2 text-sm font-medium text-gray-900 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:order-1"
           >
             {{ concert.title }}
           </a>
@@ -54,7 +54,7 @@
               :key="composer.id"
               :to="composerPath(composer.name)"
               :prefetch="false"
-              class="composer-link inline-block py-0.5 text-sm font-medium text-gray-500 hover:underline"
+              class="composer-link inline-block py-0.5 text-sm font-medium text-gray-500 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               {{ composer.name }}
             </NuxtLink>

@@ -5,7 +5,7 @@
     </label>
 
     <div
-      class="flex min-h-11 flex-wrap items-center gap-1.5 border-b border-gray-300 bg-transparent py-1.5 focus-within:border-primary"
+      class="flex min-h-11 flex-wrap items-center gap-1.5 border-b border-gray-300 bg-transparent py-1.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25"
     >
       <span
         v-for="option in selectedOptions"
