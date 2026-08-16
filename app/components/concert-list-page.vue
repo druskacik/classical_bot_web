@@ -115,12 +115,16 @@ const requestParams = computed(() => ({
   page: filters.value.page > 1 ? filters.value.page : undefined,
 }))
 
-const { data: countries } = await useAsyncData('countries', () => $fetch('/api/get-countries'))
-const { data: concertPage, status: concertStatus } = await useAsyncData(
+const countriesRequest = useAsyncData('countries', () => $fetch('/api/get-countries'))
+const concertsRequest = useAsyncData(
   `concerts-${props.countryCode || 'all'}`,
   () => $fetch('/api/get-concerts', { params: requestParams.value }),
   { watch: [requestParams] },
 )
+const [
+  { data: countries },
+  { data: concertPage, status: concertStatus },
+] = await Promise.all([countriesRequest, concertsRequest])
 
 const groupedConcerts = computed(() => (concertPage.value?.items || []).reduce((groups, concert) => {
   const month = new Date(concert.date).toLocaleString('en-GB', { month: 'long', year: 'numeric' })

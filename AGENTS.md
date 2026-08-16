@@ -9,3 +9,4 @@ Nuxt 4 frontend for discovering upcoming classical-music concerts worldwide. Con
 - Run `npm run dev`, `npm run build`, and read-only SQL with `npm run db:query -- --query "SELECT ..." --format table`.
 - `.env` contains production credentials. Never open, print, or log it; let the runtime load it implicitly.
 - Keep the restrained light editorial design and English interface. The crawler/database remains the source of truth for concert and source data.
+- When unsure about Nuxt-specific setup, consult the docs via the Nuxt MCPs
