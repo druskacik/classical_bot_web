@@ -123,10 +123,7 @@ onUnmounted(() => {
 })
 
 
-const { data: countries } = await useAsyncData(
-    'countries',
-    () => $fetch('/api/get-countries'),
-)
+const { data: countries } = await useCountries()
 
 const items = computed(() => [
     {

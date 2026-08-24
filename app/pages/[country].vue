@@ -13,10 +13,7 @@ const requestedSlug = typeof route.params.country === 'string'
   ? route.params.country
   : null
 
-const { data: countries } = await useAsyncData(
-  'countries',
-  () => $fetch('/api/get-countries'),
-)
+const { data: countries } = await useCountries()
 
 const country = countries.value?.find(item => getCountrySlug(item.name) === requestedSlug)
 

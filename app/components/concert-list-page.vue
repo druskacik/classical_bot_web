@@ -115,7 +115,7 @@ const requestParams = computed(() => ({
   page: filters.value.page > 1 ? filters.value.page : undefined,
 }))
 
-const countriesRequest = useAsyncData('countries', () => $fetch('/api/get-countries'))
+const countriesRequest = useCountries()
 const concertsRequest = useAsyncData(
   `concerts-${props.countryCode || 'all'}`,
   () => $fetch('/api/get-concerts', { params: requestParams.value }),
