@@ -12,6 +12,7 @@
     "lighthouse": "node agent_utils/run_lighthouse.mjs",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
+    "test": "node --test",
     "typecheck": "nuxt prepare && vue-tsc -b --noEmit",
     "migrations": "knex migrate:latest",
     "db:query": "node agent_utils/search_db.js"

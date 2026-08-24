@@ -1,5 +1,6 @@
 import knex from '../utils/connection.js'
 import { getCountryName, normalizeCountryCode } from '../utils/countries.js'
+import { containsNormalizedText, normalizedLikePattern, normalizeSearchText } from '../utils/search-text.js'
 
 const OPTION_LIMIT = 20
 const OPTION_TYPES = new Set(['city', 'composer', 'work'])
@@ -36,7 +37,7 @@ const applyConcertScope = (builder, country) => {
   return builder
 }
 
-const cityQuery = (country, search, selectedOnly, selected) => {
+const cityQuery = (country, matchingCityIds, selectedOnly, selected) => {
   const selectedCity = selectedOnly ? parseCityValue(selected) : null
   const query = applyConcertScope(
     knex('classical_concert as cc')
@@ -62,12 +63,8 @@ const cityQuery = (country, search, selectedOnly, selected) => {
         .whereILike('canonical_city.english_name', selectedCity.name)
         .orWhereILike('canonical_city.local_name', selectedCity.name))
     }
-  } else if (search) {
-    query.where((citySearch) => {
-      citySearch
-        .whereILike('canonical_city.english_name', `%${search}%`)
-        .orWhereILike('canonical_city.local_name', `%${search}%`)
-    })
+  } else if (matchingCityIds) {
+    query.whereIn('canonical_city.id', matchingCityIds)
   }
 
   return query.orderBy('count', 'desc').orderBy('label', 'asc').limit(OPTION_LIMIT)
@@ -85,7 +82,7 @@ const composerQuery = (country, search, selectedOnly, selected) => {
   )
 
   if (selectedOnly) query.whereIn('c.name', selected)
-  else if (search) query.whereILike('c.name', `%${search}%`)
+  else if (search) query.whereILike('c.normalized_name', normalizedLikePattern(search))
 
   return query.orderBy('count', 'desc').orderBy('c.name', 'asc').limit(OPTION_LIMIT)
 }
@@ -108,7 +105,10 @@ const workQuery = (country, search, selectedOnly, selected) => {
 
   if (selectedOnly) query.whereIn('w.id', selected.map(Number).filter(Number.isSafeInteger))
   else if (search) {
-    query.where(inner => inner.whereILike('w.title', `%${search}%`).orWhereILike('c.name', `%${search}%`))
+    const pattern = normalizedLikePattern(search)
+    query.where(inner => inner
+      .whereILike('w.normalized_title', pattern)
+      .orWhereILike('c.normalized_name', pattern))
   }
 
   return query.orderBy('count', 'desc').orderBy('c.name', 'asc').orderBy('w.title', 'asc').limit(OPTION_LIMIT)
@@ -130,16 +130,34 @@ export default defineEventHandler(async (event) => {
 
     const searchValue = firstQueryValue(query.q)
     const search = typeof searchValue === 'string' ? searchValue.trim().slice(0, 100) : ''
+    const normalizedSearch = normalizeSearchText(search)
     const selected = type === 'city'
       ? (typeof firstQueryValue(query.selected) === 'string' ? firstQueryValue(query.selected).trim() : '')
       : parseSelected(query.selected)
-    const factory = type === 'city' ? cityQuery : type === 'composer' ? composerQuery : workQuery
+    let matchingCityIds = null
+    if (type === 'city' && normalizedSearch) {
+      const cityCandidates = knex('city').select('id', 'english_name', 'local_name')
+      if (country) cityCandidates.where('country_code', country)
+      matchingCityIds = (await cityCandidates)
+        .filter(city => containsNormalizedText(city.english_name, normalizedSearch)
+          || containsNormalizedText(city.local_name, normalizedSearch))
+        .map(city => city.id)
+    }
+
+    const factory = type === 'city'
+      ? (queryCountry, querySearch, selectedOnly, querySelected) => cityQuery(
+          queryCountry,
+          selectedOnly ? null : matchingCityIds,
+          selectedOnly,
+          querySelected,
+        )
+      : type === 'composer' ? composerQuery : workQuery
 
     const selectedQuery = type === 'city'
       ? (selected ? factory(country, '', true, selected) : null)
       : (selected.length ? factory(country, '', true, selected) : null)
     const [suggestions, selectedItems] = await Promise.all([
-      factory(country, search, false, selected),
+      factory(country, normalizedSearch, false, selected),
       selectedQuery || [],
     ])
 
