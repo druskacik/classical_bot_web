@@ -41,7 +41,7 @@
             Concert sources
           </h2>
           <p class="mt-2 text-sm leading-6 text-gray-600">
-            Websites represented in upcoming concert listings, grouped by country.
+            Websites represented in upcoming concert listings, grouped by their home country or international scope.
           </p>
         </div>
 
@@ -53,16 +53,21 @@
         </UAlert>
         <div v-else class="border-b border-gray-200">
           <section
-            v-for="country in sourceGroups"
-            :key="country.code"
+            v-for="section in sourceSections"
+            :key="section.key"
             class="grid gap-2 border-t border-gray-200 py-5 lg:grid-cols-[minmax(11rem,0.24fr)_1fr] lg:gap-10"
           >
-            <h3 class="font-serif text-xl text-gray-900">
-              {{ country.name }}
-            </h3>
+            <div>
+              <h3 class="font-serif text-xl text-gray-900">
+                {{ section.name }}
+              </h3>
+              <p v-if="section.description" class="mt-1 max-w-md text-sm leading-5 text-gray-600">
+                {{ section.description }}
+              </p>
+            </div>
 
             <ul class="grid gap-x-8 sm:grid-cols-2 xl:grid-cols-3">
-              <li v-for="source in country.sources" :key="`${source.name}-${source.url}`">
+              <li v-for="source in section.sources" :key="source.url">
                 <a
                   :href="source.url"
                   target="_blank"
@@ -93,7 +98,35 @@ useSeoMeta({
 })
 
 const {
-  data: sourceGroups,
+  data: sourceData,
   status,
 } = await useAsyncData('sources', () => $fetch('/api/get-sources'))
+
+const sourceSections = computed(() => {
+  const sections = []
+
+  if (sourceData.value?.internationalSources.length) {
+    sections.push({
+      key: 'international',
+      name: 'International sources',
+      description: 'Artists and organizations whose listings span multiple countries.',
+      sources: sourceData.value.internationalSources,
+    })
+  }
+
+  for (const country of sourceData.value?.countryGroups || []) {
+    sections.push({ ...country, key: country.code })
+  }
+
+  if (sourceData.value?.otherSources.length) {
+    sections.push({
+      key: 'other',
+      name: 'Other sources',
+      description: 'Sources not yet assigned to a geographic category.',
+      sources: sourceData.value.otherSources,
+    })
+  }
+
+  return sections
+})
 </script>
