@@ -27,6 +27,7 @@
         :id="inputId"
         v-model="search"
         type="search"
+        maxlength="100"
         autocomplete="off"
         :placeholder="selectedOptions.length ? 'Add another…' : placeholder"
         class="min-w-32 flex-1 bg-transparent py-1 text-sm text-gray-900 outline-none placeholder:text-gray-400"
@@ -34,23 +35,46 @@
         aria-autocomplete="list"
         :aria-expanded="open"
         :aria-controls="listboxId"
+        :aria-activedescendant="activeOptionId"
+        :aria-describedby="statusId"
         @focus="openOptions"
-        @keydown.escape="open = false"
+        @keydown.down.prevent="moveActiveOption(1)"
+        @keydown.up.prevent="moveActiveOption(-1)"
+        @keydown.enter.prevent="selectActiveOption"
+        @keydown.escape="closeOptions"
       >
     </div>
 
     <div
-      v-if="open"
+      v-if="open && loadError"
+      class="absolute z-20 mt-1 w-full border border-gray-200 bg-white px-3 py-3 text-sm text-gray-600 shadow-lg"
+    >
+      <p>Options could not be loaded.</p>
+      <button
+        type="button"
+        class="mt-1 cursor-pointer text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        @click="loadOptions"
+      >
+        Try again
+      </button>
+    </div>
+
+    <div
+      v-else-if="open"
       :id="listboxId"
       role="listbox"
       class="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto border border-gray-200 bg-white py-1 shadow-lg"
     >
       <button
-        v-for="option in availableOptions"
+        v-for="(option, index) in availableOptions"
         :key="option.value"
+        :id="optionId(index)"
         type="button"
         role="option"
-        class="flex w-full items-start justify-between gap-4 px-3 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+        :aria-selected="index === activeIndex"
+        :class="['flex w-full items-start justify-between gap-4 px-3 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none', index === activeIndex && 'bg-gray-50']"
+        tabindex="-1"
+        @mouseenter="activeIndex = index"
         @click="select(option)"
       >
         <span class="min-w-0">
@@ -66,6 +90,10 @@
         No matching options.
       </p>
     </div>
+
+    <p :id="statusId" class="sr-only" role="status" aria-live="polite">
+      {{ statusMessage }}
+    </p>
   </div>
 </template>
 
@@ -83,11 +111,14 @@ const root = ref(null)
 const search = ref('')
 const open = ref(false)
 const loading = ref(false)
+const loadError = ref(false)
 const options = ref([])
 const selectedOptions = ref([])
 const requestSequence = ref(0)
+const activeIndex = ref(-1)
 const inputId = useId()
 const listboxId = `${inputId}-listbox`
+const statusId = `${inputId}-status`
 let debounceTimer
 
 const availableOptions = computed(() => options.value.filter(
@@ -99,9 +130,20 @@ const optionChipLabel = (option) => {
   return option.secondaryLabel ? `${option.secondaryLabel} — ${option.label}` : option.label
 }
 
+const optionId = index => `${listboxId}-option-${index}`
+const activeOptionId = computed(() => activeIndex.value >= 0 ? optionId(activeIndex.value) : undefined)
+const statusMessage = computed(() => {
+  if (!open.value) return ''
+  if (loadError.value) return 'Options could not be loaded. Try again.'
+  if (loading.value) return 'Searching for options.'
+  const count = availableOptions.value.length
+  return count ? `${count} ${count === 1 ? 'option' : 'options'} available.` : 'No matching options.'
+})
+
 const loadOptions = async () => {
   const sequence = ++requestSequence.value
   loading.value = true
+  loadError.value = false
   try {
     const response = await $fetch('/api/get-concert-filter-options', {
       params: {
@@ -113,12 +155,18 @@ const loadOptions = async () => {
     })
     if (sequence !== requestSequence.value) return
 
-    options.value = response.items
+    const items = Array.isArray(response?.items) ? response.items : []
+    options.value = items
     const byValue = new Map([
       ...selectedOptions.value,
-      ...response.items,
+      ...items,
     ].map(option => [String(option.value), { ...option, value: String(option.value) }]))
     selectedOptions.value = props.modelValue.map(value => byValue.get(String(value))).filter(Boolean)
+    activeIndex.value = -1
+  } catch {
+    if (sequence !== requestSequence.value) return
+    loadError.value = true
+    activeIndex.value = -1
   } finally {
     if (sequence === requestSequence.value) loading.value = false
   }
@@ -129,12 +177,39 @@ const openOptions = () => {
   loadOptions()
 }
 
+const closeOptions = () => {
+  open.value = false
+  activeIndex.value = -1
+}
+
+const moveActiveOption = (direction) => {
+  if (!open.value) {
+    openOptions()
+    return
+  }
+  const count = availableOptions.value.length
+  if (!count) return
+  activeIndex.value = activeIndex.value < 0
+    ? (direction > 0 ? 0 : count - 1)
+    : (activeIndex.value + direction + count) % count
+  nextTick(() => document.getElementById(optionId(activeIndex.value))?.scrollIntoView({ block: 'nearest' }))
+}
+
+const selectActiveOption = () => {
+  if (!open.value) {
+    openOptions()
+    return
+  }
+  const option = availableOptions.value[activeIndex.value]
+  if (option) select(option)
+}
+
 const select = (option) => {
   const value = String(option.value)
   selectedOptions.value = [...selectedOptions.value, { ...option, value }]
   emit('update:modelValue', [...props.modelValue, value])
   search.value = ''
-  open.value = false
+  closeOptions()
 }
 
 const remove = (value) => {
@@ -142,15 +217,19 @@ const remove = (value) => {
 }
 
 const handleOutsideClick = (event) => {
-  if (root.value && !root.value.contains(event.target)) open.value = false
+  if (root.value && !root.value.contains(event.target)) closeOptions()
 }
 
 watch(search, () => {
   clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(loadOptions, 220)
+  if (open.value) debounceTimer = setTimeout(loadOptions, 220)
 })
 
-watch(() => [props.country, ...props.modelValue], () => loadOptions())
+watch(() => [props.country, ...props.modelValue], () => {
+  const selectedValues = new Set(props.modelValue.map(value => String(value)))
+  selectedOptions.value = selectedOptions.value.filter(option => selectedValues.has(String(option.value)))
+  if (open.value || props.modelValue.length) loadOptions()
+})
 
 onMounted(() => {
   document.addEventListener('click', handleOutsideClick)

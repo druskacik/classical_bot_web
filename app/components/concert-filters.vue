@@ -5,10 +5,11 @@
         <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Country</span>
         <select
           :value="country || ''"
+          :disabled="!countries.length"
           class="h-11 w-full border-b border-gray-300 bg-transparent text-sm text-gray-900 outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
           @change="update('country', $event.target.value || null)"
         >
-          <option value="">All countries</option>
+          <option value="">{{ countries.length ? 'All countries' : 'Countries unavailable' }}</option>
           <option v-for="item in countries" :key="item.code" :value="item.code">
             {{ item.name }} ({{ item.count }})
           </option>
@@ -29,6 +30,7 @@
         <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">From</span>
         <input
           type="date"
+          :max="dateTo || undefined"
           :value="dateFrom || ''"
           class="h-11 w-full border-b border-gray-300 bg-transparent text-sm text-gray-900 outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
           @change="update('dateFrom', $event.target.value || null)"
