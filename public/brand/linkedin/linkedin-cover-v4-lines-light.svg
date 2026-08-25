@@ -1,0 +1,30 @@
+<svg
+  width="4200"
+  height="700"
+  viewBox="0 0 4200 700"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <title>ClassicalBot LinkedIn cover, highlighted lines, light</title>
+  <defs>
+    <linearGradient id="paper" x1="0" y1="350" x2="4200" y2="350" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5F5F4"/>
+      <stop offset="1" stop-color="#FAFAF9"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="4200" height="700" fill="url(#paper)"/>
+
+  <path
+    d="M0 255.5H4200M0 350H4200M0 444.5H4200"
+    stroke="#D6D3D1"
+    stroke-width="9"
+  />
+
+  <path
+    d="M2450 255.5H2810M2395 350H2865M2450 444.5H2810"
+    stroke="#111827"
+    stroke-width="27"
+    stroke-linecap="round"
+  />
+</svg>
