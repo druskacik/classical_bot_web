@@ -85,6 +85,7 @@ const parseCity = (value) => {
 const applyFilters = (builder, filters) => {
   builder.whereRaw('cc.date >= CURRENT_DATE')
   builder.where('cc.inclusion_status', 'included')
+  builder.whereNull('cc.duplicate_of_id')
 
   if (filters.country) builder.where('cc.country_code_resolved', filters.country)
   if (filters.city?.id) builder.where('cc.city_id', filters.city.id)

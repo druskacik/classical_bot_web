@@ -7,6 +7,7 @@ export default defineEventHandler(async () => {
       .select('country_code_resolved')
       .whereRaw('date >= CURRENT_DATE')
       .where('inclusion_status', 'included')
+      .whereNull('duplicate_of_id')
       .whereNotNull('country_code_resolved')
       .count('* as count')
       .groupBy('country_code_resolved')
