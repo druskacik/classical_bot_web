@@ -3,8 +3,9 @@
 </template>
 
 <script setup>
-useSeoMeta({
+useConcertListSeo({
   title: 'ClassicalBot — Classical music concerts around the world',
   description: 'Discover upcoming classical music concerts around the world.',
+  canonicalPath: '/',
 })
 </script>

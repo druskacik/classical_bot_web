@@ -24,8 +24,9 @@ if (!country) {
   })
 }
 
-useSeoMeta({
+useConcertListSeo({
   title: `Classical music concerts in ${country.name} — ClassicalBot`,
   description: `Discover upcoming classical music concerts in ${country.name}.`,
+  canonicalPath: `/${requestedSlug}`,
 })
 </script>

@@ -28,7 +28,7 @@
           </a>
 
           <div class="order-1 flex w-full flex-wrap gap-2 lg:order-2 lg:w-auto">
-            <NuxtLink :to="cityPath(concert)" :prefetch="false">
+            <NuxtLink :to="cityPath(concert)" :prefetch="false" rel="nofollow">
               <span :class="badgeClasses(concert.city, 'outline')">{{ concert.city }}</span>
             </NuxtLink>
             <NuxtLink v-if="props.showCountry" :to="getCountryPath(concert.country_code)" :prefetch="false">
@@ -54,6 +54,7 @@
               :key="composer.id"
               :to="composerPath(composer.name)"
               :prefetch="false"
+              rel="nofollow"
               class="composer-link inline-block py-0.5 text-sm font-medium text-gray-500 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               {{ composer.name }}
