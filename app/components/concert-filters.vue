@@ -1,6 +1,6 @@
 <template>
-  <section aria-label="Concert filters" class="py-2">
-    <div :class="['grid gap-x-6 gap-y-4', fixedCountry || fixedCity ? 'md:grid-cols-2' : 'md:grid-cols-3']">
+  <section aria-label="Concert filters" :class="['py-2', fixedCity && 'md:grid md:grid-cols-3 md:items-start md:gap-x-6']">
+    <div :class="['grid gap-x-6 gap-y-4', fixedCity ? 'md:grid-cols-1' : fixedCountry ? 'md:grid-cols-2' : 'md:grid-cols-3']">
       <label v-if="!fixedCountry" class="block">
         <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Country</span>
         <select
@@ -56,7 +56,7 @@
       Composer or work
       <UIcon :name="musicExpanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" class="size-4" aria-hidden="true" />
     </button>
-    <div :id="musicId" :class="[musicExpanded ? 'grid' : 'hidden', 'mt-3 gap-5 md:mt-5 md:grid md:grid-cols-2']">
+    <div :id="musicId" :class="[musicExpanded ? 'grid' : 'hidden', 'mt-3 gap-5 md:grid md:grid-cols-2', fixedCity ? 'md:col-span-2 md:mt-0 md:gap-6' : 'md:mt-5']">
       <FilterAutocomplete
         type="composer"
         :context="optionContext"
@@ -81,7 +81,7 @@
       />
     </div>
 
-    <div v-if="activeFilterCount" class="mt-4 flex min-h-11 items-center justify-between">
+    <div v-if="activeFilterCount" class="mt-4 flex min-h-11 items-center justify-between" :class="fixedCity && 'md:col-span-3'">
       <p class="text-xs text-gray-500">{{ activeFilterCount }} active {{ activeFilterCount === 1 ? 'filter' : 'filters' }}</p>
       <button type="button" class="cursor-pointer text-sm text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="$emit('clear')">Clear filters</button>
     </div>
