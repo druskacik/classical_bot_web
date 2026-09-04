@@ -123,7 +123,6 @@ const BADGE_COLORS_BY_NIBBLE = [
 ]
 const dateFormatter = new Intl.DateTimeFormat('en-GB', {
   weekday: 'long',
-  year: 'numeric',
   month: 'long',
   day: 'numeric',
 })
