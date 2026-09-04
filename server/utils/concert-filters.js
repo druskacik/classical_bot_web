@@ -129,37 +129,37 @@ export const applyFilters = (builder, filters) => {
 }
 
 export const parseConcertFilters = (query) => {
-    const countryValue = firstQueryValue(query.country)
-    const country = countryValue ? normalizeCountryCode(countryValue) : null
-    if (countryValue && !country) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Country must be an ISO 3166-1 alpha-2 code',
-      })
-    }
+  const countryValue = firstQueryValue(query.country)
+  const country = countryValue ? normalizeCountryCode(countryValue) : null
+  if (countryValue && !country) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Country must be an ISO 3166-1 alpha-2 code',
+    })
+  }
 
-    const dateFrom = parseDate(query.dateFrom, 'Start date')
-    const dateTo = parseDate(query.dateTo, 'End date')
-    if (dateFrom && dateTo && dateFrom > dateTo) {
-      throw createError({ statusCode: 400, statusMessage: 'End date must not be before start date' })
-    }
+  const dateFrom = parseDate(query.dateFrom, 'Start date')
+  const dateTo = parseDate(query.dateTo, 'End date')
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    throw createError({ statusCode: 400, statusMessage: 'End date must not be before start date' })
+  }
 
-    const city = parseCity(query.city)
-    if (country && city?.country && country !== city.country) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'City country must match the selected country',
-      })
-    }
+  const city = parseCity(query.city)
+  if (country && city?.country && country !== city.country) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'City country must match the selected country',
+    })
+  }
 
-    return {
-      country,
-      city,
-      dateFrom,
-      dateTo,
-      composers: parseCommaSeparatedValues(query.composers),
-      works: parseWorkIds(query.works),
-    }
+  return {
+    country,
+    city,
+    dateFrom,
+    dateTo,
+    composers: parseCommaSeparatedValues(query.composers),
+    works: parseWorkIds(query.works),
+  }
 
 }
 

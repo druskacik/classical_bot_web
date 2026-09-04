@@ -53,7 +53,7 @@
       <button
         type="button"
         class="mt-1 cursor-pointer text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        @click="loadOptions"
+        @click.stop="loadOptions"
       >
         Try again
       </button>
