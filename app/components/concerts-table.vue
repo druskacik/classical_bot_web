@@ -28,7 +28,8 @@
           </a>
 
           <div class="order-1 flex w-full flex-wrap gap-2 lg:order-2 lg:w-auto">
-            <NuxtLink :to="cityPath(concert)" :prefetch="false" rel="nofollow">
+            <span v-if="props.currentCityId && String(concert.city_id) === props.currentCityId" :class="badgeClasses(concert.city, 'outline')">{{ concert.city }}</span>
+            <NuxtLink v-else :to="cityPath(concert)" :prefetch="false" :rel="concert.city_path ? undefined : 'nofollow'">
               <span :class="badgeClasses(concert.city, 'outline')">{{ concert.city }}</span>
             </NuxtLink>
             <NuxtLink v-if="props.showCountry" :to="getCountryPath(concert.country_code)" :prefetch="false">
@@ -147,6 +148,7 @@ const dateFormatter = new Intl.DateTimeFormat('en-GB', {
 })
 
 const props = defineProps({
+  currentCityId: { type: String, default: null },
   concerts: {
     type: Array,
     required: true,
@@ -202,7 +204,7 @@ const badgeClasses = (label, variant = 'solid') => {
   return `${BADGE_BASE_CLASSES} ${colorClasses}`
 }
 
-const cityPath = concert => ({
+const cityPath = concert => concert.city_path || ({
   path: route.path,
   query: {
     ...route.query,

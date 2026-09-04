@@ -9,6 +9,7 @@
 import { getCountrySlug } from '~/utils/countries.js'
 
 const route = useRoute()
+definePageMeta({ key: route => route.path })
 const requestedSlug = typeof route.params.country === 'string'
   ? route.params.country
   : null

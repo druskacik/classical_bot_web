@@ -1,6 +1,6 @@
 <template>
   <section aria-label="Concert filters" class="py-5">
-    <div class="grid gap-x-6 gap-y-5 md:grid-cols-2 lg:grid-cols-4">
+    <div :class="['grid gap-x-6 gap-y-5 md:grid-cols-2', !fixedCity && 'lg:grid-cols-4']">
       <label v-if="!fixedCountry" class="block">
         <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Country</span>
         <select
@@ -17,6 +17,7 @@
       </label>
 
       <FilterAutocomplete
+        v-if="!fixedCity"
         :class="fixedCountry && 'lg:col-span-2'"
         type="city"
         label="City"
@@ -52,6 +53,7 @@
     <div class="mt-10 grid gap-6 md:grid-cols-2">
       <FilterAutocomplete
         type="composer"
+        :city-id="fixedCity"
         label="Composer"
         placeholder="Search composers"
         :country="effectiveCountry"
@@ -60,6 +62,7 @@
       />
       <FilterAutocomplete
         type="work"
+        :city-id="fixedCity"
         label="Work"
         placeholder="Search works or composers"
         :country="effectiveCountry"
@@ -79,6 +82,7 @@
 const props = defineProps({
   countries: { type: Array, required: true },
   fixedCountry: { type: String, default: null },
+  fixedCity: { type: String, default: null },
   country: { type: String, default: null },
   city: { type: String, default: null },
   dateFrom: { type: String, default: null },
@@ -91,7 +95,7 @@ const emit = defineEmits(['update', 'clear'])
 const effectiveCountry = computed(() => props.fixedCountry || props.country || null)
 const activeFilterCount = computed(() => [
   !props.fixedCountry && props.country,
-  props.city,
+  !props.fixedCity && props.city,
   props.dateFrom,
   props.dateTo,
   ...props.composers,

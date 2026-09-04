@@ -1,21 +1,23 @@
 export const CLASSICALBOT_ORIGIN = 'https://classicalbot.com'
 
-export const getConcertListSeoState = ({ canonicalPath, query }) => {
+export const getConcertListSeoState = ({ canonicalPath, query, indexable = true }) => {
   const hasQuery = Object.keys(query || {}).length > 0
+  const allowIndex = !hasQuery && indexable
 
   return {
-    robots: hasQuery ? 'noindex, follow' : 'index, follow',
-    canonicalHref: hasQuery
+    robots: allowIndex ? 'index, follow' : 'noindex, follow',
+    canonicalHref: !allowIndex
       ? null
       : new URL(canonicalPath, CLASSICALBOT_ORIGIN).href,
   }
 }
 
-export const useConcertListSeo = ({ title, description, canonicalPath }) => {
+export const useConcertListSeo = ({ title, description, canonicalPath, indexable = true }) => {
   const route = useRoute()
   const seoState = computed(() => getConcertListSeoState({
-    canonicalPath,
+    canonicalPath: toValue(canonicalPath),
     query: route.query,
+    indexable: toValue(indexable),
   }))
 
   useSeoMeta({

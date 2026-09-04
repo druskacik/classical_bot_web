@@ -5,3 +5,5 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+Sitemap: https://classicalbot.com/sitemap.xml

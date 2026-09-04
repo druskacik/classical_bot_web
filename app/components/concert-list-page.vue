@@ -6,6 +6,7 @@
       <ConcertFilters
         :countries="countries || []"
         :fixed-country="countryCode"
+        :fixed-city="cityPage?.id || null"
         :country="filters.country"
         :city="filters.city"
         :date-from="filters.dateFrom"
@@ -27,7 +28,10 @@
         <UProgress animation="swing" />
       </div>
       <UAlert v-else-if="concertStatus === 'error'" class="mt-6" color="error" title="Concerts could not be loaded">
-        Please check the selected dates and try again.
+        <template #description>
+          Try again, or adjust the selected filters.
+          <button type="button" class="ml-2 underline" @click="refreshConcerts()">Retry</button>
+        </template>
       </UAlert>
       <div
         v-else-if="concertPage?.items.length"
@@ -36,7 +40,7 @@
       >
         <div v-for="(concertGroup, month) in groupedConcerts" :key="month" class="mt-9">
           <h2 class="mb-4 font-serif text-2xl capitalize text-gray-900">{{ month }}</h2>
-          <ConcertsTable :concerts="concertGroup" :show-country="!countryCode" />
+          <ConcertsTable :concerts="concertGroup" :show-country="!countryCode" :current-city-id="cityPage?.id || null" />
         </div>
 
         <nav v-if="concertPage.totalPages > 1" class="mt-10 flex items-center justify-center gap-1" aria-label="Concert pages">
@@ -74,8 +78,9 @@
         </nav>
       </div>
       <div v-else class="py-16 text-center">
-        <p class="font-serif text-xl text-gray-800">No upcoming concerts match these filters.</p>
-        <button type="button" class="mt-3 cursor-pointer text-sm text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="clearFilters">Clear filters</button>
+        <p class="font-serif text-xl text-gray-800">{{ cityPage && !hasRemovableFilters ? `No upcoming concerts listed in ${cityPage.name}.` : 'No upcoming concerts match these filters.' }}</p>
+        <button v-if="!cityPage || hasRemovableFilters" type="button" class="mt-3 cursor-pointer text-sm text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="clearFilters">Clear filters</button>
+        <NuxtLink v-else :to="cityParentPath" class="mt-3 inline-block text-sm text-primary hover:underline">Browse {{ cityParentPath === '/' ? 'all concerts' : `concerts in ${cityPage.countryName}` }}</NuxtLink>
       </div>
     </div>
   </main>
@@ -85,6 +90,7 @@
 const props = defineProps({
   title: { type: String, required: true },
   countryCode: { type: String, default: null },
+  cityPage: { type: Object, default: null },
 })
 
 const route = useRoute()
@@ -97,13 +103,17 @@ const listValue = value => typeof firstValue(value) === 'string'
 
 const filters = computed(() => ({
   country: props.countryCode || firstValue(route.query.country) || null,
-  city: firstValue(route.query.city) || null,
+  city: props.cityPage?.id || firstValue(route.query.city) || null,
   dateFrom: firstValue(route.query.dateFrom) || null,
   dateTo: firstValue(route.query.dateTo) || null,
   composers: listValue(route.query.composers),
   works: listValue(route.query.works),
   page: Number(firstValue(route.query.page)) || 1,
 }))
+
+const hasRemovableFilters = computed(() => Boolean(
+  filters.value.dateFrom || filters.value.dateTo || filters.value.composers.length || filters.value.works.length,
+))
 
 const requestParams = computed(() => ({
   country: filters.value.country || undefined,
@@ -117,14 +127,29 @@ const requestParams = computed(() => ({
 
 const countriesRequest = useCountries()
 const concertsRequest = useAsyncData(
-  `concerts-${props.countryCode || 'all'}`,
+  computed(() => `concerts:${JSON.stringify(requestParams.value)}`),
   () => $fetch('/api/get-concerts', { params: requestParams.value }),
-  { watch: [requestParams] },
 )
 const [
   { data: countries },
-  { data: concertPage, status: concertStatus },
+  { data: concertPage, status: concertStatus, error: concertError, refresh: refreshConcerts },
 ] = await Promise.all([countriesRequest, concertsRequest])
+
+const cityParentPath = computed(() => countries.value?.some(country => country.code === props.countryCode)
+  ? props.cityPage?.countryPath || '/'
+  : '/')
+
+if (props.cityPage) {
+  if (concertError.value) {
+    throw createError({ statusCode: concertError.value.statusCode || 500, statusMessage: 'Concerts could not be loaded' })
+  }
+  useConcertListSeo({
+    title: () => `${props.title} — ClassicalBot`,
+    description: () => `Discover upcoming classical music concerts in ${props.cityPage.name}, ${props.cityPage.countryName}.`,
+    canonicalPath: () => props.cityPage.path,
+    indexable: () => concertStatus.value === 'success' && (concertPage.value?.total || 0) > 0,
+  })
+}
 
 const groupedConcerts = computed(() => (concertPage.value?.items || []).reduce((groups, concert) => {
   const month = new Date(concert.date).toLocaleString('en-GB', { month: 'long', year: 'numeric' })

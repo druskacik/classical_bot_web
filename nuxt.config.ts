@@ -3,7 +3,13 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
   nitro: { compressPublicAssets: true },
-  modules: ['@nuxt/ui', '@nuxt/content'],
+  modules: ['@nuxt/ui', '@nuxt/content', '@nuxtjs/sitemap'],
+  site: { url: 'https://classicalbot.com' },
+  sitemap: {
+    excludeAppSources: true,
+    cacheMaxAgeSeconds: 3600,
+    autoLastmod: false,
+  },
   css: ['~/assets/css/main.css'],
   ui: {
     colorMode: false,

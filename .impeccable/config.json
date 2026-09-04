@@ -1,3 +1,18 @@
 {
-  "buildPath": "code"
+  "buildPath": "code",
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font-size",
+        "value": "0.875rem",
+        "files": [
+          "app/components/concert-list-page.vue"
+        ],
+        "createdAt": "2026-09-04T20:11:11.009Z",
+        "reason": "Existing pagination size is intentional; user approved narrowing this exception to its component."
+      }
+    ]
+  }
 }

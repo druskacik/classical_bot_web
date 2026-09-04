@@ -1,5 +1,7 @@
 import knex from '../utils/connection.js'
 import { normalizeCountryCode } from '../utils/countries.js'
+import { getCityCatalogue } from '../utils/city-catalogue.js'
+import { applyPublicConcertScope } from '../utils/public-concerts.js'
 
 const PAGE_SIZE = 50
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
@@ -83,11 +85,7 @@ const parseCity = (value) => {
 }
 
 const applyFilters = (builder, filters) => {
-  builder.whereRaw('cc.date >= CURRENT_DATE')
-  builder.where('cc.inclusion_status', 'included')
-  builder.whereNull('cc.duplicate_of_id')
-
-  if (filters.country) builder.where('cc.country_code_resolved', filters.country)
+  applyPublicConcertScope(builder, filters.country)
   if (filters.city?.id) builder.where('cc.city_id', filters.city.id)
   else if (filters.city?.name) {
     if (filters.city.country) {
@@ -202,7 +200,11 @@ export default defineEventHandler(async (event) => {
       .limit(PAGE_SIZE)
       .offset((page - 1) * PAGE_SIZE)
 
-    const [countRow, concerts] = await Promise.all([countQuery, itemQuery])
+    const [countRow, concerts, catalogue] = await Promise.all([countQuery, itemQuery, getCityCatalogue()])
+    const total = Number(countRow.total)
+    if (city?.id && page > Math.max(1, Math.ceil(total / PAGE_SIZE))) {
+      throw createError({ statusCode: 404, statusMessage: 'Concert page not found' })
+    }
     const concertIds = concerts.map(concert => concert.id)
     const composerRows = concertIds.length
       ? await knex('classical_concert_composer as ccc')
@@ -219,10 +221,10 @@ export default defineEventHandler(async (event) => {
       return groups
     }, {})
 
-    const total = Number(countRow.total)
     return {
       items: concerts.map(concert => ({
         ...concert,
+        city_path: catalogue.byId.get(String(concert.city_id))?.path || null,
         title: concert.title.replace(/\s+/g, ' '),
         composers: composersByConcert[concert.id] || [],
       })),

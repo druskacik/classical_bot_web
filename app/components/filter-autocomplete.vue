@@ -103,6 +103,7 @@ const props = defineProps({
   label: { type: String, required: true },
   placeholder: { type: String, required: true },
   country: { type: String, default: null },
+  cityId: { type: String, default: null },
   modelValue: { type: Array, required: true },
 })
 
@@ -149,6 +150,7 @@ const loadOptions = async () => {
       params: {
         type: props.type,
         country: props.country || undefined,
+        cityId: props.cityId || undefined,
         q: search.value || undefined,
         selected: props.modelValue.length ? props.modelValue.join(',') : undefined,
       },
@@ -161,7 +163,10 @@ const loadOptions = async () => {
       ...selectedOptions.value,
       ...items,
     ].map(option => [String(option.value), { ...option, value: String(option.value) }]))
-    selectedOptions.value = props.modelValue.map(value => byValue.get(String(value))).filter(Boolean)
+    selectedOptions.value = props.modelValue.map(value => byValue.get(String(value)) || {
+      value: String(value),
+      label: props.type === 'work' ? `Work ${value}` : String(value),
+    })
     activeIndex.value = -1
   } catch {
     if (sequence !== requestSequence.value) return
@@ -225,7 +230,7 @@ watch(search, () => {
   if (open.value) debounceTimer = setTimeout(loadOptions, 220)
 })
 
-watch(() => [props.country, ...props.modelValue], () => {
+watch(() => [props.country, props.cityId, ...props.modelValue], () => {
   const selectedValues = new Set(props.modelValue.map(value => String(value)))
   selectedOptions.value = selectedOptions.value.filter(option => selectedValues.has(String(option.value)))
   if (open.value || props.modelValue.length) loadOptions()

@@ -1,6 +1,8 @@
 import knex from '../utils/connection.js'
 import { getCountryName, normalizeCountryCode } from '../utils/countries.js'
 import { containsNormalizedText, normalizedLikePattern, normalizeSearchText } from '../utils/search-text.js'
+import { applyPublicConcertScope } from '../utils/public-concerts.js'
+import { getCityCatalogue } from '../utils/city-catalogue.js'
 
 const OPTION_LIMIT = 20
 const OPTION_TYPES = new Set(['city', 'composer', 'work'])
@@ -30,13 +32,7 @@ const parseCityValue = (value) => {
   return name ? { id: null, name, country } : null
 }
 
-const applyConcertScope = (builder, country) => {
-  builder.whereRaw('cc.date >= CURRENT_DATE')
-  builder.where('cc.inclusion_status', 'included')
-  builder.whereNull('cc.duplicate_of_id')
-  if (country) builder.where('cc.country_code_resolved', country)
-  return builder
-}
+const applyConcertScope = applyPublicConcertScope
 
 const cityQuery = (country, matchingCityIds, selectedOnly, selected) => {
   const selectedCity = selectedOnly ? parseCityValue(selected) : null
@@ -71,7 +67,7 @@ const cityQuery = (country, matchingCityIds, selectedOnly, selected) => {
   return query.orderBy('count', 'desc').orderBy('label', 'asc').limit(OPTION_LIMIT)
 }
 
-const composerQuery = (country, search, selectedOnly, selected) => {
+const composerQuery = (country, search, selectedOnly, selected, cityId = null) => {
   const query = applyConcertScope(
     knex('classical_concert as cc')
       .join('classical_concert_composer as ccc', 'ccc.classical_concert_id', 'cc.id')
@@ -80,6 +76,7 @@ const composerQuery = (country, search, selectedOnly, selected) => {
       .countDistinct('cc.id as count')
       .groupBy('c.name'),
     country,
+    cityId,
   )
 
   if (selectedOnly) query.whereIn('c.name', selected)
@@ -88,7 +85,7 @@ const composerQuery = (country, search, selectedOnly, selected) => {
   return query.orderBy('count', 'desc').orderBy('c.name', 'asc').limit(OPTION_LIMIT)
 }
 
-const workQuery = (country, search, selectedOnly, selected) => {
+const workQuery = (country, search, selectedOnly, selected, cityId = null) => {
   const query = applyConcertScope(
     knex('classical_concert as cc')
       .join('classical_concert_work as ccw', 'ccw.classical_concert_id', 'cc.id')
@@ -102,6 +99,7 @@ const workQuery = (country, search, selectedOnly, selected) => {
       .countDistinct('cc.id as count')
       .groupBy('w.id', 'w.title', 'c.name'),
     country,
+    cityId,
   )
 
   if (selectedOnly) query.whereIn('w.id', selected.map(Number).filter(Number.isSafeInteger))
@@ -124,9 +122,21 @@ export default defineEventHandler(async (event) => {
     }
 
     const countryValue = firstQueryValue(query.country)
-    const country = countryValue ? normalizeCountryCode(countryValue) : null
+    let country = countryValue ? normalizeCountryCode(countryValue) : null
     if (countryValue && !country) {
       throw createError({ statusCode: 400, statusMessage: 'Country must be an ISO 3166-1 alpha-2 code' })
+    }
+
+    const cityId = firstQueryValue(query.cityId)
+    if (cityId !== undefined) {
+      if (typeof cityId !== 'string' || !/^[1-9]\d*$/.test(cityId)) {
+        throw createError({ statusCode: 400, statusMessage: 'City ID must be a positive integer' })
+      }
+      const city = (await getCityCatalogue()).byId.get(cityId)
+      if (!city || (country && country !== city.countryCode)) {
+        throw createError({ statusCode: 400, statusMessage: 'City must match the selected country' })
+      }
+      country = city.countryCode
     }
 
     const searchValue = firstQueryValue(query.q)
@@ -152,7 +162,7 @@ export default defineEventHandler(async (event) => {
           selectedOnly,
           querySelected,
         )
-      : type === 'composer' ? composerQuery : workQuery
+      : (...args) => (type === 'composer' ? composerQuery : workQuery)(...args, cityId)
 
     const selectedQuery = type === 'city'
       ? (selected ? factory(country, '', true, selected) : null)
