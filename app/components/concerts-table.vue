@@ -3,10 +3,10 @@
     <li
       v-for="concert in props.concerts"
       :key="concert.id"
-      class="px-6 py-4 hover:bg-gray-50"
+      class="px-4 py-4 sm:px-6 hover:bg-gray-50"
     >
       <div class="grid gap-2 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-0">
-        <div class="flex items-baseline gap-2 lg:block">
+        <div class="flex flex-wrap items-baseline gap-x-2 lg:block">
           <span class="text-sm text-gray-900">{{ formatDate(concert.date) }}</span>
           <time
             v-if="formatTime(concert.time_from)"
@@ -17,22 +17,23 @@
           </time>
         </div>
 
-        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-2">
+        <div class="min-w-0 space-y-2 [overflow-wrap:anywhere]">
           <a
             :href="concert.url"
             target="_blank"
             rel="noopener noreferrer"
-            class="order-2 text-sm font-medium text-gray-900 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:order-1"
+            class="block text-base font-medium text-gray-900 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             {{ concert.title }}
+            <span class="sr-only"> (opens in a new tab)</span>
           </a>
 
-          <div class="order-1 flex w-full flex-wrap gap-2 lg:order-2 lg:w-auto">
+          <div class="flex flex-wrap items-start gap-2">
             <span v-if="props.currentCityId && String(concert.city_id) === props.currentCityId" :class="badgeClasses(concert.city, 'outline')">{{ concert.city }}</span>
             <NuxtLink v-else :to="cityPath(concert)" :prefetch="false" :rel="concert.city_path ? undefined : 'nofollow'">
               <span :class="badgeClasses(concert.city, 'outline')">{{ concert.city }}</span>
             </NuxtLink>
-            <NuxtLink v-if="props.showCountry" :to="getCountryPath(concert.country_code)" :prefetch="false">
+            <NuxtLink v-if="props.showCountry" :to="countryPath(concert.country_code)" :prefetch="false">
               <span :class="badgeClasses(getCountryName(concert.country_code), 'outline')">
                 {{ getCountryName(concert.country_code) }}
               </span>
@@ -49,7 +50,7 @@
             <span v-else :class="badgeClasses(concert.source)">{{ concert.source }}</span>
           </div>
 
-          <div class="order-3 flex flex-wrap items-baseline">
+          <div class="flex flex-wrap items-baseline">
             <NuxtLink
               v-for="composer in concert.composers"
               :key="composer.id"
@@ -68,30 +69,10 @@
 </template>
 
 <script setup>
-import { getCountryName, getCountryPath } from '~/utils/countries.js'
+import { getCountryName } from '~/utils/countries.js'
+import { concertCityLocation, concertCountryLocation, concertComposerLocation } from '~/utils/concert-discovery.js'
 
 const BADGE_BASE_CLASSES = 'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium'
-const BADGE_SOLID_CLASSES = {
-  primary: 'bg-primary text-inverted',
-  error: 'bg-error text-inverted',
-  red: 'bg-red text-inverted',
-  orange: 'bg-orange text-inverted',
-  amber: 'bg-amber text-inverted',
-  yellow: 'bg-yellow text-inverted',
-  lime: 'bg-lime text-inverted',
-  green: 'bg-green text-inverted',
-  emerald: 'bg-emerald text-inverted',
-  teal: 'bg-teal text-inverted',
-  cyan: 'bg-cyan text-inverted',
-  sky: 'bg-sky text-inverted',
-  blue: 'bg-blue text-inverted',
-  indigo: 'bg-indigo text-inverted',
-  violet: 'bg-violet text-inverted',
-  purple: 'bg-purple text-inverted',
-  fuchsia: 'bg-fuchsia text-inverted',
-  pink: 'bg-pink text-inverted',
-  rose: 'bg-rose text-inverted',
-}
 const BADGE_OUTLINE_CLASSES = {
   primary: 'text-primary ring ring-inset ring-primary/50',
   error: 'text-error ring ring-inset ring-error/50',
@@ -161,16 +142,6 @@ const props = defineProps({
 
 const route = useRoute()
 
-const selectedComposers = computed(() => {
-  const value = Array.isArray(route.query.composers)
-    ? route.query.composers[0]
-    : route.query.composers
-
-  return typeof value === 'string'
-    ? value.split(',').map(item => item.trim()).filter(Boolean)
-    : []
-})
-
 const formatTime = (timeString) => {
   if (typeof timeString !== 'string') return null
 
@@ -200,29 +171,13 @@ const badgeClasses = (label, variant = 'solid') => {
   const color = badgeColor(label)
   const colorClasses = variant === 'outline'
     ? BADGE_OUTLINE_CLASSES[color]
-    : BADGE_SOLID_CLASSES[color]
+    : 'bg-gray-100 text-gray-700'
   return `${BADGE_BASE_CLASSES} ${colorClasses}`
 }
 
-const cityPath = concert => concert.city_path || ({
-  path: route.path,
-  query: {
-    ...route.query,
-    city: concert.country_code ? `${concert.city},${concert.country_code}` : concert.city,
-    page: undefined,
-  },
-})
-
-const composerPath = composer => ({
-  path: route.path,
-  query: {
-    ...route.query,
-    composers: Array.from(new Set([
-      ...selectedComposers.value,
-      composer,
-    ])).join(','),
-  },
-})
+const cityPath = concert => concertCityLocation(route.query, concert)
+const countryPath = country => concertCountryLocation(route.query, country)
+const composerPath = composer => concertComposerLocation(route, composer)
 
 </script>
 

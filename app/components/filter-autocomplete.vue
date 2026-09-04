@@ -29,7 +29,7 @@
         type="search"
         maxlength="100"
         autocomplete="off"
-        :placeholder="selectedOptions.length ? 'Add another…' : placeholder"
+        :placeholder="selectedOptions.length ? (type === 'city' ? 'Change city…' : 'Add another…') : placeholder"
         class="min-w-32 flex-1 bg-transparent py-1 text-sm text-gray-900 outline-none placeholder:text-gray-400"
         role="combobox"
         aria-autocomplete="list"
@@ -83,7 +83,7 @@
             {{ option.secondaryLabel }}
           </span>
         </span>
-        <span class="shrink-0 pt-0.5 text-xs tabular-nums text-gray-400">{{ option.count }}</span>
+        <span v-if="showCount" class="shrink-0 pt-0.5 text-xs tabular-nums text-gray-400">{{ option.count }}</span>
       </button>
       <p v-if="loading" class="px-3 py-3 text-sm text-gray-500">Searching…</p>
       <p v-else-if="!availableOptions.length" class="px-3 py-3 text-sm text-gray-500">
@@ -104,6 +104,7 @@ const props = defineProps({
   placeholder: { type: String, required: true },
   country: { type: String, default: null },
   cityId: { type: String, default: null },
+  showCount: { type: Boolean, default: true },
   modelValue: { type: Array, required: true },
 })
 

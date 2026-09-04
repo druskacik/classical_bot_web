@@ -1,8 +1,8 @@
 <template>
-  <main class="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
+  <main class="container mx-auto px-4 py-5 sm:py-8 sm:px-6 lg:px-8">
     <h1 class="mx-auto max-w-4xl text-center font-serif text-3xl text-gray-950 sm:text-4xl">{{ title }}</h1>
 
-    <div class="mx-auto mt-8 max-w-6xl">
+    <div class="mx-auto mt-5 max-w-6xl">
       <ConcertFilters
         :countries="countries || []"
         :fixed-country="countryCode"
@@ -11,13 +11,14 @@
         :city="filters.city"
         :date-from="filters.dateFrom"
         :date-to="filters.dateTo"
+        :date-preset="filters.datePreset"
         :composers="filters.composers"
         :works="filters.works"
         @update="updateFilter"
         @clear="clearFilters"
       />
 
-      <div ref="resultsHeading" class="mt-8 flex min-h-8 items-center justify-between gap-4" tabindex="-1">
+      <div ref="resultsHeading" class="mt-3 flex min-h-8 items-center justify-between gap-4" tabindex="-1">
         <p v-if="concertPage" class="text-sm text-gray-600" aria-live="polite">
           {{ resultSummary }}
         </p>
@@ -38,7 +39,7 @@
         :class="['transition-opacity duration-200', concertStatus === 'pending' ? 'opacity-55' : 'opacity-100']"
         :aria-busy="concertStatus === 'pending'"
       >
-        <div v-for="(concertGroup, month) in groupedConcerts" :key="month" class="mt-9">
+        <div v-for="(concertGroup, month) in groupedConcerts" :key="month" class="mt-4 sm:mt-6">
           <h2 class="mb-4 font-serif text-2xl capitalize text-gray-900">{{ month }}</h2>
           <ConcertsTable :concerts="concertGroup" :show-country="!countryCode" :current-city-id="cityPage?.id || null" />
         </div>
@@ -79,6 +80,10 @@
       </div>
       <div v-else class="py-16 text-center">
         <p class="font-serif text-xl text-gray-800">{{ cityPage && !hasRemovableFilters ? `No upcoming concerts listed in ${cityPage.name}.` : 'No upcoming concerts match these filters.' }}</p>
+        <div class="mt-3 flex flex-wrap justify-center gap-x-6 gap-y-2">
+          <button v-if="filters.dateFrom || filters.dateTo" type="button" class="min-h-11 cursor-pointer text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" @click="updateFilter({ changes: { dateFrom: null, dateTo: null } })">Try any date</button>
+          <button v-if="filters.composers.length || filters.works.length" type="button" class="min-h-11 cursor-pointer text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" @click="updateFilter({ changes: { composers: [], works: [] } })">Remove music filters</button>
+        </div>
         <button v-if="!cityPage || hasRemovableFilters" type="button" class="mt-3 cursor-pointer text-sm text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="clearFilters">Clear filters</button>
         <NuxtLink v-else :to="cityParentPath" class="mt-3 inline-block text-sm text-primary hover:underline">Browse {{ cityParentPath === '/' ? 'all concerts' : `concerts in ${cityPage.countryName}` }}</NuxtLink>
       </div>
@@ -87,6 +92,7 @@
 </template>
 
 <script setup>
+import { cleanConcertQuery, updateConcertQuery } from '~/utils/concert-discovery.js'
 const props = defineProps({
   title: { type: String, required: true },
   countryCode: { type: String, default: null },
@@ -106,6 +112,7 @@ const filters = computed(() => ({
   city: props.cityPage?.id || firstValue(route.query.city) || null,
   dateFrom: firstValue(route.query.dateFrom) || null,
   dateTo: firstValue(route.query.dateTo) || null,
+  datePreset: firstValue(route.query.datePreset) || null,
   composers: listValue(route.query.composers),
   works: listValue(route.query.works),
   page: Number(firstValue(route.query.page)) || 1,
@@ -179,20 +186,8 @@ const paginationItems = computed(() => {
   return items
 })
 
-const cleanQuery = (query) => Object.fromEntries(
-  Object.entries(query).filter(([, value]) => value !== undefined && value !== null && value !== ''),
-)
-
-const updateFilter = async ({ key, value }) => {
-  const queryKey = key === 'country' ? 'country' : key
-  await router.push({
-    query: cleanQuery({
-      ...route.query,
-      [queryKey]: Array.isArray(value) ? (value.length ? value.join(',') : undefined) : value || undefined,
-      page: undefined,
-      ...(key === 'country' ? { city: undefined } : {}),
-    }),
-  })
+const updateFilter = async ({ key, value, changes }) => {
+  await router.push({ query: updateConcertQuery(route.query, changes || { [key]: value }) })
 }
 
 const clearFilters = async () => {
@@ -202,7 +197,7 @@ const clearFilters = async () => {
 const goToPage = async (page) => {
   if (page < 1 || page > (concertPage.value?.totalPages || 1) || page === concertPage.value?.page) return
   await router.push({
-    query: cleanQuery({ ...route.query, page: page === 1 ? undefined : String(page) }),
+    query: cleanConcertQuery({ ...route.query, page: page === 1 ? undefined : String(page) }),
   })
   await nextTick()
   resultsHeading.value?.focus({ preventScroll: true })
