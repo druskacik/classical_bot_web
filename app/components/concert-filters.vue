@@ -5,20 +5,23 @@
         <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Country</span>
         <select
           :value="country || ''"
-          :disabled="!countries.length"
+          :disabled="countriesLoading || countriesError"
           class="h-11 w-full border-b border-gray-300 bg-transparent text-sm text-gray-900 outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
           @change="update('country', $event.target.value || null)"
         >
-          <option value="">{{ countries.length ? 'All countries' : 'Countries unavailable' }}</option>
+          <option value="">{{ countriesLoading ? 'Loading countries…' : countriesError ? 'Countries unavailable' : 'All countries' }}</option>
           <option v-for="item in countries" :key="item.code" :value="item.code">
-            {{ item.name }} ({{ item.count }})
+            {{ item.name }}{{ item.count == null ? '' : ` (${item.count})` }}
           </option>
+          <option v-if="!countriesLoading && !countriesError && !countries.length" disabled>No matching countries</option>
         </select>
+        <span v-if="countriesError" class="mt-2 block text-xs text-gray-600">Countries could not be loaded. <button type="button" class="cursor-pointer text-primary underline" @click="$emit('retry-countries')">Try again</button></span>
       </label>
 
       <FilterAutocomplete
         v-if="!fixedCity"
         type="city"
+        :context="optionContext"
         label="City"
         placeholder="Any city"
         :country="effectiveCountry"
@@ -56,6 +59,7 @@
     <div :id="musicId" :class="[musicExpanded ? 'grid' : 'hidden', 'mt-3 gap-5 md:mt-5 md:grid md:grid-cols-2']">
       <FilterAutocomplete
         type="composer"
+        :context="optionContext"
         :show-count="false"
         :city-id="fixedCity"
         label="Composer"
@@ -66,6 +70,7 @@
       />
       <FilterAutocomplete
         type="work"
+        :context="optionContext"
         :show-count="false"
         :city-id="fixedCity"
         label="Work"
@@ -88,6 +93,8 @@ import { concertDatePreset, formatConcertDateRange, resolveConcertDateMode } fro
 
 const props = defineProps({
   countries: { type: Array, required: true },
+  countriesLoading: Boolean,
+  countriesError: Boolean,
   fixedCountry: { type: String, default: null },
   fixedCity: { type: String, default: null },
   country: { type: String, default: null },
@@ -99,7 +106,7 @@ const props = defineProps({
   works: { type: Array, required: true },
 })
 
-const emit = defineEmits(['update', 'clear'])
+const emit = defineEmits(['update', 'clear', 'retry-countries'])
 const musicId = useId()
 const musicExpanded = ref(Boolean(props.composers.length || props.works.length))
 watch(() => [props.composers.join(','), props.works.join(',')], () => {
@@ -121,6 +128,13 @@ const selectDateMode = (mode) => {
   chosenDateMode.value = { mode, ...range }
   emit('update', { changes: { ...range, datePreset: ['today', 'week', 'weekend'].includes(mode) ? mode : null } })
 }
+const optionContext = computed(() => ({
+  city: props.fixedCity || props.city || undefined,
+  dateFrom: props.dateFrom || undefined,
+  dateTo: props.dateTo || undefined,
+  composers: props.composers.join(',') || undefined,
+  works: props.works.join(',') || undefined,
+}))
 const effectiveCountry = computed(() => props.fixedCountry || props.country || null)
 const activeFilterCount = computed(() => [
   !props.fixedCountry && props.country,

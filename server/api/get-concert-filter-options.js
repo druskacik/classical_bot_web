@@ -1,192 +1,94 @@
 import knex from '../utils/connection.js'
-import { getCountryName, normalizeCountryCode } from '../utils/countries.js'
+import { getCountryName } from '../utils/countries.js'
 import { containsNormalizedText, normalizedLikePattern, normalizeSearchText } from '../utils/search-text.js'
-import { applyPublicConcertScope } from '../utils/public-concerts.js'
+import { applyFilters, facetFilters, parseCity, parseConcertFilters } from '../utils/concert-filters.js'
 import { getCityCatalogue } from '../utils/city-catalogue.js'
 
 const OPTION_LIMIT = 20
-const OPTION_TYPES = new Set(['city', 'composer', 'work'])
-const firstQueryValue = value => Array.isArray(value) ? value[0] : value
-
-const parseSelected = value => {
-  const queryValue = firstQueryValue(value)
-  return typeof queryValue === 'string'
-    ? [...new Set(queryValue.split(',').map(item => item.trim()).filter(Boolean))]
-    : []
-}
-
-const parseCityValue = (value) => {
-  if (typeof value !== 'string' || !value.trim()) return null
-  const city = value.trim()
-  if (/^\d+$/.test(city)) {
-    const id = Number(city)
-    return Number.isSafeInteger(id) && id > 0 ? { id, name: null, country: null } : null
-  }
-
-  const separator = city.lastIndexOf(',')
-  if (separator === -1) return { id: null, name: city, country: null }
-
-  const name = city.slice(0, separator).trim()
-  const country = normalizeCountryCode(city.slice(separator + 1).trim())
-  if (!country) return { id: null, name: city, country: null }
-  return name ? { id: null, name, country } : null
-}
-
-const applyConcertScope = applyPublicConcertScope
-
-const cityQuery = (country, matchingCityIds, selectedOnly, selected) => {
-  const selectedCity = selectedOnly ? parseCityValue(selected) : null
-  const query = applyConcertScope(
-    knex('classical_concert as cc')
-      .join('city as canonical_city', 'canonical_city.id', 'cc.city_id')
-      .select(
-        selectedOnly
-          ? knex.raw('?::text as value', [selected])
-          : knex.raw("canonical_city.english_name || ',' || canonical_city.country_code as value"),
-        knex.raw('canonical_city.english_name as label'),
-        'canonical_city.country_code',
-      )
-      .count('* as count')
-      .groupBy('canonical_city.english_name', 'canonical_city.country_code'),
-    country,
-  )
-
-  if (selectedOnly) {
-    if (!selectedCity) return null
-    if (selectedCity.id) query.where('canonical_city.id', selectedCity.id)
-    else {
-      if (selectedCity.country) query.where('canonical_city.country_code', selectedCity.country)
-      query.where(cityMatch => cityMatch
-        .whereILike('canonical_city.english_name', selectedCity.name)
-        .orWhereILike('canonical_city.local_name', selectedCity.name))
-    }
-  } else if (matchingCityIds) {
-    query.whereIn('canonical_city.id', matchingCityIds)
-  }
-
-  return query.orderBy('count', 'desc').orderBy('label', 'asc').limit(OPTION_LIMIT)
-}
-
-const composerQuery = (country, search, selectedOnly, selected, cityId = null) => {
-  const query = applyConcertScope(
-    knex('classical_concert as cc')
-      .join('classical_concert_composer as ccc', 'ccc.classical_concert_id', 'cc.id')
-      .join('composer as c', 'c.id', 'ccc.composer_id')
-      .select(knex.raw('c.name as value'), knex.raw('c.name as label'))
-      .countDistinct('cc.id as count')
-      .groupBy('c.name'),
-    country,
-    cityId,
-  )
-
-  if (selectedOnly) query.whereIn('c.name', selected)
-  else if (search) query.whereILike('c.normalized_name', normalizedLikePattern(search))
-
-  return query.orderBy('count', 'desc').orderBy('c.name', 'asc').limit(OPTION_LIMIT)
-}
-
-const workQuery = (country, search, selectedOnly, selected, cityId = null) => {
-  const query = applyConcertScope(
-    knex('classical_concert as cc')
-      .join('classical_concert_work as ccw', 'ccw.classical_concert_id', 'cc.id')
-      .join('work as w', 'w.id', 'ccw.work_id')
-      .join('composer as c', 'c.id', 'w.composer_id')
-      .select(
-        knex.raw('w.id::text as value'),
-        knex.raw('w.title as label'),
-        knex.raw('c.name as "secondaryLabel"'),
-      )
-      .countDistinct('cc.id as count')
-      .groupBy('w.id', 'w.title', 'c.name'),
-    country,
-    cityId,
-  )
-
-  if (selectedOnly) query.whereIn('w.id', selected.map(Number).filter(Number.isSafeInteger))
-  else if (search) {
-    const pattern = normalizedLikePattern(search)
-    query.where(inner => inner
-      .whereILike('w.normalized_title', pattern)
-      .orWhereILike('c.normalized_name', pattern))
-  }
-
-  return query.orderBy('count', 'desc').orderBy('c.name', 'asc').orderBy('w.title', 'asc').limit(OPTION_LIMIT)
-}
+const first = value => Array.isArray(value) ? value[0] : value
 
 export default defineEventHandler(async (event) => {
   try {
     const query = getQuery(event)
-    const type = firstQueryValue(query.type)
-    if (!OPTION_TYPES.has(type)) {
-      throw createError({ statusCode: 400, statusMessage: 'Type must be city, composer, or work' })
+    const type = first(query.type)
+    if (!['country', 'city', 'composer', 'work'].includes(type)) {
+      throw createError({ statusCode: 400, statusMessage: 'Type must be country, city, composer, or work' })
     }
-
-    const countryValue = firstQueryValue(query.country)
-    let country = countryValue ? normalizeCountryCode(countryValue) : null
-    if (countryValue && !country) {
-      throw createError({ statusCode: 400, statusMessage: 'Country must be an ISO 3166-1 alpha-2 code' })
-    }
-
-    const cityId = firstQueryValue(query.cityId)
-    if (cityId !== undefined) {
-      if (typeof cityId !== 'string' || !/^[1-9]\d*$/.test(cityId)) {
+    const filters = parseConcertFilters(query)
+    // Retain the canonical-city parameter used by existing API callers.
+    if (query.cityId !== undefined) {
+      const id = first(query.cityId)
+      if (typeof id !== 'string' || !/^[1-9]\d*$/.test(id)) {
         throw createError({ statusCode: 400, statusMessage: 'City ID must be a positive integer' })
       }
-      const city = (await getCityCatalogue()).byId.get(cityId)
-      if (!city || (country && country !== city.countryCode)) {
+      const city = (await getCityCatalogue()).byId.get(id)
+      if (!city || (filters.country && filters.country !== city.countryCode)) {
         throw createError({ statusCode: 400, statusMessage: 'City must match the selected country' })
       }
-      country = city.countryCode
+      filters.country = city.countryCode
+      if (!filters.city) filters.city = parseCity(id)
     }
-
-    const searchValue = firstQueryValue(query.q)
-    const search = typeof searchValue === 'string' ? searchValue.trim().slice(0, 100) : ''
-    const normalizedSearch = normalizeSearchText(search)
-    const selected = type === 'city'
-      ? (typeof firstQueryValue(query.selected) === 'string' ? firstQueryValue(query.selected).trim() : '')
-      : parseSelected(query.selected)
-    let matchingCityIds = null
-    if (type === 'city' && normalizedSearch) {
-      const cityCandidates = knex('city').select('id', 'english_name', 'local_name')
-      if (country) cityCandidates.where('country_code', country)
-      matchingCityIds = (await cityCandidates)
-        .filter(city => containsNormalizedText(city.english_name, normalizedSearch)
-          || containsNormalizedText(city.local_name, normalizedSearch))
-        .map(city => city.id)
-    }
-
-    const factory = type === 'city'
-      ? (queryCountry, querySearch, selectedOnly, querySelected) => cityQuery(
-          queryCountry,
-          selectedOnly ? null : matchingCityIds,
-          selectedOnly,
-          querySelected,
-        )
-      : (...args) => (type === 'composer' ? composerQuery : workQuery)(...args, cityId)
-
-    const selectedQuery = type === 'city'
-      ? (selected ? factory(country, '', true, selected) : null)
-      : (selected.length ? factory(country, '', true, selected) : null)
-    const [suggestions, selectedItems] = await Promise.all([
-      factory(country, normalizedSearch, false, selected),
-      selectedQuery || [],
-    ])
-
-    const items = [...selectedItems, ...suggestions].reduce((unique, item) => {
-      if (!unique.some(candidate => candidate.value === item.value)) {
-        unique.push({
-          ...item,
-          count: Number(item.count),
-          secondaryLabel: type === 'city' && !country ? getCountryName(item.country_code) : item.secondaryLabel,
-        })
+    const context = facetFilters(filters, type)
+    const search = normalizeSearchText(String(first(query.q) || '').trim().slice(0, 100))
+    const selectedText = String(first(query.selected) || '').trim()
+    const selected = type === 'city' ? (selectedText ? [selectedText] : []) : selectedText.split(',').filter(Boolean)
+    const base = () => applyFilters(knex('classical_concert as cc')
+      .leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), context)
+    let suggestions
+    let labels = []
+    if (type === 'country') {
+      const rows = await base().select('cc.country_code_resolved as value')
+        .whereNotNull('cc.country_code_resolved').countDistinct('cc.id as count').groupBy('cc.country_code_resolved')
+      suggestions = rows.map(row => ({ ...row, label: getCountryName(row.value) }))
+      labels = selected.map(value => ({ value, label: getCountryName(value) }))
+    } else if (type === 'city') {
+      const cities = await knex('city').select('id', 'english_name', 'local_name', 'country_code')
+      const candidates = cities.filter(city => (!context.country || city.country_code === context.country)
+        && (!search || containsNormalizedText(city.english_name, search) || containsNormalizedText(city.local_name, search)))
+      suggestions = await base().whereIn('canonical_city.id', candidates.map(city => city.id))
+        .select(knex.raw("canonical_city.english_name || ',' || canonical_city.country_code as value"), 'canonical_city.english_name as label', 'canonical_city.country_code')
+        .countDistinct('cc.id as count').groupBy('canonical_city.english_name', 'canonical_city.country_code')
+        .orderBy('count', 'desc').orderBy('label').limit(OPTION_LIMIT)
+      for (const value of selected) {
+        const parsed = parseCity(value)
+        const city = cities.find(city => parsed?.id ? Number(city.id) === parsed.id :
+          (!parsed?.country || city.country_code === parsed.country) &&
+          [city.english_name, city.local_name].some(name => name?.toLowerCase() === parsed?.name?.toLowerCase()))
+        if (city) {
+          const row = await applyFilters(knex('classical_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), { ...context, city: parsed }).countDistinct('cc.id as count').first()
+          labels.push({ value, label: city.english_name, country_code: city.country_code, count: Number(row.count) })
+        } else labels.push({ value, label: parsed?.name || value })
       }
-      return unique
-    }, [])
-
-    return { items: items.slice(0, OPTION_LIMIT + selectedItems.length) }
+    } else {
+      const music = builder => type === 'composer'
+        ? builder.join('classical_concert_composer as ccc', 'ccc.classical_concert_id', 'cc.id').join('composer as c', 'c.id', 'ccc.composer_id')
+        : builder.join('classical_concert_work as ccw', 'ccw.classical_concert_id', 'cc.id').join('work as w', 'w.id', 'ccw.work_id').join('composer as c', 'c.id', 'w.composer_id')
+      const fields = type === 'composer' ? ['c.name as value', 'c.name as label'] : [knex.raw('w.id::text as value'), 'w.title as label', 'c.name as secondaryLabel']
+      const grouped = () => music(base()).select(...fields).countDistinct('cc.id as count')
+        .groupBy(...(type === 'composer' ? ['c.name'] : ['w.id', 'w.title', 'c.name']))
+      const matching = grouped()
+      if (search) matching.where(inner => {
+        inner.whereILike('c.normalized_name', normalizedLikePattern(search))
+        if (type === 'work') inner.orWhereILike('w.normalized_title', normalizedLikePattern(search))
+      })
+      suggestions = await matching.orderBy('count', 'desc').orderBy('label').limit(OPTION_LIMIT)
+      if (selected.length) {
+        const values = type === 'composer' ? selected : selected.map(Number).filter(id => Number.isSafeInteger(id) && id > 0)
+        const key = type === 'composer' ? 'c.name' : 'w.id'
+        const identities = type === 'composer' ? knex('composer as c') : knex('work as w').join('composer as c', 'c.id', 'w.composer_id')
+        const [identitiesRows, counts] = await Promise.all([identities.select(...fields).whereIn(key, values), grouped().whereIn(key, values)])
+        labels = identitiesRows.map(row => ({ ...row, count: Number(counts.find(item => item.value === row.value)?.count || 0) }))
+      }
+    }
+    const items = new Map(suggestions.map(item => [String(item.value), { ...item, value: String(item.value), count: Number(item.count) }]))
+    for (const label of labels) if (!items.has(String(label.value))) items.set(String(label.value), { ...label, value: String(label.value), count: label.count || 0 })
+    const result = [...items.values()].map(item => ({ ...item,
+      ...(type === 'city' && !context.country ? { secondaryLabel: getCountryName(item.country_code) } : {}),
+    }))
+    if (type === 'country') result.sort((a, b) => a.label.localeCompare(b.label, 'en'))
+    return { items: result }
   } catch (error) {
     if (error.statusCode) throw error
-
     console.error('Error fetching concert filter options:', error)
     throw createError({ statusCode: 500, statusMessage: 'Failed to fetch filter options' })
   }

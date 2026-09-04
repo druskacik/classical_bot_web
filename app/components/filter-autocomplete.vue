@@ -104,6 +104,7 @@ const props = defineProps({
   placeholder: { type: String, required: true },
   country: { type: String, default: null },
   cityId: { type: String, default: null },
+  context: { type: Object, default: () => ({}) },
   showCount: { type: Boolean, default: true },
   modelValue: { type: Array, required: true },
 })
@@ -144,11 +145,14 @@ const statusMessage = computed(() => {
 
 const loadOptions = async () => {
   const sequence = ++requestSequence.value
+  options.value = []
+  activeIndex.value = -1
   loading.value = true
   loadError.value = false
   try {
     const response = await $fetch('/api/get-concert-filter-options', {
       params: {
+        ...props.context,
         type: props.type,
         country: props.country || undefined,
         cityId: props.cityId || undefined,
@@ -227,11 +231,21 @@ const handleOutsideClick = (event) => {
 }
 
 watch(search, () => {
-  clearTimeout(debounceTimer)
+  invalidateOptions()
   if (open.value) debounceTimer = setTimeout(loadOptions, 220)
 })
 
-watch(() => [props.country, props.cityId, ...props.modelValue], () => {
+const invalidateOptions = () => {
+  clearTimeout(debounceTimer)
+  requestSequence.value++
+  options.value = []
+  activeIndex.value = -1
+  loading.value = false
+  loadError.value = false
+}
+
+watch(() => JSON.stringify([props.context, props.country, props.cityId, props.modelValue]), () => {
+  invalidateOptions()
   const selectedValues = new Set(props.modelValue.map(value => String(value)))
   selectedOptions.value = selectedOptions.value.filter(option => selectedValues.has(String(option.value)))
   if (open.value || props.modelValue.length) loadOptions()
@@ -243,7 +257,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  clearTimeout(debounceTimer)
+  invalidateOptions()
   document.removeEventListener('click', handleOutsideClick)
 })
 </script>

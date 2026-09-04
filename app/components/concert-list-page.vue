@@ -4,7 +4,10 @@
 
     <div class="mx-auto mt-5 max-w-6xl">
       <ConcertFilters
-        :countries="countries || []"
+        :countries="filterCountries"
+        :countries-loading="countryOptionsStatus === 'pending'"
+        :countries-error="countryOptionsStatus === 'error'"
+        @retry-countries="refreshCountryOptions()"
         :fixed-country="countryCode"
         :fixed-city="cityPage?.id || null"
         :country="filters.country"
@@ -141,6 +144,24 @@ const [
   { data: countries },
   { data: concertPage, status: concertStatus, error: concertError, refresh: refreshConcerts },
 ] = await Promise.all([countriesRequest, concertsRequest])
+
+const countryOptionParams = computed(() => ({
+  type: 'country',
+  dateFrom: requestParams.value.dateFrom,
+  dateTo: requestParams.value.dateTo,
+  composers: requestParams.value.composers,
+  works: requestParams.value.works,
+  selected: filters.value.country || undefined,
+}))
+const { data: countryOptions, status: countryOptionsStatus, refresh: refreshCountryOptions } = await useAsyncData(
+  computed(() => `country-options:${JSON.stringify(countryOptionParams.value)}`),
+  () => props.countryCode ? Promise.resolve({ items: [] }) : $fetch('/api/get-concert-filter-options', { params: countryOptionParams.value }),
+)
+const filterCountries = computed(() => {
+  if (countryOptionsStatus.value === 'success') return (countryOptions.value?.items || []).map(item => ({ code: item.value, name: item.label, count: item.count }))
+  const selected = countries.value?.find(item => item.code === filters.value.country)
+  return selected ? [{ ...selected, count: null }] : []
+})
 
 const cityParentPath = computed(() => countries.value?.some(country => country.code === props.countryCode)
   ? props.cityPage?.countryPath || '/'
