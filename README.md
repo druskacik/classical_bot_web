@@ -47,11 +47,14 @@ The root Nuxt application remains the ClassicalBot website. It extends the local
 are unchanged.
 
 - `layers/concerts/app/`: concert components, composables, discovery utilities,
-  and the existing editorial styles and Nuxt UI theme.
+  and the shared editorial styles and Nuxt UI theme. `SiteNavbar`, `BrandLogo`,
+  `BrandMark`, `SiteFooter`, and `EditorialArticle` provide both sites' common
+  presentation. App wrappers supply navigation items, brand names, and translated
+  labels; article pages supply their content and optional metadata.
 - `layers/concerts/server/`: concert APIs, database connections/models, filtering,
   and the cached city catalogue.
 - `layers/concerts/shared/`: city identity and canonical path construction.
-- Root `app/`, `content/`, and `public/`: ClassicalBot pages, navigation, branding,
+- Root `app/`, `content/`, and `public/`: ClassicalBot pages, navigation data,
   editorial content, and public assets.
 - Root `nuxt.config.ts`, `site.config.js`, and sitemap helpers/plugin: site identity,
   analytics, content module, and the global site's sitemap policy.
