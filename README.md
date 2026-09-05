@@ -125,8 +125,51 @@ international platforms that contribute those concerts. City pages use Slovak
 names and dates. The shared UI provides English and Slovak copy without changing
 concert titles or composer names from the database.
 
-These commands do not deploy either app. The existing Dockerfile still builds
-ClassicalBot; switching the live classical.sk deployment is a separate step.
+These commands do not deploy either app. Switching the live classical.sk
+deployment is a separate step.
+
+## CapRover deployments
+
+Both CapRover apps use this repository as their build context. In each app's
+Deployment tab, select the corresponding **Captain Definition Path**:
+
+| Website | Captain Definition Path | Dockerfile |
+| --- | --- | --- |
+| classicalbot.com | `./captain-definition` | `Dockerfile` |
+| classical.sk | `./captain-definition-classical-sk` | `Dockerfile.classical-sk` |
+
+CapRover supports separate definitions for apps in one repository; all Dockerfile
+paths are relative to the repository root. See the
+[CapRover monorepo documentation](https://caprover.com/docs/captain-definition-file.html#monorepos).
+
+For each existing CapRover app:
+
+- Use the same repository and intended release branch, with the definition path
+  from the table. Keep the existing custom domain and HTTPS settings.
+- Set **Container HTTP Port** to `3000` for both apps. The Slovak development
+  port `3001` is only a local convenience.
+- Supply `NUXT_DB_HOST`, `NUXT_DB_PORT`, `NUXT_DB_NAME`, `NUXT_DB_USER`, and
+  `NUXT_DB_PASS` as runtime environment variables in CapRover. Preserve the
+  existing database configuration; these values are not build arguments.
+- If using automatic repository deployments, configure the generated webhook
+  for each app separately. A shared-code push must trigger both apps to update
+  both websites.
+
+Each multi-stage image installs from the root lockfile and builds one application.
+The final image contains only that app's `.output`, runs as the `node` user, and
+listens on `0.0.0.0:3000`. No `.env` file is copied into either image, and no
+database migration runs during build or startup. Content is bundled with the
+application; these frontends do not require persistent volumes.
+
+To build the images locally from the repository root:
+
+```bash
+docker build -f Dockerfile -t classicalbot-web:local .
+docker build -f Dockerfile.classical-sk -t classical-sk-web:local .
+```
+
+Deploy each image to its matching app: the domain alone does not select the site
+variant. These files do not change the live CapRover settings or trigger a deploy.
 
 For read-only database inspection, use:
 
