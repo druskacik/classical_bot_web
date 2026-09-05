@@ -40,6 +40,94 @@ These are repeatable local lab measurements for troubleshooting code changes. Th
 
 Run the built application with `node .output/server/index.mjs`.
 
+## Shared concert foundation
+
+The root Nuxt application remains the ClassicalBot website. It extends the local
+`layers/concerts` layer; development, build, Docker, and deployment entry points
+are unchanged.
+
+- `layers/concerts/app/`: concert components, composables, discovery utilities,
+  and the existing editorial styles and Nuxt UI theme.
+- `layers/concerts/server/`: concert APIs, database connections/models, filtering,
+  and the cached city catalogue.
+- `layers/concerts/shared/`: city identity and canonical path construction.
+- Root `app/`, `content/`, and `public/`: ClassicalBot pages, navigation, branding,
+  editorial content, and public assets.
+- Root `nuxt.config.ts`, `site.config.js`, and sitemap helpers/plugin: site identity,
+  analytics, content module, and the global site's sitemap policy.
+- `apps/classical-sk/`: the Slovak application, with its own routes, content,
+  navigation, metadata, analytics, and sitemap.
+
+The shared layer has no page routes or sitemap plugin. A consuming application
+defines its own pages and sets `appConfig.concertSite.name` and
+`appConfig.concertSite.origin` (see `app/app.config.ts`). The origin is required
+for concert canonical URLs; it has no fallback to another website. Nuxt's root
+application can override layer components and configuration.
+
+Imports of layer-owned files use relative paths. Application code can use
+`#layers/concerts/...`; plain Node tests use relative filesystem imports. Avoid
+`~/` and `#shared/` for layer-owned files because those aliases resolve to the
+consuming application.
+
+The `#concert-site` module alias supplies build-time locale, country scope, and
+city route policy. The layer defaults to the English global application; the
+Slovak app overrides it with `apps/classical-sk/site.config.js`. This is fixed per
+application build, not chosen by a query parameter or incoming hostname. All
+listing, facet, country, city, composer, and source queries enforce that scope.
+Facet exclusions cannot remove it. Each process has its own city cache.
+
+## Run both websites locally
+
+Install dependencies once at the repository root with Node.js 24 and `npm ci`.
+Use two terminals, both at the repository root:
+
+```bash
+# Global website: http://localhost:3000
+npm run dev
+```
+
+```bash
+# Slovak website: http://localhost:3001
+npm run dev:sk
+```
+
+Both commands load the existing root `.env` through the runtime. Do not copy it
+into the Slovak app. The apps have separate build directories and can run at the
+same time. Override ports with `-- --port 3002` if necessary.
+
+For production-mode local testing:
+
+```bash
+npm run build
+npm run build:sk
+npm run preview -- --port 3000
+# In another terminal:
+npm run preview:sk
+```
+
+The global output remains `.output`; Slovak output is
+`apps/classical-sk/.output`. `npm run typecheck` checks the global app;
+`npm run typecheck:sk` checks the Slovak app; `npm test` checks shared behavior,
+geographic restrictions, URL identity, sitemap scope, and translations.
+With both servers running, `npm run test:sites` exercises pages and APIs on ports
+3000 and 3001 (override with `GLOBAL_SITE_URL` and `SLOVAK_SITE_URL`).
+
+The Slovak routes are `/`, `/<local city name>` (including accents and spaces),
+`/kontakt`, `/zdroje`, `/blog`, and `/blog/<slug>`. Known unresolved city names from
+historical Slovak concerts remain routable, such as `/Pezinok`; arbitrary and
+foreign city names return 404. Legacy `?skladatelia=...` links redirect to
+`?composers=...`, preserving the city and other filters. The original article is
+stored in `apps/classical-sk/content/o-projekte.md`. Add new article URLs to
+`apps/classical-sk/shared/utils/sitemap-inventory.js` when adding content.
+
+The Slovak source list is generated from public upcoming Slovak concerts, including
+international platforms that contribute those concerts. City pages use Slovak
+names and dates. The shared UI provides English and Slovak copy without changing
+concert titles or composer names from the database.
+
+These commands do not deploy either app. The existing Dockerfile still builds
+ClassicalBot; switching the live classical.sk deployment is a separate step.
+
 For read-only database inspection, use:
 
 ```bash

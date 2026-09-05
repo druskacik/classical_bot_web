@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildCityCatalogue } from '../shared/utils/city-catalogue.js'
+import { buildCityCatalogue } from '../layers/concerts/shared/utils/city-catalogue.js'
 import { CITY_SITEMAP_MIN_CONCERTS } from '../shared/utils/sitemap-inventory.js'
-import { getConcertListSeoState } from '../app/composables/useConcertListSeo.js'
+import { getConcertListSeoState } from '../layers/concerts/app/composables/useConcertListSeo.js'
 
 const city = (id, english_name, country_code = 'CZ') => ({ id, english_name, country_code, local_name: english_name })
 
@@ -35,10 +35,10 @@ test('inventory never participates in URL identity', () => {
 
 test('index eligibility and sitemap promotion have independent boundaries', () => {
   for (const count of [0, 1, 9, 10]) {
-    const state = getConcertListSeoState({ canonicalPath: '/czechia/prague', query: {}, indexable: count > 0 })
+    const state = getConcertListSeoState({ origin: 'https://classicalbot.com', canonicalPath: '/czechia/prague', query: {}, indexable: count > 0 })
     assert.equal(state.robots, count === 0 ? 'noindex, follow' : 'index, follow')
     assert.equal(state.canonicalHref, count === 0 ? null : 'https://classicalbot.com/czechia/prague')
     assert.equal(count >= CITY_SITEMAP_MIN_CONCERTS, count === 10)
-    assert.equal(getConcertListSeoState({ canonicalPath: '/czechia/prague', query: { page: '2' }, indexable: count > 0 }).canonicalHref, null)
+    assert.equal(getConcertListSeoState({ origin: 'https://classicalbot.com', canonicalPath: '/czechia/prague', query: { page: '2' }, indexable: count > 0 }).canonicalHref, null)
   }
 })

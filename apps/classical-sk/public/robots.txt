@@ -1,0 +1,9 @@
+# Crawlers are welcome. ClaudeBot supports this non-standard delay directive.
+User-agent: ClaudeBot
+Crawl-delay: 5
+Allow: /
+
+User-agent: *
+Allow: /
+
+Sitemap: https://classical.sk/sitemap.xml

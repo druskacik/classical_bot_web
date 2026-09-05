@@ -15,7 +15,12 @@
     "test": "node --test",
     "typecheck": "nuxt prepare && vue-tsc -b --noEmit",
     "migrations": "knex migrate:latest",
-    "db:query": "node agent_utils/search_db.js"
+    "db:query": "node agent_utils/search_db.js",
+    "dev:sk": "nuxt dev apps/classical-sk --dotenv ../../.env --port 3001",
+    "build:sk": "nuxt build apps/classical-sk --dotenv ../../.env",
+    "preview:sk": "nuxt preview apps/classical-sk --dotenv ../../.env --port 3001",
+    "typecheck:sk": "nuxt prepare apps/classical-sk && vue-tsc -b apps/classical-sk/tsconfig.json --noEmit",
+    "test:sites": "node agent_utils/check_sites.mjs"
   },
   "dependencies": {
     "@nuxt/content": "^3.15.2",

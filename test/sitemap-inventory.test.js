@@ -1,9 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import knex from 'knex'
-import { buildCityCatalogue } from '../shared/utils/city-catalogue.js'
+import { buildCityCatalogue } from '../layers/concerts/shared/utils/city-catalogue.js'
 import { buildSitemapInventory } from '../shared/utils/sitemap-inventory.js'
-import { applyPublicConcertScope } from '../server/utils/public-concerts.js'
+import { applyPublicConcertScope } from '../layers/concerts/server/utils/public-concerts.js'
 
 test('sitemap includes only explicit pages, current countries, and matching cities with 10+ concerts', () => {
   const catalogue = buildCityCatalogue([0, 1, 9, 10].map((count, id) => ({

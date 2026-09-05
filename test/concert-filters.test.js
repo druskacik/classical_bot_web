@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import knex from 'knex'
-import { applyFilters, facetFilters, parseConcertFilters } from '../server/utils/concert-filters.js'
+import { applyFilters, facetFilters, parseConcertFilters } from '../layers/concerts/server/utils/concert-filters.js'
 
 globalThis.createError = details => Object.assign(new Error(details.statusMessage), details)
 const db = knex({ client: 'pg' })

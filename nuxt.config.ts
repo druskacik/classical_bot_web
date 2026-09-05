@@ -1,44 +1,13 @@
-// https://nuxt.com/docs/api/configuration/nuxt-config
+import { classicalBotSite } from './site.config.js'
 export default defineNuxtConfig({
-  compatibilityDate: '2024-11-01',
+  extends: ['./layers/concerts'],
   devtools: { enabled: true },
-  nitro: { compressPublicAssets: true },
-  modules: ['@nuxt/ui', '@nuxt/content', '@nuxtjs/sitemap'],
-  site: { url: 'https://classicalbot.com' },
+  modules: ['@nuxt/content', '@nuxtjs/sitemap'],
+  site: { url: classicalBotSite.origin },
   sitemap: {
     excludeAppSources: true,
     cacheMaxAgeSeconds: 3600,
     autoLastmod: false,
-  },
-  css: ['~/assets/css/main.css'],
-  ui: {
-    colorMode: false,
-    theme: {
-      colors: [
-        'primary',
-        'error',
-        'red',
-        'orange',
-        'amber',
-        'yellow',
-        'lime',
-        'green',
-        'emerald',
-        'teal',
-        'cyan',
-        'sky',
-        'blue',
-        'indigo',
-        'violet',
-        'purple',
-        'fuchsia',
-        'pink',
-        'rose',
-      ]
-    },
-    experimental: {
-      componentDetection: true
-    }
   },
   app: {
     head: {

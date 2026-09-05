@@ -5,7 +5,7 @@ import {
   containsNormalizedText,
   normalizedLikePattern,
   normalizeSearchText,
-} from '../server/utils/search-text.js'
+} from '../layers/concerts/server/utils/search-text.js'
 
 test('normalizes accents, case, punctuation, and whitespace like catalogue text', () => {
   assert.equal(normalizeSearchText('  Thomas ADÈS  '), 'thomas ades')

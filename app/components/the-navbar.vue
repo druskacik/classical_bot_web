@@ -93,7 +93,7 @@
 
 <script setup>
 
-import { getCountryPath } from '~/utils/countries.js'
+import { getCountryPath } from '#layers/concerts/app/utils/countries.js'
 
 const isMenuOpen = ref(false)
 const menuButton = ref(null)

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { resolveConcertDateMode, concertDatePreset, formatConcertDateRange, updateConcertQuery, concertCityLocation, concertCountryLocation, concertComposerLocation } from '../app/utils/concert-discovery.js'
+import { resolveConcertDateMode, concertDatePreset, formatConcertDateRange, updateConcertQuery, concertCityLocation, concertCountryLocation, concertComposerLocation } from '../layers/concerts/app/utils/concert-discovery.js'
 
 test('date presets use calendar days and handle weekend/month/year boundaries', () => {
   for (const [today, from, to] of [
@@ -21,7 +21,7 @@ test('date presets use calendar days and handle weekend/month/year boundaries', 
 })
 
 test('presets survive DST and use local dates rather than UTC dates', () => {
-  const moduleUrl = new URL('../app/utils/concert-discovery.js', import.meta.url).href
+  const moduleUrl = new URL('../layers/concerts/app/utils/concert-discovery.js', import.meta.url).href
   for (const [zone, instant, expected] of [
     ['Europe/Prague', '2026-03-28T23:45:00', ['2026-03-28', '2026-03-29']],
     ['Europe/Prague', '2026-10-24T23:45:00', ['2026-10-24', '2026-10-25']],

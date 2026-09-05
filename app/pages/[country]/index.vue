@@ -6,7 +6,7 @@
 </template>
 
 <script setup>
-import { getCountrySlug } from '~/utils/countries.js'
+import { getCountrySlug } from '#layers/concerts/app/utils/countries.js'
 
 const route = useRoute()
 definePageMeta({ key: route => route.path })

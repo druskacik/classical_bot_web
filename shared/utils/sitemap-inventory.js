@@ -1,4 +1,4 @@
-import { getCountryPath } from '../../app/utils/countries.js'
+import { getCountryPath } from '../../layers/concerts/app/utils/countries.js'
 
 export const CITY_SITEMAP_MIN_CONCERTS = 10
 
