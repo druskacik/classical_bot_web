@@ -1,0 +1,20 @@
+.composer-surface {
+  --composer-selection: #dbeafe;
+  --ui-primary: var(--color-blue-600);
+}
+.composer-surface ::selection { background: var(--composer-selection); color: #111827; }
+.composer-surface a, .composer-surface button { text-underline-offset: 0.2em; }
+.composer-surface a:focus-visible, .composer-surface button:focus-visible {
+  outline: 2px solid var(--ui-primary); outline-offset: 4px; border-radius: 2px;
+}
+.composer-action { color: var(--ui-primary); }
+.composer-action:hover { text-decoration: underline; }
+.composer-work-link:hover { background: #f9fafb; }
+.composer-gallery-link .composer-cover { transition: filter 180ms ease-out; }
+.composer-gallery-link:hover .composer-cover { filter: brightness(0.97); }
+@media (min-width: 1024px) and (min-height: 850px) {
+  .composer-listening { position: sticky; top: 2rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer-gallery-link .composer-cover { transition: none; }
+}

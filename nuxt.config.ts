@@ -1,6 +1,7 @@
 import { classicalBotSite } from './site.config.js'
 export default defineNuxtConfig({
   extends: ['./layers/concerts'],
+  css: ['~/assets/css/composers.css'],
   devtools: { enabled: true },
   modules: ['@nuxt/content', '@nuxtjs/sitemap'],
   site: { url: classicalBotSite.origin },

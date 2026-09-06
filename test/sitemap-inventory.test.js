@@ -13,13 +13,20 @@ test('sitemap includes only explicit pages, current countries, and matching citi
   counts.push({ city_id: 1, country_code_resolved: 'SK', count: '100' })
   counts.push({ city_id: null, country_code_resolved: 'AT', count: '2' })
   const paths = buildSitemapInventory(catalogue, counts).map(item => item.loc)
-  assert.deepEqual(paths, ['/', '/about', '/austria', '/contact', '/czechia', '/czechia/city-10', '/slovakia', '/sources'])
+  assert.deepEqual(paths, ['/', '/about', '/austria', '/composers', '/contact', '/czechia', '/czechia/city-10', '/slovakia', '/sources'])
   assert.equal(new Set(paths).size, paths.length)
 })
 
 test('empty inventory has only the fixed public pages', () => {
   assert.deepEqual(buildSitemapInventory(buildCityCatalogue([]), []),
-    ['/', '/about', '/contact', '/sources'].map(loc => ({ loc })))
+    ['/', '/about', '/composers', '/contact', '/sources'].map(loc => ({ loc })))
+})
+
+test('composer sitemap paths come from the eligible directory and are deduplicated', () => {
+  const paths = buildSitemapInventory(buildCityCatalogue([]), [], [
+    { path: '/composers/3-ludwig-van-beethoven' }, { path: '/composers/3-ludwig-van-beethoven' },
+  ]).map(item => item.loc)
+  assert.equal(paths.filter(path => path === '/composers/3-ludwig-van-beethoven').length, 1)
 })
 
 test('shared scope uses current date, inclusion, deduplication, canonical city and resolved country', () => {
