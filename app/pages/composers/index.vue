@@ -2,8 +2,8 @@
   <main class="composer-surface mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
     <header class="max-w-2xl">
       <h1 class="font-serif text-4xl text-gray-950 sm:text-5xl">Composers</h1>
-      <p class="mt-5 font-serif text-2xl leading-snug text-gray-800 sm:text-3xl">Discover a composer.<br>Find your next concert.</p>
-      <p class="mt-4 max-w-xl leading-7 text-gray-600">Explore the works appearing in upcoming programmes, listen to our Spotify selections, and find where to hear them live.</p>
+      <!-- <p class="mt-5 font-serif text-2xl leading-snug text-gray-800 sm:text-3xl">Discover a composer.<br>Find your next concert.</p> -->
+      <p class="mt-4 max-w-xl leading-7 text-gray-600">The best way how to get to know a composer is to listen to their most played pieces. Click a composer to see what the are, and listen to them on Spotify.</p>
     </header>
     <div v-if="status === 'pending'" class="mt-12" role="status"><UProgress animation="swing" /><span class="sr-only">Loading composers</span></div>
     <div v-else-if="error" class="mt-12" role="alert">
