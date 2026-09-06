@@ -15,6 +15,7 @@
                     variant="link"
                     :highlight="false"
                     :items="items"
+                    :external-icon="externalIcon"
                     class="hidden md:block w-full ml-6 z-1"
                 />
                 <!-- Mobile hamburger menu -->
@@ -69,6 +70,7 @@
                             :highlight="false"
                             color="neutral"
                             :items="items"
+                            :external-icon="externalIcon"
                         >
                             <template #item="{ item }">
                                 <span class="block px-4 py-2 text-gray-800 hover:text-gray-900">
@@ -96,6 +98,7 @@
 <script setup>
 
 defineProps({
+  externalIcon: { type: Boolean, default: true },
   items: { type: Array, required: true },
   brandName: { type: String, default: 'ClassicalBot' },
   labels: { type: Object, default: () => ({ navigation: 'Primary navigation', home: 'ClassicalBot home', open: 'Open menu', close: 'Close menu', menu: 'Navigation menu' }) },

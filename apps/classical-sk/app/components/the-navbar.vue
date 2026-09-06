@@ -1,5 +1,5 @@
 <template>
-  <SiteNavbar :items="items" brand-name="classical.sk" :labels="labels" />
+  <SiteNavbar :items="items" brand-name="classical.sk" :labels="labels" :external-icon="false" />
 </template>
 <script setup>
 const labels = { navigation: 'Hlavná navigácia', home: 'classical.sk – domov', open: 'Otvoriť menu', close: 'Zavrieť menu', menu: 'Navigačné menu' }
@@ -17,5 +17,11 @@ const items = computed(() => [
   { label: 'Zdroje', href: '/zdroje' },
   { label: 'O projekte', href: '/blog/o-projekte' },
   { label: 'Kontakt', href: '/kontakt' },
+  {
+    label: 'Koncerty vo svete',
+    href: 'https://classicalbot.com',
+    target: '_blank',
+    rel: 'noopener noreferrer',
+  },
 ])
 </script>
