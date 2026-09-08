@@ -25,7 +25,7 @@
 
       <input
         :id="inputId"
-        v-model="search"
+        :value="search"
         type="search"
         maxlength="100"
         autocomplete="off"
@@ -37,11 +37,10 @@
         :aria-controls="listboxId"
         :aria-activedescendant="activeOptionId"
         :aria-describedby="statusId"
+        @input="updateSearch"
+        @compositionend="updateSearch"
         @focus="openOptions"
-        @keydown.down.prevent="moveActiveOption(1)"
-        @keydown.up.prevent="moveActiveOption(-1)"
-        @keydown.enter.prevent="selectActiveOption"
-        @keydown.escape="closeOptions"
+        @keydown="handleKeydown"
       >
     </div>
 
@@ -191,6 +190,27 @@ const openOptions = () => {
 const closeOptions = () => {
   open.value = false
   activeIndex.value = -1
+}
+
+// Mobile keyboards can compose whole words; suggestions must follow input
+// before composition is committed (unlike v-model's default behavior).
+const updateSearch = (event) => {
+  search.value = event.target.value
+  open.value = true
+}
+
+const handleKeydown = (event) => {
+  // Let the keyboard finish composing without selecting or closing suggestions.
+  if (event.isComposing || event.keyCode === 229) return
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault()
+    moveActiveOption(event.key === 'ArrowDown' ? 1 : -1)
+  } else if (event.key === 'Enter') {
+    event.preventDefault()
+    selectActiveOption()
+  } else if (event.key === 'Escape') {
+    closeOptions()
+  }
 }
 
 const moveActiveOption = (direction) => {

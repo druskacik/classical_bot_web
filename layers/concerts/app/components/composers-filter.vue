@@ -15,7 +15,9 @@
                         </button>
                     </div>
                     <input 
-                        v-model="searchQuery" 
+                        :value="searchQuery"
+                        @input="searchQuery = $event.target.value; showDropdown = true"
+                        @compositionend="searchQuery = $event.target.value"
                         type="text" 
                         placeholder="Search..."
                         class="flex-grow outline-none min-w-[120px]"
