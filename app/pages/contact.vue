@@ -87,12 +87,15 @@ async function submit() {
   color: var(--color-gray-600);
 }
 .contact-field {
+  appearance: none;
+  box-sizing: border-box;
   display: block;
   width: 100%;
   min-height: 2.75rem;
   margin-top: 0.5rem;
   padding: 0.5rem 0;
-  border-bottom: 1px solid var(--color-gray-300);
+  border: 0;
+  border-bottom: 2px solid var(--color-gray-300);
   border-radius: 0;
   background: transparent;
   color: var(--color-gray-900);
@@ -106,12 +109,13 @@ input.contact-field {
 }
 textarea.contact-field {
   border: 1px solid var(--color-gray-300);
+  border-bottom-width: 2px;
   padding: 0.75rem;
 }
 .contact-field:focus {
   outline: none;
-  border-color: var(--color-blue-700);
-  box-shadow: inset 0 -2px 0 var(--color-blue-700);
+  border-bottom-color: var(--color-blue-700);
+  box-shadow: none;
 }
 .contact-field[aria-invalid="true"] { border-color: var(--color-red-700); }
 @media (forced-colors: active) {
