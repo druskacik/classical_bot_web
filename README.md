@@ -193,3 +193,56 @@ Clean city pages with at least one public upcoming concert are indexable. Empty 
 The sitemap module's runtime hook builds the explicit inventory; automatic page discovery is disabled. The cache interval is configured to one hour, but this is not a freshness guarantee: the module caches both resolved URLs and generated XML, using stale-while-revalidate (serving cached data while refreshing in the background). An XML refresh can reuse stale URL data, so concert changes can take longer than an hour to appear, depending on requests and refresh success.
 
 A failed refresh cannot publish a partial inventory: an existing good cache may be served, otherwise generation returns 503. The city catalogue has a separate five-minute in-process identity cache. No build-time database snapshot or scheduled generation is required.
+
+## Contact form
+
+The global site's `/contact` form posts to `/api/contact` and sends a plain-text
+email through authenticated SMTP using Nodemailer. No submissions are saved in
+the database. SMTP credentials and message contents are never logged or exposed
+in API responses. The visitor's address is used only as `Reply-To`; the sender
+and recipient are controlled by the server.
+
+Supply these **runtime** environment variables (local development loads `.env`
+implicitly; configure production values in CapRover):
+
+| Variable | Meaning |
+| --- | --- |
+| `SMTP_HOST` | SMTP hostname |
+| `SMTP_PORT` | Port, default `587` |
+| `SMTP_SECURE` | `true` for implicit TLS (usually 465), `false` for required STARTTLS (usually 587) |
+| `SMTP_USER` | SMTP login; also default sender address and recipient |
+| `SMTP_PASS` | SMTP password |
+| `SMTP_FROM` | Display name, email address, or `ClassicalBot <contact@example.com>`; default name `ClassicalBot` |
+| `SMTP_TO` | Optional single recipient address; defaults to `SMTP_USER` |
+| `CONTACT_TRUST_PROXY_HOPS` | Default `0`; see proxy setup below |
+
+If the SMTP login is not an email address, explicitly set a full `SMTP_FROM`
+and `SMTP_TO`. Use a sender your provider authorizes, with its required domain
+SPF/DKIM configuration. SMTP transport requires TLS with certificate validation.
+`SMTP_SECURE=false` does not permit unencrypted delivery.
+
+Ethereal accounts capture test messages without delivering to real inboxes.
+Inspect them in the Ethereal account. Switch to a real SMTP provider and recipient
+before launching publicly; test delivery and Reply-To there as well.
+
+Abuse controls include a honeypot, strict origin and JSON checks, a 32 KiB streamed
+body limit, field validation, five submission attempts per IP per 15 minutes,
+30 SMTP attempts per hour globally, and at most three concurrent SMTP sends.
+Limits are held in bounded process memory, reset on restart, and apply separately
+to each replica. Use a shared limiter or proxy-level limits before scaling beyond
+one process. Failed sends count toward the sending cap. No automatic retries or
+autoresponses are sent. SMTP acceptance is reported as success, not a guarantee
+of inbox delivery. An ambiguous connection failure can still have delivered mail;
+manual resubmission can produce a duplicate.
+
+By default, IP limits use the socket peer, ignoring forwarded headers. Behind a
+proxy this groups clients together until proxy trust is configured. For a single
+CapRover nginx proxy, set `CONTACT_TRUST_PROXY_HOPS=1` **only after verifying** that
+nginx appends/overwrites `X-Forwarded-For` and that the app port cannot be reached
+directly from the public internet. For multiple proxies, configure the exact
+trusted hop count. Do not trust arbitrary client-supplied forwarded prefixes.
+The global SMTP cap applies regardless of IP trust settings.
+
+Production accepts the origin from `site.config.js`; local development additionally
+accepts HTTP localhost/127.0.0.1 origins. The endpoint requires an Origin header.
+Run contact validation and HTTP integration tests with `node --test test/contact.test.js`.

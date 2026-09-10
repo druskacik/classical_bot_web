@@ -1,6 +1,10 @@
 import { classicalBotSite } from './site.config.js'
+import { fileURLToPath } from 'node:url'
 export default defineNuxtConfig({
   extends: ['./layers/concerts'],
+  nitro: {
+    externals: { inline: [fileURLToPath(new URL('./site.config.js', import.meta.url))] },
+  },
   css: ['~/assets/css/composers.css'],
   devtools: { enabled: true },
   modules: ['@nuxt/content', '@nuxtjs/sitemap'],
