@@ -24,7 +24,7 @@
         <label for="contact-website">Website</label>
         <input id="contact-website" v-model="form.website" name="website" tabindex="-1" autocomplete="off">
       </div>
-      <button class="min-h-11 cursor-pointer bg-blue-700 px-5 py-2.5 text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-700 disabled:cursor-wait disabled:opacity-60" type="submit" :disabled="!ready || sending">
+      <button class="min-h-11 cursor-pointer bg-blue-700 px-5 py-2.5 text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 disabled:cursor-wait disabled:opacity-60" type="submit" :disabled="!ready || sending">
         {{ sending ? 'Sending…' : 'Send message' }}
       </button>
       <p v-if="failure" role="alert" class="text-sm text-red-700">{{ failure }}</p>
