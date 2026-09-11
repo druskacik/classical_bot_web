@@ -29,3 +29,5 @@ logs
 
 .playwright-mcp
 .impeccable/review/
+
+output/imagegen
