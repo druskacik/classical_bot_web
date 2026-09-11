@@ -2,7 +2,7 @@ import knex from '#layers/concerts/server/utils/connection.js'
 import { composerPath, seasonLabel, catalogueLabel } from '#shared/utils/composers.js'
 import { publishedPlaylists, composerCounts, rankedWorks } from './composer-queries.js'
 
-const coverComposers = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 21, 26, 29, 32, 33, 34, 39, 41, 46, 49, 51, 53, 67, 111])
+const coverComposers = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 17, 18, 20, 21, 26, 29, 32, 33, 34, 39, 41, 42, 44, 46, 49, 51, 53, 57, 59, 63, 65, 67, 88, 93, 111, 365])
 
 export const getComposerDirectory = defineCachedFunction(async () => {
   const playlists = await publishedPlaylists(knex)
