@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Reel"
+  short_description: "Make vertical reels with captions above local video"
+  default_prompt: "Use $create-reel to turn my local video and caption into a vertical reel."
