@@ -1,7 +1,8 @@
+import { cachedConcertData } from '#layers/concerts/server/utils/concert-data-cache.js'
 import knex from '#layers/concerts/server/utils/connection.js'
 import { getCityCatalogue } from '#layers/concerts/server/utils/city-catalogue.js'
 import { applyPublicConcertScope } from '#layers/concerts/server/utils/public-concerts.js'
-export default defineEventHandler(async () => {
+export default defineEventHandler(() => cachedConcertData('cities', {}, async () => {
   const [catalogue, counts] = await Promise.all([
     getCityCatalogue(),
     applyPublicConcertScope(knex('classical_concert as cc'), 'SK').select('cc.city_id', 'cc.city_raw').count('* as count').groupBy('cc.city_id', 'cc.city_raw'),
@@ -14,4 +15,4 @@ export default defineEventHandler(async () => {
     cities.set(city.path, { ...city, count })
   }
   return [...cities.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'sk'))
-})
+}))

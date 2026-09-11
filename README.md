@@ -79,6 +79,72 @@ application build, not chosen by a query parameter or incoming hostname. All
 listing, facet, country, city, composer, and source queries enforce that scope.
 Facet exclusions cannot remove it. Each process has its own city cache.
 
+## Server data cache
+
+Both builds share a bounded in-memory cache for successful endpoint results.
+It is used by browser API requests and Nuxt's internal requests during page
+rendering; it does not cache HTML or add browser/Cloudflare cache headers.
+
+| Endpoint | Result lifetime |
+| --- | --- |
+| `/api/get-concerts` | 2 minutes |
+| `/api/get-concert-filter-options` | 2 minutes |
+| `/api/get-countries` | 5 minutes |
+| `/api/get-sources` | 5 minutes |
+| `/api/get-composers` (legacy endpoint) | 5 minutes |
+| classical.sk `/api/get-cities` | 2 minutes |
+
+The cache is enabled when `NODE_ENV=production` and disabled otherwise. Set
+`SERVER_DATA_CACHE_ENABLED=true` or `false` to override this at runtime. No new
+production configuration is required. To bypass these caches during local
+testing, or roll back caching in CapRover, set `SERVER_DATA_CACHE_ENABLED=false`
+and restart the application. This switch leaves the pre-existing city catalogue,
+composer-page, and sitemap caches unchanged.
+
+Validation runs before lookup. Keys include the build's country, locale, city
+route mode, and all relevant parsed filters, including pagination and selected
+autocomplete values. Ignored parameters such as tracking tags do not create new
+entries. Equivalent composer/work filter sets share entries. No request or
+result data is written to disk.
+
+Each server process retains at most 500 results and 16 MiB of serialized
+key/result data, evicting the least-recently-used entries as needed. This is a
+serialized-data budget, not a limit on total JavaScript heap usage. Entries over
+1 MiB are not retained. Up to 100 distinct loads are tracked concurrently;
+additional distinct requests run normally without caching. Requests for an
+already tracked key still share its load. Retained and concurrent-load limits
+are shared across these endpoints, with separate state in each process/replica.
+
+Expiry starts when a result finishes loading and is not extended by reads.
+Expired results are removed on cache access and during metric reporting. The
+first request after expiry waits for fresh data, and simultaneous requests for
+that key share the load. Successful empty results are cached; errors are not.
+Failed refreshes return the endpoint's normal error rather than expired data,
+and subsequent requests may retry. Restarts clear all entries; no warm-up is
+required. There is no manual purge endpoint or connection to crawler updates.
+
+The lifetime is a reuse window, not an exact end-to-end freshness guarantee:
+query duration and the existing five-minute city catalogue cache also contribute.
+Changes in `CURRENT_DATE` can remain unseen until the result expires. Existing
+composer and sitemap freshness behavior is unchanged.
+
+Every five minutes, `[server-data-cache]` logs aggregate counters by endpoint
+namespace: `hits`, `misses` (tracked loads), `shared` (joined loads),
+`loadFailures`, `evictions` (capacity removals), and `bypasses` (disabled,
+capacity-limited, or oversized operations). Oversized loads can count as both a
+miss and a bypass. Counters reset after reporting; `retainedEntries` and
+`retainedBytes` report current gauges. Logs contain no keys, filters, result
+contents, or credentials. The reporting timer is stopped on application shutdown.
+
+Validate with `npm test`, both type checks, and both builds. For a production
+smoke test, start both preview servers and request the same concert, country,
+source, and filter API URLs twice, plus `/` on both sites and the Slovak city
+directory. Responses must retain their existing shape and geographic scope;
+the next metrics summary should show hits after initial misses. Repeat with the
+switch disabled to confirm bypasses. After deployment, compare load counts,
+database activity, and response times under comparable traffic before claiming
+a production improvement. These changes do not deploy either site.
+
 ## Run both websites locally
 
 Install dependencies once at the repository root with Node.js 24 and `npm ci`.
