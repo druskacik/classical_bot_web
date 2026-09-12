@@ -13,13 +13,13 @@ test('sitemap includes only explicit pages, current countries, and matching citi
   counts.push({ city_id: 1, country_code_resolved: 'SK', count: '100' })
   counts.push({ city_id: null, country_code_resolved: 'AT', count: '2' })
   const paths = buildSitemapInventory(catalogue, counts).map(item => item.loc)
-  assert.deepEqual(paths, ['/', '/about', '/austria', '/composers', '/contact', '/czechia', '/czechia/city-10', '/slovakia', '/sources'])
+  assert.deepEqual(paths, ['/', '/about', '/austria', '/blog', '/composers', '/contact', '/czechia', '/czechia/city-10', '/slovakia', '/sources'])
   assert.equal(new Set(paths).size, paths.length)
 })
 
 test('empty inventory has only the fixed public pages', () => {
   assert.deepEqual(buildSitemapInventory(buildCityCatalogue([]), []),
-    ['/', '/about', '/composers', '/contact', '/sources'].map(loc => ({ loc })))
+    ['/', '/about', '/blog', '/composers', '/contact', '/sources'].map(loc => ({ loc })))
 })
 
 test('composer sitemap paths come from the eligible directory and are deduplicated', () => {

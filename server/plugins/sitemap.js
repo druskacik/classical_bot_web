@@ -1,4 +1,5 @@
 import { getSitemapInventory } from '../utils/sitemap-inventory.js'
+import { queryCollection } from '@nuxt/content/server'
 
 export default defineNitroPlugin((nitroApp) => {
   // Populate inside the module's resolved-URL cache (XML is cached separately).
@@ -7,7 +8,11 @@ export default defineNitroPlugin((nitroApp) => {
   // or returns an error, never a successful sitemap missing all dynamic pages.
   nitroApp.hooks.hook('sitemap:input', async (ctx) => {
     try {
-      ctx.urls = await getSitemapInventory()
+      const [inventory, posts] = await Promise.all([
+        getSitemapInventory(),
+        queryCollection(ctx.event, 'blog').select('path').all(),
+      ])
+      ctx.urls = [...inventory, ...posts.map(post => ({ loc: post.path }))]
     } catch {
       throw createError({ statusCode: 503, statusMessage: 'Sitemap temporarily unavailable' })
     }

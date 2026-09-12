@@ -16,6 +16,7 @@ const items = computed(() => [
     },
     { label: 'Composers', href: '/composers' },
     { label: 'Sources', href: '/sources' },
+    { label: 'Blog', href: '/blog' },
     { label: 'About', href: '/about' },
     { label: 'Contact', href: '/contact' },
 ]);
