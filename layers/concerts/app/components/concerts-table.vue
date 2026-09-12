@@ -71,6 +71,7 @@
 <script setup>
 const { t, locale } = useConcertText()
 import { getCountryName } from '../utils/countries.js'
+import { createConcertDateFormatting, formatConcertTime as formatTime, formatConcertDateTime as formatDateTime } from '../utils/concert-dates.js'
 import { concertCityLocation, concertCountryLocation, concertComposerLocation } from '../utils/concert-discovery.js'
 
 const BADGE_BASE_CLASSES = 'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium'
@@ -122,11 +123,7 @@ const BADGE_COLORS_BY_NIBBLE = [
   'orange',
   'red',
 ]
-const dateFormatter = new Intl.DateTimeFormat(locale, {
-  weekday: 'long',
-  month: 'long',
-  day: 'numeric',
-})
+const { formatDate } = createConcertDateFormatting(locale, t('Date unavailable'))
 
 const props = defineProps({
   currentCityId: { type: String, default: null },
@@ -141,20 +138,6 @@ const props = defineProps({
 })
 
 const route = useRoute()
-
-const formatTime = (timeString) => {
-  if (typeof timeString !== 'string') return null
-
-  const match = timeString.match(/^(\d{2}):(\d{2})/)
-  return match ? `${match[1]}:${match[2]}` : null
-}
-
-const formatDate = dateString => dateFormatter.format(new Date(dateString))
-
-const formatDateTime = (dateString, timeString) => {
-  const time = formatTime(timeString)
-  return time ? `${dateString.slice(0, 10)}T${time}` : undefined
-}
 
 const badgeColor = (label) => {
   if (SPECIAL_BADGE_COLORS[label]) return SPECIAL_BADGE_COLORS[label]

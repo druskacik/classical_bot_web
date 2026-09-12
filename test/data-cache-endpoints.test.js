@@ -16,6 +16,9 @@ db.client.runner = builder => ({
     if (fail) throw new Error('Database unavailable')
     const { sql } = builder.toSQL()
     if (sql.includes('as "total"')) return { total: '1' }
+    if (sql.includes('"cc"."time_from"') && sql.includes('"cc"."title"')) {
+      assert.ok(sql.includes("to_char(cc.date, 'YYYY-MM-DD') || 'T00:00:00.000Z' as date"), 'calendar dates must reach JSON as text, bypassing pg server-local Date conversion')
+    }
     if (sql.includes('"classical_concert_composer" as "ccc"')) {
       return [{ classical_concert_id: 7, id: 3, name: 'Mozart' }]
     }

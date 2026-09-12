@@ -28,7 +28,9 @@ export default defineEventHandler(async (event) => {
             'cc.id',
             'cc.url',
             'cc.title',
-            'cc.date',
+            // Preserve the calendar date before pg can interpret it in the server timezone.
+            // Keep the existing UTC-midnight API representation for compatibility.
+            knex.raw("to_char(cc.date, 'YYYY-MM-DD') || 'T00:00:00.000Z' as date"),
             'cc.time_from',
             'cc.time_to',
             'cc.city_id',

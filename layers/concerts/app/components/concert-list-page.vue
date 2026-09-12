@@ -98,6 +98,7 @@
 <script setup>
 const { t, locale, plural } = useConcertText()
 import { cleanConcertQuery, updateConcertQuery } from '../utils/concert-discovery.js'
+import { createConcertDateFormatting } from '../utils/concert-dates.js'
 const props = defineProps({
   title: { type: String, required: true },
   countryCode: { type: String, default: null },
@@ -182,13 +183,8 @@ if (props.cityPage) {
   })
 }
 
-const monthFormatter = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' })
-const groupedConcerts = computed(() => (concertPage.value?.items || []).reduce((groups, concert) => {
-  const month = monthFormatter.format(new Date(concert.date))
-  if (!groups[month]) groups[month] = []
-  groups[month].push(concert)
-  return groups
-}, {}))
+const { groupByMonth } = createConcertDateFormatting(locale, t('Date unavailable'))
+const groupedConcerts = computed(() => groupByMonth(concertPage.value?.items || []))
 
 const resultSummary = computed(() => {
   const total = concertPage.value?.total || 0
