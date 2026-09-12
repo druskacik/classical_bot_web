@@ -1,4 +1,4 @@
 interface:
   display_name: "Create Reel"
-  short_description: "Make vertical reels with captions above local video"
-  default_prompt: "Use $create-reel to turn my local video and caption into a vertical reel."
+  short_description: "Make captioned reels from local videos or YouTube excerpts"
+  default_prompt: "Use $create-reel to turn my local video or YouTube excerpt and caption into a vertical reel, using the excerpt specified in our conversation."
