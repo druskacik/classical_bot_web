@@ -182,8 +182,9 @@ if (props.cityPage) {
   })
 }
 
+const monthFormatter = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' })
 const groupedConcerts = computed(() => (concertPage.value?.items || []).reduce((groups, concert) => {
-  const month = new Date(concert.date).toLocaleString(locale, { month: 'long', year: 'numeric' })
+  const month = monthFormatter.format(new Date(concert.date))
   if (!groups[month]) groups[month] = []
   groups[month].push(concert)
   return groups

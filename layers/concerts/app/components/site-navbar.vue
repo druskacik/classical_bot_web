@@ -9,8 +9,9 @@
                 >
                     <BrandLogo :name="brandName" />
                 </NuxtLink>
-                <!-- Desktop menu -->
-                <UNavigationMenu
+                <!-- Keep SSR links, but hydrate only at Tailwind's md breakpoint. -->
+                <LazyUNavigationMenu
+                    hydrate-on-media-query="(min-width: 48rem)"
                     content-orientation="vertical"
                     variant="link"
                     :highlight="false"
@@ -64,7 +65,7 @@
                                 </svg>
                             </UButton>
                         </div>
-                        <UNavigationMenu
+                        <LazyUNavigationMenu
                             orientation="vertical"
                             variant="link"
                             :highlight="false"
@@ -87,7 +88,7 @@
                                     </div>
                                 </span>
                             </template>
-                        </UNavigationMenu>
+                        </LazyUNavigationMenu>
                     </div>
                 </div>
             </div>
