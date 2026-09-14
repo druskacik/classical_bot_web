@@ -50,7 +50,7 @@
             <span v-else :class="badgeClasses(concert.source)">{{ concert.source }}</span>
           </div>
 
-          <div class="flex flex-wrap items-baseline">
+          <div v-if="!concert.works?.length && concert.composers?.length" class="flex flex-wrap items-baseline">
             <NuxtLink
               v-for="composer in concert.composers"
               :key="composer.id"
@@ -62,6 +62,7 @@
               {{ composer.name }}
             </NuxtLink>
           </div>
+          <ConcertProgramme :works="concert.works || []" :composers="concert.composers || []" />
         </div>
       </div>
     </li>

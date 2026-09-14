@@ -34,6 +34,14 @@ export const concertComposerLocation = (route, composer) => {
   return { path: route.path, query: updateConcertQuery(route.query, { composers: [...new Set([...selected, composer])] }) }
 }
 
+export const concertWorkLocation = (route, workId) => {
+  const value = Array.isArray(route.query.works) ? route.query.works[0] : route.query.works
+  const selected = typeof value === 'string' ? value.split(',').map(item => item.trim()).filter(Boolean) : []
+  const works = [...new Set([...selected.map(Number), Number(workId)])]
+    .filter(id => Number.isSafeInteger(id) && id > 0)
+  return { path: route.path, query: updateConcertQuery(route.query, { works }) }
+}
+
 const localDate = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
 export const concertDatePreset = (preset, now = new Date()) => {

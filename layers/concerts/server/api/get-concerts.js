@@ -4,6 +4,7 @@ import { concertSite } from '#concert-site'
 import knex from '../utils/connection.js'
 import { applyFilters, parseConcertFilters, parsePage } from '../utils/concert-filters.js'
 import { getCityCatalogue } from '../utils/city-catalogue.js'
+import { groupConcertWorks } from '../utils/concert-works.js'
 
 const PAGE_SIZE = 50
 export default defineEventHandler(async (event) => {
@@ -54,13 +55,23 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 404, statusMessage: 'Concert page not found' })
       }
       const concertIds = concerts.map(concert => concert.id)
-      const composerRows = concertIds.length
-        ? await knex('classical_concert_composer as ccc')
+      const [composerRows, workRows] = await Promise.all([
+        concertIds.length
+        ? knex('classical_concert_composer as ccc')
             .join('composer as c', 'c.id', 'ccc.composer_id')
             .whereIn('ccc.classical_concert_id', concertIds)
             .select('ccc.classical_concert_id', 'c.id', 'c.name')
             .orderBy('c.name', 'asc')
-        : []
+        : [],
+        concertIds.length
+        ? knex('classical_concert_work as ccw')
+            .join('work as w', 'w.id', 'ccw.work_id')
+            .leftJoin('composer as c', 'c.id', 'w.composer_id')
+            .whereIn('ccw.classical_concert_id', concertIds)
+            .select('ccw.classical_concert_id', 'w.id', 'w.title', 'c.id as composer_id', 'c.name as composer_name')
+        : [],
+      ])
+      const worksByConcert = groupConcertWorks(workRows)
 
       const composersByConcert = composerRows.reduce((groups, composer) => {
         const id = composer.classical_concert_id
@@ -76,6 +87,7 @@ export default defineEventHandler(async (event) => {
           ...(concertSite.cityRoutes === 'local' ? { city: catalogue.byId.get(String(concert.city_id))?.name || concert.city } : {}),
           title: concert.title.replace(/\s+/g, ' '),
           composers: composersByConcert[concert.id] || [],
+          works: worksByConcert.get(String(concert.id)) || [],
         })),
         page,
         pageSize: PAGE_SIZE,

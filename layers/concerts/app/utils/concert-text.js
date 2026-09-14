@@ -1,5 +1,7 @@
 const slovak = {
   "Date unavailable": "Dátum nie je k dispozícii",
+  "Matches filter": "Vyhovuje filtru",
+  "Find concerts featuring {work}": "Nájsť koncerty s dielom {work}",
   "Concert filters": "Filtre koncertov",
   "Country": "Krajina",
   "Loading countries…": "Načítavajú sa krajiny…",
