@@ -29,7 +29,7 @@ try {
         width: innerWidth, height: innerHeight,
         documentWidth: document.documentElement.scrollWidth,
         documentHeight: document.documentElement.scrollHeight,
-        footerBottom: document.querySelector('.map-footer').getBoundingClientRect().bottom + scrollY,
+        hasFooter: Boolean(document.querySelector('footer')),
         mapHeight: document.querySelector('.map-stage').getBoundingClientRect().height,
         programmeHeight: programme.clientHeight,
         programmeScrollHeight: programme.scrollHeight,
@@ -37,7 +37,7 @@ try {
     })
     const result = await measure()
     assert.ok(result.documentWidth <= width + 1, `Horizontal overflow: ${JSON.stringify(result)}`)
-    assert.ok(result.documentHeight <= Math.ceil(Math.max(height, result.footerBottom)) + 1, `Content escapes below footer: ${JSON.stringify(result)}`)
+    assert.equal(result.hasFooter, false, 'Map layout must not render a footer')
     {
       assert.ok(result.documentHeight <= height + 1, `Page exceeds viewport: ${JSON.stringify(result)}`)
       assert.ok(result.mapHeight >= 80 && result.mapHeight <= height, 'Map must remain usable and bounded')
