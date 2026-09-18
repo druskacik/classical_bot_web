@@ -1,6 +1,9 @@
 const slovak = {
   "Filters": "Filtre",
   "About the map": "O mape",
+  "Selected area ({radius} km radius)": "Vybraná oblasť (okruh {radius} km)",
+  "No concerts match this location": "Pre túto lokalitu nie sú koncerty",
+  "Show the map area or try another date.": "Zobrazte oblasť na mape alebo skúste iný dátum.",
   "In this area": "V tejto oblasti",
   "Back to map": "Späť na mapu",
   "Show concerts": "Zobraziť koncerty",
@@ -24,6 +27,7 @@ const slovak = {
   "Explore concerts by scrolling the map.": "Objavuj koncerty posúvaním sa po mape.",
   "List view": "Zobraziť zoznam",
   "Go to city": "Prejsť na mesto",
+  "Search cities": "Hľadať mestá",
   "Search cities worldwide": "Hľadať mestá vo svete",
   "Explore concerts on the map": "Objavujte koncerty na mape",
   "{count} concerts across {cities} cities": "{count} koncertov v {cities} mestách",

@@ -1,4 +1,4 @@
-import { clearAreaQuery, hasAreaQuery, areaQuery } from '../../shared/utils/concert-area.js'
+import { AREA_KEYS, clearAreaQuery, hasAreaQuery, areaQuery } from '../../shared/utils/concert-area.js'
 import { getCountryPath } from './countries.js'
 
 export const cleanConcertQuery = query => Object.fromEntries(
@@ -96,5 +96,33 @@ export const cityRadiusLocation = (query, city, radius = 0) => ({
   query: updateConcertQuery(query, {
     ...clearAreaQuery(), city: city || undefined, country: undefined,
     radius: city && Number(radius) > 0 ? String(radius) : undefined,
+  }),
+})
+
+const firstQuery = value => Array.isArray(value) ? value[0] : value
+
+// Preserve the public filter independently of the ID used to highlight a marker.
+// Legacy IDs stay IDs: cityName is only a label, never identity evidence.
+export const mapSelectionQuery = query => {
+  const city = firstQuery(query.city) || firstQuery(query.mapCity) || firstQuery(query.nearCity)
+  if (city) return cleanConcertQuery({ city, radius: firstQuery(query.radius) ?? (query.nearCity ? firstQuery(query.radiusKm) : undefined) })
+  if (hasAreaQuery(query)) return cleanConcertQuery(Object.fromEntries(AREA_KEYS.map(key => [key, firstQuery(query[key])])))
+  return {}
+}
+
+export const normalizeMapQuery = query => cleanConcertQuery({
+  ...query, ...clearAreaQuery(), city: undefined, radius: undefined,
+  mapCity: undefined, cityName: undefined, country: undefined,
+  ...mapSelectionQuery(query),
+})
+
+export const concertMapLocation = (query, city) => ({
+  path: '/map', query: normalizeMapQuery({ ...query, city: city || undefined, page: undefined }),
+})
+
+export const mapListLocation = query => ({
+  path: '/', query: cleanConcertQuery({
+    ...Object.fromEntries(['dateFrom', 'dateTo', 'datePreset', 'composers', 'works'].map(key => [key, firstQuery(query[key])])),
+    ...(Object.keys(mapSelectionQuery(query)).length ? mapSelectionQuery(query) : { bounds: firstQuery(query.bounds) }),
   }),
 })

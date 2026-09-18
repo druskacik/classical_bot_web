@@ -9,6 +9,8 @@ export default defineEventHandler(async event => {
   }
   const names = new Intl.DisplayNames([concertSite.locale], { type: 'region' })
   let cities = await getAreaCities()
+  // Apply site scope before search, selected-item restoration and origin lookup.
+  if (concertSite.country) cities = cities.filter(city => city.country_code === concertSite.country)
   if (query.origin !== undefined) {
     if (typeof query.origin !== 'string' || !query.origin.trim() || query.origin.length > 160) {
       throw createError({ statusCode: 400, statusMessage: 'Origin must be a city ID or name' })

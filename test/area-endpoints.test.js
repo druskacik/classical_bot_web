@@ -84,8 +84,12 @@ test('real area endpoints resolve coordinates, constrain all SQL, cache repeats 
     const origins = await cities({ query: { q: 'No concerts' } })
     assert.equal(origins.items[0].value, '999', 'origins do not depend on concert availability')
     const vienna = (await cities({ query: { q: 'Wien' } })).items[0]
-    assert.equal(vienna.value, '25', 'local names and worldwide origins work on both sites')
-    assert.equal(vienna.secondaryLabel, country ? 'Rakúsko' : 'Austria')
+    if (country) assert.equal(vienna, undefined, 'Slovak autocomplete excludes foreign cities')
+    else {
+      assert.equal(vienna.cityQuery, 'Vienna,AT')
+      assert.equal(vienna.value, '25', 'global autocomplete retains worldwide local-name search')
+      assert.equal(vienna.secondaryLabel, 'Austria')
+    }
     assert.ok((await cities({ query: { q: 'Prague', selected: '2' } })).items.some(item => item.value === '2'))
     await assert.rejects(concerts({ query: { nearCity: '99999', radiusKm: '100' } }), { statusCode: 400 })
     await assert.rejects(facets({ query: { ...query, type: 'composer', cityId: '2' } }), { statusCode: 400 })
@@ -102,6 +106,7 @@ test('map endpoint returns complete city totals and accounts for unmapped concer
     assert.equal(response.unmapped, 2)
     assert.equal(response.total, 6)
     assert.equal(response.items[0].id, '2')
+    assert.equal(response.items[0].cityQuery, 'Bratislava,SK')
     const aggregate = statements.find(statement => statement.sql.includes('group by "cc"."city_id"'))
     assert.ok(aggregate)
     assert.equal(aggregate.bindings.includes('SK'), Boolean(country))
@@ -111,6 +116,8 @@ test('map endpoint returns complete city totals and accounts for unmapped concer
 })
 
 test('map origins use full-catalogue exact name resolution with list API semantics', async () => {
+  site.country = null
+  site.locale = 'en-GB'
   for (const origin of ['Vienna', 'vIeNnA', 'wIeN', 'vienna,at', '25', ' Vienna ']) {
     assert.equal((await cities({ query: { origin } })).items[0].value, '25')
   }
@@ -120,4 +127,24 @@ test('map origins use full-catalogue exact name resolution with list API semanti
     assert.deepEqual((await cities({ query: { origin: 'Vienna' } })).items, [])
     assert.equal((await cities({ query: { origin: 'Vienna,AT' } })).items[0].value, '25')
   } finally { locations.pop() }
+})
+
+
+test('Slovak city autocomplete scopes search, restored selections and origins before returning options', async () => {
+  site.country = 'SK'
+  site.locale = 'sk-SK'
+  site.cityRoutes = 'local'
+  try {
+    for (const query of [{}, { q: 'Vienna' }, { q: 'Wien' }, { selected: '25' }, { q: 'Vienna', selected: '25' }, { origin: '25' }, { origin: 'Vienna,AT' }]) {
+      const response = await cities({ query })
+      assert.ok(response.items.every(city => city.country_code === 'SK'))
+      assert.ok(!response.items.some(city => city.value === '25'))
+      if (query.origin || query.q) assert.deepEqual(response.items, [])
+    }
+    for (const query of [{ q: 'Bratislava' }, { selected: '2', q: 'No match' }, { origin: 'Bratislava,SK' }]) {
+      const response = await cities({ query })
+      assert.equal(response.items[0].value, '2')
+      assert.equal(response.items[0].cityQuery, 'Bratislava,SK')
+    }
+  } finally { site.country = null; site.locale = 'en-GB'; site.cityRoutes = 'global' }
 })

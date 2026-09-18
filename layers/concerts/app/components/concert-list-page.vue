@@ -32,7 +32,7 @@
         <p v-if="concertPage" class="text-sm text-gray-600" aria-live="polite">
           {{ resultSummary }}
         </p>
-        <NuxtLink :to="{ path: '/map', query: cleanConcertQuery({ ...route.query, city: filters.city || undefined, country: undefined, page: undefined }) }" class="ml-auto inline-flex min-h-11 items-center gap-2 text-sm text-primary hover:underline"><UIcon name="i-lucide-map" class="size-4" />{{ t('Explore map') }}</NuxtLink>
+        <NuxtLink :to="concertMapLocation(route.query, filters.city)" class="ml-auto inline-flex min-h-11 items-center gap-2 text-sm text-primary hover:underline"><UIcon name="i-lucide-map" class="size-4" />{{ t('Explore map') }}</NuxtLink>
       </div>
 
       <div v-if="concertStatus === 'pending' && !concertPage" class="py-10">
@@ -104,7 +104,7 @@
 
 <script setup>
 const { t, locale, plural } = useConcertText()
-import { cleanConcertQuery, updateConcertQuery, cityRadiusLocation } from '../utils/concert-discovery.js'
+import { concertMapLocation, cleanConcertQuery, updateConcertQuery, cityRadiusLocation } from '../utils/concert-discovery.js'
 import { AREA_KEYS, hasAreaQuery, clearAreaQuery } from '../../shared/utils/concert-area.js'
 import { createConcertDateFormatting } from '../utils/concert-dates.js'
 const props = defineProps({

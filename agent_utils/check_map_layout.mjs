@@ -155,11 +155,11 @@ try {
         })
         assert.ok(marker, 'Fixture must include a visible single-city marker')
         await page.mouse.click(marker.x, marker.y)
-        await page.waitForFunction(() => new URL(location.href).searchParams.has('mapCity'))
+        await page.waitForFunction(() => new URL(location.href).searchParams.has('city'))
         await page.waitForSelector('.is-preview')
         await page.reload({ waitUntil: 'domcontentloaded' })
         await page.waitForSelector('.is-preview')
-        assert.ok(new URL(page.url()).searchParams.has('mapCity'), 'City links restore the programme preview')
+        assert.ok(new URL(page.url()).searchParams.has('city'), 'City links restore the programme preview')
       }
     }
     console.log(JSON.stringify(result))

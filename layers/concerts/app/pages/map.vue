@@ -10,12 +10,12 @@
 
     <div class="map-controls" @keydown.esc="filtersOpen = false">
       <div v-if="mobile" class="mobile-search">
-        <FilterAutocomplete compact type="area-city" :label="t('Go to city')" :placeholder="t('Search cities worldwide')" :show-count="false" :model-value="jumpCity ? [jumpCity] : []" @select="jump" @update:model-value="values => { if (!values.length) clearCity() }" />
+        <FilterAutocomplete compact type="area-city" :label="t('Go to city')" :placeholder="t(concertSite.country ? 'Search cities' : 'Search cities worldwide')" :show-count="false" :model-value="jumpCity ? [jumpCity] : []" @select="jump" @update:model-value="values => { if (!values.length) clearCity() }" />
         <button ref="filterTrigger" type="button" class="map-filter-toggle" aria-haspopup="dialog" :aria-expanded="filtersOpen" @click="filtersOpen = true"><UIcon name="i-lucide-sliders-horizontal" class="size-4" />{{ t('Filters') }}<span v-if="filterCount"> · {{ filterCount }}</span></button>
       </div>
       <component :is="mobile ? 'dialog' : 'div'" ref="filterDialog" class="map-toolbar" :aria-label="mobile ? t('Concert filters') : undefined" @cancel="filtersOpen = false" @close="filtersOpen = false">
       <div v-if="mobile" class="filter-heading"><h2 class="font-serif text-2xl">{{ t('Concert filters') }}</h2><button type="button" autofocus class="min-h-11 text-primary" @click="filtersOpen = false">{{ t('Done') }}</button></div>
-      <FilterAutocomplete v-if="!mobile" type="area-city" :label="t('Go to city')" :placeholder="t('Search cities worldwide')" :show-count="false" :model-value="jumpCity ? [jumpCity] : []" @select="jump" @update:model-value="values => { if (!values.length) clearCity() }" />
+      <FilterAutocomplete v-if="!mobile" type="area-city" :label="t('Go to city')" :placeholder="t(concertSite.country ? 'Search cities' : 'Search cities worldwide')" :show-count="false" :model-value="jumpCity ? [jumpCity] : []" @select="jump" @update:model-value="values => { if (!values.length) clearCity() }" />
       <label>
         <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">{{ t('When') }}</span>
         <select :value="dateMode" class="h-11 w-full border-b border-gray-300 bg-transparent text-sm text-gray-900 focus-visible:outline-2 focus-visible:outline-primary" @change="setDate($event.target.value)">
@@ -47,19 +47,19 @@
         </div>
       </section>
 
-      <MapMobilePanel v-model="panelState" @occlusion="panelHeight = $event" :mobile="mobile" :short="shortScreen" :title="selectedName || t('In this area')" :summary="listLoading ? t('Updating…') : t('{count} concerts', { count: (concerts?.total || 0).toLocaleString(locale) })" :selected="Boolean(selectedCity)" :list-location="listLocation" @clear="clearCity">
+      <MapMobilePanel v-model="panelState" @occlusion="panelHeight = $event" :mobile="mobile" :short="shortScreen" :title="selectionTitle || t('In this area')" :summary="listLoading ? t('Updating…') : t('{count} concerts', { count: (concerts?.total || 0).toLocaleString(locale) })" :selected="hasSelection" :list-location="listLocation" @clear="clearCity">
       <section id="map-programme" ref="programmePanel" class="map-programme" :inert="mobile && panelState === 'explore'" :aria-label="t('Concert programme')" :aria-busy="listLoading">
         <div v-if="!mobile" class="border-b border-gray-200 px-5 py-4">
           <div class="flex items-start justify-between gap-3">
-            <h2 class="font-serif text-2xl text-gray-950">{{ selectedName || t('In this view') }}</h2>
-            <button v-if="selectedCity" type="button" class="min-h-11 shrink-0 cursor-pointer text-sm text-primary underline-offset-4 hover:underline" @click="clearCity">{{ t('Show area') }}</button>
+            <h2 class="font-serif text-2xl text-gray-950">{{ selectionTitle || t('In this view') }}</h2>
+            <button v-if="hasSelection" type="button" class="min-h-11 shrink-0 cursor-pointer text-sm text-primary underline-offset-4 hover:underline" @click="clearCity">{{ t('Show area') }}</button>
           </div>
           <p class="mt-1 text-xs text-gray-600" aria-live="polite">{{ listLoading ? t('Updating…') : t('{count} concerts', { count: (concerts?.total || 0).toLocaleString(locale) }) }}</p>
         </div>
         <div v-if="listStatus === 'error'" class="px-5 py-8 text-sm text-gray-600">{{ t('Concerts could not be loaded') }} <button type="button" class="min-h-11 text-primary underline" @click="refreshList()">{{ t('Retry') }}</button></div>
         <div v-else-if="!listLoading && !concerts?.items.length" class="px-5 py-10">
-          <h3 class="font-serif text-xl">{{ t('No concerts in this view') }}</h3>
-          <p class="mt-3 text-sm text-gray-600">{{ t('Move the map, zoom out, or try another date.') }}</p>
+          <h3 class="font-serif text-xl">{{ hasSelection ? t('No concerts match this location') : t('No concerts in this view') }}</h3>
+          <p class="mt-3 text-sm text-gray-600">{{ hasSelection ? t('Show the map area or try another date.') : t('Move the map, zoom out, or try another date.') }}</p>
           <button v-if="hasMusicDates" type="button" class="mt-3 min-h-11 text-sm text-primary hover:underline" @click="resetFilters">{{ t('Clear filters') }}</button>
         </div>
         <ol v-else class="divide-y divide-gray-200" :class="listLoading && 'opacity-50'">
@@ -85,7 +85,7 @@
 </template>
 <script setup>
 definePageMeta({ layout: 'map' })
-import { cleanConcertQuery, concertDatePreset, resolveConcertDateMode } from '../utils/concert-discovery.js'
+import { mapSelectionQuery, normalizeMapQuery, mapListLocation, cleanConcertQuery, concertDatePreset, resolveConcertDateMode } from '../utils/concert-discovery.js'
 import { parseMapBounds } from '../../shared/utils/concert-map.js'
 const { t, locale } = useConcertText()
 const { concertSite } = useAppConfig()
@@ -95,7 +95,9 @@ const first = value => Array.isArray(value) ? value[0] : value
 const values = value => typeof first(value) === 'string' ? first(value).split(',').filter(Boolean) : []
 const composers = computed(() => values(route.query.composers))
 const works = computed(() => values(route.query.works))
-const mapCityQuery = computed(() => first(route.query.mapCity) || null)
+const selectionQuery = computed(() => mapSelectionQuery(route.query))
+const hasSelection = computed(() => Object.keys(selectionQuery.value).length > 0)
+const cityQuery = computed(() => selectionQuery.value.city || null)
 const jumpCity = ref(null)
 const focus = ref(null)
 const resolvedOrigin = ref(null)
@@ -119,7 +121,7 @@ onMounted(() => {
   mobileQuery = window.matchMedia('(max-width: 768px), (max-width: 1024px) and (max-height: 500px) and (pointer: coarse)')
   shortQuery = window.matchMedia('(max-height: 500px)')
   syncScreen()
-  if (route.query.mapCity || route.query.city || route.query.nearCity) revealConcerts()
+  if (hasSelection.value) revealConcerts()
   mobileQuery.addEventListener('change', syncScreen)
   shortQuery.addEventListener('change', syncScreen)
 })
@@ -142,20 +144,22 @@ const customDates = ref(false)
 onMounted(() => { now.value = new Date() })
 const dateMode = computed(() => customDates.value ? 'custom' : resolveConcertDateMode(first(route.query.datePreset), first(route.query.dateFrom), first(route.query.dateTo), now.value))
 const { data: mapData, status: mapStatus, refresh: refreshMap } = await useAsyncData(computed(() => `map:${JSON.stringify(musicContext.value)}`), () => $fetch('/api/get-concert-map', { params: musicContext.value }))
-const cityQueryValue = city => city?.englishName && (city.country || city.country_code)
-  ? `${city.englishName},${city.country || city.country_code}` : city?.id
-const matchesCityQuery = (city, value) => city && value && (city.id === value || cityQueryValue(city)?.toLowerCase() === value.trim().toLowerCase())
+const cityQueryValue = city => city?.cityQuery || String(city?.id || city?.value || '')
+const resolvedQuery = ref(null)
+const matchesCityQuery = (city, value) => city && value && (String(city.id) === value || (city === resolvedOrigin.value && resolvedQuery.value === value))
 const selectedCityDetails = computed(() => {
-  const value = mapCityQuery.value
+  const value = cityQuery.value
   if (matchesCityQuery(resolvedOrigin.value, value)) return resolvedOrigin.value
   return mapData.value?.items.find(city => city.id === value) || null
 })
-const selectedCity = computed(() => selectedCityDetails.value?.id || (/^\d+$/.test(mapCityQuery.value || '') ? mapCityQuery.value : null))
+const selectedCity = computed(() => selectedCityDetails.value?.id || (/^\d+$/.test(cityQuery.value || '') ? cityQuery.value : null))
 const selectedName = computed(() => selectedCityDetails.value?.name || null)
+const selectionTitle = computed(() => selectedName.value || cityQuery.value || (hasSelection.value
+  ? t('Selected area ({radius} km radius)', { radius: selectionQuery.value.radiusKm }) : null))
 const listParams = computed(() => {
-  const city = selectedCity.value || mapCityQuery.value || first(route.query.city) || first(route.query.nearCity)
-  if (!city && !bounds.value) return null
-  return { ...musicContext.value, ...(city ? { city } : { bounds: bounds.value }), page: page.value }
+  const selection = selectionQuery.value
+  if (!Object.keys(selection).length && !bounds.value) return null
+  return { ...musicContext.value, ...(Object.keys(selection).length ? selection : { bounds: bounds.value }), page: page.value }
 })
 // A bare map has no viewport until Leaflet measures its container. Do not fetch
 // worldwide rows that would immediately be replaced by the visible area's rows.
@@ -163,8 +167,13 @@ const { data: concerts, status: listStatus, refresh: refreshList } = await useAs
   ? $fetch('/api/get-concerts', { params: listParams.value })
   : Promise.resolve({ items: [], total: 0, totalPages: 0 }))
 const listLoading = computed(() => !listParams.value || listStatus.value === 'pending')
-const listLocation = computed(() => ({ path: '/', query: cleanConcertQuery({ ...musicContext.value, ...(mapCityQuery.value ? { city: selectedCity.value || mapCityQuery.value, cityName: selectedCityDetails.value ? cityQueryValue(selectedCityDetails.value) : first(route.query.cityName) } : { bounds: bounds.value }) }) }))
-const navigate = (changes, replace = false) => router[replace ? 'replace' : 'push']({ path: '/map', query: cleanConcertQuery({ ...route.query, cityName: selectedCityDetails.value ? cityQueryValue(selectedCityDetails.value) : first(route.query.cityName), mapCity: selectedCity.value || mapCityQuery.value || undefined, city: undefined, country: undefined, radius: undefined, nearCity: undefined, nearLat: undefined, nearLng: undefined, radiusKm: undefined, page: undefined, bounds: latestBounds || bounds.value || undefined, ...changes }) })
+const listLocation = computed(() => mapListLocation(route.query))
+const navigate = (changes, replace = false) => router[replace ? 'replace' : 'push']({ path: '/map', query: cleanConcertQuery({ ...normalizeMapQuery(route.query), page: undefined, bounds: latestBounds || bounds.value || undefined, ...changes }) })
+// Upgrade old map links without adding a history entry or changing their filter.
+onMounted(() => watch(() => route.query, query => {
+  const normalized = normalizeMapQuery(query)
+  if (JSON.stringify(query) !== JSON.stringify(normalized)) router.replace({ path: '/map', query: normalized })
+}, { immediate: true }))
 let moveTimer
 let latestBounds = bounds.value
 const moveMap = (value, { restoring = false } = {}) => {
@@ -174,21 +183,22 @@ const moveMap = (value, { restoring = false } = {}) => {
   if (restoring && bounds.value) return
   latestBounds = value
   if (value === bounds.value) return
-  moveTimer = setTimeout(() => { if (!resolvingOrigin.value) navigate({ bounds: value, mapCity: selectedCity.value || mapCityQuery.value || undefined, page: restoring || mapCityQuery.value ? route.query.page : undefined }, true) }, 300)
+  moveTimer = setTimeout(() => { if (!resolvingOrigin.value) navigate({ bounds: value, page: restoring || Object.keys(selectionQuery.value).length ? route.query.page : undefined }, true) }, 300)
 }
-const selectCity = city => { revealConcerts(); clearTimeout(moveTimer); jumpCity.value = city.id; resolvedOrigin.value = city; navigate({ mapCity: city.id, cityName: cityQueryValue(city) }) }
-const jump = city => { revealConcerts(); clearTimeout(moveTimer); jumpCity.value = String(city.value); resolvedOrigin.value = { ...city, id: String(city.value), name: city.label }; focus.value = city; navigate({ mapCity: String(city.value), cityName: cityQueryValue(resolvedOrigin.value) }) }
-const clearCity = () => { revealConcerts(); clearTimeout(moveTimer); jumpCity.value = null; navigate({ mapCity: undefined, cityName: undefined }) }
+const clearSelection = { city: undefined, radius: undefined, nearCity: undefined, nearLat: undefined, nearLng: undefined, radiusKm: undefined }
+const selectCity = city => { revealConcerts(); clearTimeout(moveTimer); jumpCity.value = city.id; resolvedOrigin.value = city; resolvedQuery.value = cityQueryValue(city); navigate({ ...clearSelection, city: resolvedQuery.value }) }
+const jump = city => { const selected = { ...city, id: String(city.value), name: city.label }; selectCity(selected); focus.value = selected }
+const clearCity = () => { revealConcerts(); clearTimeout(moveTimer); jumpCity.value = null; navigate(clearSelection) }
 const setFilter = (key, value) => { clearTimeout(moveTimer); navigate({ [key]: Array.isArray(value) ? value.join(',') : value || undefined, ...(['dateFrom', 'dateTo'].includes(key) ? { datePreset: undefined } : {}) }) }
 const setDate = mode => { clearTimeout(moveTimer); customDates.value = mode === 'custom'; if (customDates.value) return; navigate({ ...concertDatePreset(mode, new Date()), datePreset: mode === 'any' ? undefined : mode }) }
 const resetFilters = () => navigate({ dateFrom: undefined, dateTo: undefined, datePreset: undefined, composers: undefined, works: undefined })
 const setPage = value => navigate({ page: value > 1 ? String(value) : undefined })
 watch(() => JSON.stringify(listParams.value), () => { if (programmePanel.value) programmePanel.value.scrollTop = 0 }, { flush: 'post' })
-watch(mapCityQuery, value => { if (value) revealConcerts() })
+watch([cityQuery, hasSelection], () => { if (hasSelection.value) revealConcerts() })
 const concertDate = (date, part) => date ? new Intl.DateTimeFormat(locale, { [part]: part === 'month' ? 'short' : 'numeric', timeZone: 'UTC' }).format(new Date(date)) : ''
 watch(selectedCity, value => { jumpCity.value = value }, { immediate: true })
 watch(bounds, value => { clearTimeout(moveTimer); latestBounds = value }, { flush: 'sync' })
-const originQuery = computed(() => mapCityQuery.value || first(route.query.city) || first(route.query.nearCity))
+const originQuery = cityQuery
 onMounted(() => watch(originQuery, async origin => {
   if (!origin) { resolvingOrigin.value = false; return }
   resolvingOrigin.value = true
@@ -206,6 +216,7 @@ onMounted(() => watch(originQuery, async origin => {
   resolvingOrigin.value = false
   if (city) {
     resolvedOrigin.value = city
+    resolvedQuery.value = origin
     if (!bounds.value) {
       // The map may have reported its default viewport during the lookup.
       // Discard it and let the city focus publish the new viewport instead.
@@ -213,7 +224,6 @@ onMounted(() => watch(originQuery, async origin => {
       latestBounds = null
       focus.value = { ...city, label: city.name }
     }
-    if (!mapCityQuery.value) navigate({ mapCity: city.id, cityName: cityQueryValue(city), bounds: bounds.value || undefined }, true)
   }
 }, { immediate: true }))
 onBeforeUnmount(() => clearTimeout(moveTimer))
