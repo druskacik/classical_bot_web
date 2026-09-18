@@ -51,12 +51,15 @@ test('real area endpoints resolve coordinates, constrain all SQL, cache repeats 
     assert.equal(result.area.label, 'Bratislava')
     assert.equal(result.area.latitude, 48.14816)
     assert.equal(result.area.cityIds, undefined)
+    assert.equal(result.area.unresolvedCity, undefined)
     const listing = statements.filter(statement => statement.sql.includes('from "classical_concert" as "cc"'))
     assert.equal(listing.length, 2, 'count and page queries share the area filter')
     for (const statement of listing) {
       assert.match(statement.sql, /"cc"\."city_id" in \(\?, \?\)/)
       assert.ok(statement.bindings.includes('2') && statement.bindings.includes('25'))
-      assert.equal(statement.bindings.includes('SK'), Boolean(country))
+      assert.match(statement.sql, /or \("cc"\."city_id" is null and COALESCE\(cc.country_code_resolved, cc.country_code_raw\) = \? and LOWER\(cc.city_raw\) in/)
+      assert.ok(statement.bindings.includes('bratislava'))
+      assert.equal(statement.sql.includes('"cc"."country_code_resolved" = ?'), Boolean(country))
     }
     const before = statements.length
     assert.deepEqual(await concerts({ query }), result)
@@ -70,9 +73,14 @@ test('real area endpoints resolve coordinates, constrain all SQL, cache repeats 
       assert.ok(constrained.length)
       for (const statement of constrained) {
         assert.match(statement.sql, /"cc"\."city_id" in/)
-        assert.equal(statement.bindings.includes('SK'), Boolean(country))
+        assert.match(statement.sql, /LOWER\(cc.city_raw\) in/)
+        assert.equal(statement.sql.includes('"cc"."country_code_resolved" = ?'), Boolean(country))
       }
     }
+    const mapped = await map({ query })
+    assert.equal(mapped.total, 6)
+    assert.equal(mapped.mapped, 4)
+    assert.equal(mapped.unmapped, 2)
     const origins = await cities({ query: { q: 'No concerts' } })
     assert.equal(origins.items[0].value, '999', 'origins do not depend on concert availability')
     const vienna = (await cities({ query: { q: 'Wien' } })).items[0]

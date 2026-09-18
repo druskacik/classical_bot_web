@@ -54,7 +54,7 @@ test('city and point origins agree and shared SQL retains server site scope', ()
     const query = applyFilters(db('classical_concert as cc'), filters).toSQL()
     assert.match(query.sql, /"cc"\."city_id" in/)
     assert.ok(query.bindings.includes('25'))
-    assert.equal(query.bindings.includes('SK'), siteCountry === 'SK')
+    assert.equal(query.sql.includes('"cc"."country_code_resolved" = ?'), siteCountry === 'SK')
     assert.equal((query.sql.match(/exists \(/g) || []).length, 2)
     for (const facet of ['country','city','composer','work']) assert.deepEqual(facetFilters(filters, facet).area, area)
   }

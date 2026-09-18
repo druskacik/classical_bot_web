@@ -90,7 +90,20 @@ export const applyFilters = (builder, filters) => {
     if (west <= east) builder.whereBetween('canonical_city.longitude', [west, east])
     else builder.where(inner => inner.where('canonical_city.longitude', '>=', west).orWhere('canonical_city.longitude', '<=', east))
   }
-  if (filters.area) builder.whereIn('cc.city_id', filters.area.cityIds)
+  if (filters.area) {
+    const { cityIds, unresolvedCity } = filters.area
+    builder.where(areaFilter => {
+      areaFilter.whereIn('cc.city_id', cityIds)
+      // Keep unlinked origin-city concerts when expanding a city search.
+      // An existing city link always wins over the source's raw city label.
+      if (unresolvedCity?.countryCode && unresolvedCity.names.length) {
+        areaFilter.orWhere(unresolved => unresolved
+          .whereNull('cc.city_id')
+          .whereRaw('COALESCE(cc.country_code_resolved, cc.country_code_raw) = ?', [unresolvedCity.countryCode])
+          .whereIn(builder.client.raw('LOWER(cc.city_raw)'), unresolvedCity.names))
+      }
+    })
+  }
   if (filters.city?.id) builder.where('cc.city_id', filters.city.id)
   else if (filters.city?.name) {
     if (filters.city.country) {

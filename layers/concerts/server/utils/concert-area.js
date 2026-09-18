@@ -48,11 +48,15 @@ export function resolveArea(area, cities, locale = 'en-GB') {
   if (area.cityId && !city) invalid('City coordinates are unavailable; choose another city or point')
   const resolved = city ? { ...area, cityId: String(city.id), latitude: city.latitude, longitude: city.longitude,
     label: locale === 'sk-SK' ? city.local_name || city.english_name : city.english_name,
-    countryCode: city.country_code } : { ...area, label: null }
+    countryCode: city.country_code,
+    unresolvedCity: {
+      names: [...new Set([city.english_name, city.local_name].filter(Boolean).map(name => name.toLowerCase()))].sort(),
+      countryCode: city.country_code,
+    } } : { ...area, label: null }
   return { ...resolved, cityIds: citiesWithinArea(cities, resolved) }
 }
 export const publicArea = area => {
   if (!area) return null
-  const { cityIds, ...metadata } = area
+  const { cityIds, unresolvedCity, ...metadata } = area
   return metadata
 }
