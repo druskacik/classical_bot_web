@@ -1,5 +1,5 @@
 <template>
-  <main class="map-page">
+  <main class="map-page" :class="mobile && 'map-mobile'">
     <header class="map-heading">
       <div>
         <h1 class="font-serif text-3xl text-gray-950">{{ t('Map of classical music concerts') }}</h1>
@@ -9,11 +9,13 @@
     </header>
 
     <div class="map-controls" @keydown.esc="filtersOpen = false">
-      <button type="button" class="map-filter-toggle" :aria-expanded="filtersOpen" aria-controls="map-filters" @click="filtersOpen = !filtersOpen">
-        <UIcon name="i-lucide-sliders-horizontal" class="size-4" aria-hidden="true" />{{ filtersOpen ? t('Done') : t('Concert filters') }}
-      </button>
-      <div id="map-filters" class="map-toolbar" :class="filtersOpen && 'map-toolbar-open'">
-      <FilterAutocomplete type="area-city" :label="t('Go to city')" :placeholder="t('Search cities worldwide')" :show-count="false" :model-value="jumpCity ? [jumpCity] : []" @select="jump" @update:model-value="values => { if (!values.length) clearCity() }" />
+      <div v-if="mobile" class="mobile-search">
+        <FilterAutocomplete compact type="area-city" :label="t('Go to city')" :placeholder="t('Search cities worldwide')" :show-count="false" :model-value="jumpCity ? [jumpCity] : []" @select="jump" @update:model-value="values => { if (!values.length) clearCity() }" />
+        <button ref="filterTrigger" type="button" class="map-filter-toggle" aria-haspopup="dialog" :aria-expanded="filtersOpen" @click="filtersOpen = true"><UIcon name="i-lucide-sliders-horizontal" class="size-4" />{{ t('Filters') }}<span v-if="filterCount"> · {{ filterCount }}</span></button>
+      </div>
+      <component :is="mobile ? 'dialog' : 'div'" ref="filterDialog" class="map-toolbar" :aria-label="mobile ? t('Concert filters') : undefined" @cancel="filtersOpen = false" @close="filtersOpen = false">
+      <div v-if="mobile" class="filter-heading"><h2 class="font-serif text-2xl">{{ t('Concert filters') }}</h2><button type="button" autofocus class="min-h-11 text-primary" @click="filtersOpen = false">{{ t('Done') }}</button></div>
+      <FilterAutocomplete v-if="!mobile" type="area-city" :label="t('Go to city')" :placeholder="t('Search cities worldwide')" :show-count="false" :model-value="jumpCity ? [jumpCity] : []" @select="jump" @update:model-value="values => { if (!values.length) clearCity() }" />
       <label>
         <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">{{ t('When') }}</span>
         <select :value="dateMode" class="h-11 w-full border-b border-gray-300 bg-transparent text-sm text-gray-900 focus-visible:outline-2 focus-visible:outline-primary" @change="setDate($event.target.value)">
@@ -26,25 +28,28 @@
         <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('From') }} <input type="date" :value="route.query.dateFrom || ''" :max="route.query.dateTo || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="setFilter('dateFrom', $event.target.value)"></label>
         <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('To') }} <input type="date" :value="route.query.dateTo || ''" :min="route.query.dateFrom || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="setFilter('dateTo', $event.target.value)"></label>
       </div>
-    </div>
+      <button v-if="mobile && hasMusicDates" type="button" class="min-h-11 text-left text-primary" @click="resetFilters">{{ t('Clear filters') }}</button>
+    </component>
 
     </div>
 
-    <div class="map-workspace">
-      <section class="map-stage" :aria-label="t('Explore concerts on the map')">
+    <div class="map-workspace" :data-panel="panelState">
+      <section class="map-stage" :inert="mobile && panelState === 'read'" :aria-label="t('Explore concerts on the map')">
         <ClientOnly>
-          <LazyConcertMap :cities="mapData?.items || []" :bounds="bounds" :selected="selectedCity" :focus="focus" @bounds="moveMap" @select="selectCity" />
+          <LazyConcertMap :obscured-height="mobile ? panelHeight : 0" :cities="mapData?.items || []" :bounds="bounds" :selected="selectedCity" :focus="focus" @bounds="moveMap" @select="selectCity" />
           <template #fallback><div class="flex h-full min-h-0 items-center justify-center bg-gray-100 text-sm text-gray-600">{{ t('Loading map…') }}</div></template>
         </ClientOnly>
-        <div class="map-caption" aria-live="polite">
+        <details v-if="mobile" class="map-info"><summary :aria-label="t('About the map')"><UIcon name="i-lucide-info" class="size-5" /></summary><p>{{ t('Markers show city locations, not individual venues.') }}<template v-if="concertSite.country"> {{ t('Only concerts in Slovakia') }}.</template></p></details>
+        <div v-if="!mobile || mapStatus === 'pending' || mapStatus === 'error'" class="map-caption" :style="mobile ? { bottom: `${panelHeight + 16}px` } : undefined" aria-live="polite">
           <span v-if="mapStatus === 'pending'">{{ t('Updating…') }}</span>
           <span v-else-if="mapStatus === 'error'">{{ t('Concerts could not be loaded') }} <button type="button" class="underline" @click="refreshMap()">{{ t('Retry') }}</button></span>
           <span v-else>{{ t('{count} concerts across {cities} cities', { count: (mapData?.mapped || 0).toLocaleString(locale), cities: (mapData?.items.length || 0).toLocaleString(locale) }) }}</span>
         </div>
       </section>
 
-      <section ref="programmePanel" class="map-programme" :aria-label="t('Concert programme')" :aria-busy="listLoading">
-        <div class="border-b border-gray-200 px-5 py-4">
+      <MapMobilePanel v-model="panelState" @occlusion="panelHeight = $event" :mobile="mobile" :short="shortScreen" :title="selectedName || t('In this area')" :summary="listLoading ? t('Updating…') : t('{count} concerts', { count: (concerts?.total || 0).toLocaleString(locale) })" :selected="Boolean(selectedCity)" :list-location="listLocation" @clear="clearCity">
+      <section id="map-programme" ref="programmePanel" class="map-programme" :inert="mobile && panelState === 'explore'" :aria-label="t('Concert programme')" :aria-busy="listLoading">
+        <div v-if="!mobile" class="border-b border-gray-200 px-5 py-4">
           <div class="flex items-start justify-between gap-3">
             <h2 class="font-serif text-2xl text-gray-950">{{ selectedName || t('In this view') }}</h2>
             <button v-if="selectedCity" type="button" class="min-h-11 shrink-0 cursor-pointer text-sm text-primary underline-offset-4 hover:underline" @click="clearCity">{{ t('Show area') }}</button>
@@ -74,6 +79,7 @@
           <button type="button" :disabled="page >= concerts.totalPages" class="min-h-11 text-sm text-primary underline-offset-4 enabled:cursor-pointer enabled:hover:underline disabled:cursor-not-allowed disabled:opacity-30" @click="setPage(page + 1)">{{ t('Next page') }}</button>
         </nav>
       </section>
+      </MapMobilePanel>
     </div>
   </main>
 </template>
@@ -94,6 +100,36 @@ const jumpCity = ref(null)
 const focus = ref(null)
 const resolvedOrigin = ref(null)
 const filtersOpen = ref(false)
+const mobile = ref(false)
+const shortScreen = ref(false)
+const panelState = ref('explore')
+const panelHeight = ref(0)
+const filterDialog = ref(null)
+const filterTrigger = ref(null)
+const filterCount = computed(() => Number(Boolean(route.query.dateFrom || route.query.dateTo || route.query.datePreset)) + composers.value.length + works.value.length)
+const revealConcerts = () => { if (mobile.value) panelState.value = shortScreen.value ? 'read' : 'preview' }
+let mobileQuery, shortQuery
+const syncScreen = () => {
+  mobile.value = mobileQuery.matches
+  shortScreen.value = shortQuery.matches
+  filtersOpen.value = false
+  if (shortScreen.value && panelState.value === 'preview') panelState.value = 'read'
+}
+onMounted(() => {
+  mobileQuery = window.matchMedia('(max-width: 768px), (max-width: 1024px) and (max-height: 500px) and (pointer: coarse)')
+  shortQuery = window.matchMedia('(max-height: 500px)')
+  syncScreen()
+  if (route.query.mapCity || route.query.city || route.query.nearCity) revealConcerts()
+  mobileQuery.addEventListener('change', syncScreen)
+  shortQuery.addEventListener('change', syncScreen)
+})
+onBeforeUnmount(() => { mobileQuery?.removeEventListener('change', syncScreen); shortQuery?.removeEventListener('change', syncScreen) })
+watch(filtersOpen, async open => {
+  await nextTick()
+  if (!mobile.value) return
+  if (open) filterDialog.value?.showModal()
+  else { filterDialog.value?.close(); filterTrigger.value?.focus() }
+})
 const resolvingOrigin = ref(Boolean(route.query.city || route.query.nearCity || route.query.mapCity))
 const bounds = computed(() => { try { return parseMapBounds(first(route.query.bounds)) ? first(route.query.bounds) : null } catch { return null } })
 const page = computed(() => Math.max(1, Number(first(route.query.page)) || 1))
@@ -140,13 +176,15 @@ const moveMap = (value, { restoring = false } = {}) => {
   if (value === bounds.value) return
   moveTimer = setTimeout(() => { if (!resolvingOrigin.value) navigate({ bounds: value, mapCity: selectedCity.value || mapCityQuery.value || undefined, page: restoring || mapCityQuery.value ? route.query.page : undefined }, true) }, 300)
 }
-const selectCity = city => { clearTimeout(moveTimer); jumpCity.value = city.id; resolvedOrigin.value = city; navigate({ mapCity: city.id, cityName: cityQueryValue(city) }) }
-const jump = city => { clearTimeout(moveTimer); jumpCity.value = String(city.value); resolvedOrigin.value = { ...city, id: String(city.value), name: city.label }; focus.value = city; navigate({ mapCity: String(city.value), cityName: cityQueryValue(resolvedOrigin.value) }) }
-const clearCity = () => { clearTimeout(moveTimer); jumpCity.value = null; navigate({ mapCity: undefined, cityName: undefined }) }
+const selectCity = city => { revealConcerts(); clearTimeout(moveTimer); jumpCity.value = city.id; resolvedOrigin.value = city; navigate({ mapCity: city.id, cityName: cityQueryValue(city) }) }
+const jump = city => { revealConcerts(); clearTimeout(moveTimer); jumpCity.value = String(city.value); resolvedOrigin.value = { ...city, id: String(city.value), name: city.label }; focus.value = city; navigate({ mapCity: String(city.value), cityName: cityQueryValue(resolvedOrigin.value) }) }
+const clearCity = () => { revealConcerts(); clearTimeout(moveTimer); jumpCity.value = null; navigate({ mapCity: undefined, cityName: undefined }) }
 const setFilter = (key, value) => { clearTimeout(moveTimer); navigate({ [key]: Array.isArray(value) ? value.join(',') : value || undefined, ...(['dateFrom', 'dateTo'].includes(key) ? { datePreset: undefined } : {}) }) }
 const setDate = mode => { clearTimeout(moveTimer); customDates.value = mode === 'custom'; if (customDates.value) return; navigate({ ...concertDatePreset(mode, new Date()), datePreset: mode === 'any' ? undefined : mode }) }
 const resetFilters = () => navigate({ dateFrom: undefined, dateTo: undefined, datePreset: undefined, composers: undefined, works: undefined })
 const setPage = value => navigate({ page: value > 1 ? String(value) : undefined })
+watch(() => JSON.stringify(listParams.value), () => { if (programmePanel.value) programmePanel.value.scrollTop = 0 }, { flush: 'post' })
+watch(mapCityQuery, value => { if (value) revealConcerts() })
 const concertDate = (date, part) => date ? new Intl.DateTimeFormat(locale, { [part]: part === 'month' ? 'short' : 'numeric', timeZone: 'UTC' }).format(new Date(date)) : ''
 watch(selectedCity, value => { jumpCity.value = value }, { immediate: true })
 watch(bounds, value => { clearTimeout(moveTimer); latestBounds = value }, { flush: 'sync' })
@@ -199,14 +237,31 @@ useConcertListSeo({ title: () => `${t('Concert map')} — ${concertSite.name}`, 
 .map-page :is(button, a, input, select):focus-visible { outline: 2px solid var(--ui-primary); outline-offset: 3px; }
 .map-page ::selection { background: var(--color-blue-100); color: var(--color-gray-950); }
 @media (max-width: 64rem) { .map-workspace { grid-template-columns: minmax(0, 1fr) minmax(0, 21rem); } }
-@media (max-width: 48rem) {
-  .map-heading { padding: 1rem; align-items: start; }
-  .map-heading h1 { font-size: var(--text-2xl); }
-  .map-filter-toggle { display: flex; align-items: center; gap: .5rem; min-height: 2.75rem; margin-inline: 1rem; color: var(--ui-primary); font-size: var(--text-sm); cursor: pointer; }
-  .map-toolbar { display: none; position: absolute; inset-inline: 0; top: 100%; max-height: 55dvh; overflow: auto; border-bottom: 1px solid var(--color-gray-200); grid-template-columns: repeat(2, minmax(0, 1fr)); padding: .75rem 1rem 1rem; gap: 1rem; }
-  .map-toolbar-open { display: grid; }
-  .map-workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
-}
+/* Mobile keeps one stable map viewport behind the programme panel. */
+.map-mobile { grid-template-rows: auto minmax(0, 1fr); }
+.map-mobile .map-heading { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.map-mobile .map-heading a { display: none; }
+.mobile-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: .5rem 1rem; background: white; }
+.mobile-search :deep(label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.mobile-search :deep(input) { font-size: 16px; }
+.map-mobile .map-filter-toggle { display: inline-flex; gap: .4rem; align-items: center; min-height: 44px; color: var(--ui-primary); font-size: var(--text-sm); cursor: pointer; }
+.map-mobile :deep(.text-primary), .map-mobile :deep(.panel-back), .map-mobile .map-filter-toggle { color: var(--color-blue-600); }
+.map-mobile :deep(input::placeholder) { color: var(--color-gray-500); }
+.map-mobile .map-toolbar { position: fixed; inset: 0; width: 100%; height: 100dvh; max-width: none; max-height: 100dvh; margin: 0; border: 0; padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom)); overflow-y: auto; background: white; }
+.map-mobile .map-toolbar:not([open]) { display: none; }
+.map-mobile .map-toolbar[open] { display: flex; flex-direction: column; gap: 1.5rem; }
+.map-mobile .map-toolbar :deep(input), .map-mobile .map-toolbar select { font-size: 16px; }
+.filter-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.map-mobile .map-workspace { position: relative; display: block; overflow: hidden; }
+.map-mobile .map-stage { position: absolute; inset: 0; }
+.map-mobile .map-caption { top: auto; bottom: calc(100px + env(safe-area-inset-bottom)); left: .5rem; padding: .35rem .5rem; max-width: calc(100% - 8rem); }
+.map-mobile .map-concert { padding: 1rem; gap: .75rem; }
+.map-mobile :deep(.leaflet-bottom) { bottom: calc(88px + env(safe-area-inset-bottom)); }
+.map-mobile [data-panel="preview"] :deep(.leaflet-bottom) { bottom: max(45%, 230px); }
+.map-info { position: absolute; top: .75rem; left: .75rem; z-index: 600; background: white; border: 1px solid var(--color-gray-300); max-width: calc(100% - 5rem); font-size: var(--text-xs); }
+.map-info summary { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; cursor: pointer; list-style: none; }
+.map-info summary::-webkit-details-marker { display: none; }
+.map-info p { padding: 0 .75rem .75rem; max-width: 17rem; }
 @media (max-height: 600px) and (min-width: 48.001rem) {
   .map-heading { padding-block: .5rem; }
   .map-heading h1 { font-size: var(--text-2xl); }

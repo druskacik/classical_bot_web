@@ -14,13 +14,23 @@ const renderer = Vue.createRenderer({ createComment: () => ({}), insert() {}, re
 async function mount(path, props, route = Vue.reactive({ query: {} }), fetcher = async () => ({ items: [] })) {
   const mounted = []
   const dataRequests = []
+  // Each mount gets desktop media queries and its own listener lifecycle.
+  const mediaQueries = new Map()
+  const browserWindow = {
+    matchMedia(query) {
+      if (!mediaQueries.has(query)) {
+        mediaQueries.set(query, Object.assign(new EventTarget(), { media: query, matches: false }))
+      }
+      return mediaQueries.get(query)
+    },
+  }
   const { descriptor } = parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
   const executable = compileScript(descriptor, { id: 'review-test' }).content
     .replace(/import \{([^}]+)\} from ['"]([^'"]+)['"]/g, (_, names, source) =>
       `const { ${names.replace(/ as /g, ': ')} } = ${source === 'vue' ? 'Vue' : 'utilities'}`)
     .replace('export default', 'return')
-  const component = new Function('Vue', 'utilities', 'route', '$fetch', 'mounted', 'dataRequests', `
-    const { ref, computed, watch, useId, onBeforeUnmount } = Vue;
+  const component = new Function('Vue', 'utilities', 'route', '$fetch', 'mounted', 'dataRequests', 'window', `
+    const { ref, computed, watch, useId, nextTick, onBeforeUnmount } = Vue;
     const onMounted = callback => mounted.push(callback);
     const useConcertText = () => ({ t: text => text, locale: 'en-GB' });
     const useAppConfig = () => ({ concertSite: {} });
@@ -30,7 +40,7 @@ async function mount(path, props, route = Vue.reactive({ query: {} }), fetcher =
     const useConcertListSeo = () => {};
     const useAsyncData = (key, handler) => { dataRequests.push({ key, handler }); return { data: ref({ items: [] }), status: ref('success'), refresh() {} } };
     ${executable}
-  `)(Vue, { ...discovery, ...area, ...map }, route, fetcher, mounted, dataRequests)
+  `)(Vue, { ...discovery, ...area, ...map }, route, fetcher, mounted, dataRequests, browserWindow)
   let result
   const app = renderer.createApp({ setup() { result = component.setup(props, { emit() {}, expose() {} }); return () => null } })
   app.mount({})
@@ -203,7 +213,13 @@ test('map component marks initialization, history fitBounds and resize events as
     on: (name, fn) => { handlers[name] = fn },
     invalidateSize: () => handlers.moveend?.(), remove() {},
   }
-  const layer = { addTo() { return this }, on() {}, clearLayers() {} }
+  const markerLayers = new Set()
+  const layer = {
+    addTo() { return this }, on() {},
+    addLayer(marker) { markerLayers.add(marker); return this },
+    clearLayers() { markerLayers.clear() },
+    eachLayer(callback) { markerLayers.forEach(callback) },
+  }
   const leaflet = { map: () => leafletMap, control: { zoom: () => layer, scale: () => layer }, layerGroup: () => layer, tileLayer: () => layer }
   const { descriptor } = parse(readFileSync(new URL('../layers/concerts/app/components/concert-map.client.vue', import.meta.url), 'utf8'))
   const executable = compileScript(descriptor, { id: 'leaflet-restoration' }).content
@@ -218,7 +234,7 @@ test('map component marks initialization, history fitBounds and resize events as
     const useRuntimeConfig = () => ({ public: {} });
     ${executable}
   `)(Vue, map, leaflet, class { constructor(callback) { resizeCallback = callback } observe() {} disconnect() {} })
-  const props = Vue.reactive({ cities: [], bounds: '10,40,20,50', selected: null, focus: null })
+  const props = Vue.reactive({ cities: [], bounds: '10,40,20,50', selected: null, focus: null, obscuredHeight: 0 })
   const app = renderer.createApp({ setup() { component.setup(props, { emit: (...args) => events.push(args), expose() {} }); return () => null } })
   app.mount({})
   try {

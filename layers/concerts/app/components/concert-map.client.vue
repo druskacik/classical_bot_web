@@ -1,7 +1,7 @@
 <template>
   <div class="relative h-full min-h-0 bg-gray-100">
     <div ref="container" class="h-full min-h-0 w-full" :aria-label="t('Concert map. Use arrow keys to pan, plus and minus to zoom.')" />
-    <div v-if="loading || error" class="absolute inset-x-4 bottom-10 z-[500] mx-auto max-w-sm bg-white px-4 py-3 text-sm text-gray-700" role="status">
+    <div v-if="loading || error" :style="obscuredHeight ? { bottom: `${obscuredHeight + 16}px` } : undefined" class="absolute inset-x-4 bottom-10 z-[500] mx-auto max-w-sm bg-white px-4 py-3 text-sm text-gray-700" role="status">
       <template v-if="error">{{ t('Map tiles could not be loaded.') }} <button type="button" class="min-h-11 px-2 text-primary underline" @click="retry">{{ t('Retry') }}</button></template>
       <template v-else>{{ t('Loading map…') }}</template>
     </div>
@@ -9,7 +9,7 @@
 </template>
 <script setup>
 import { clusterMapCities, nearestMapLongitude, parseMapBounds, serializeMapBounds } from '../../shared/utils/concert-map.js'
-const props = defineProps({ cities: { type: Array, default: () => [] }, bounds: { type: String, default: null }, selected: { type: String, default: null }, focus: { type: Object, default: null } })
+const props = defineProps({ obscuredHeight: { type: Number, default: 0 }, cities: { type: Array, default: () => [] }, bounds: { type: String, default: null }, selected: { type: String, default: null }, focus: { type: Object, default: null } })
 const emit = defineEmits(['bounds', 'select'])
 const { t, locale } = useConcertText()
 const { concertSite } = useAppConfig()
@@ -36,6 +36,17 @@ const fit = value => {
     try { map.fitBounds([[b.south, b.west], [b.north, b.east < b.west ? b.east + 360 : b.east]], { animate: false }) }
     finally { restoringViewport = false }
   }
+}
+const updateMarkerAccess = () => {
+  if (!map || !markers) return
+  markers.eachLayer(marker => {
+    const point = map.latLngToContainerPoint(marker.getLatLng())
+    const covered = props.obscuredHeight > 0 && point.y + 22 > map.getSize().y - props.obscuredHeight
+    const element = marker.getElement()
+    element.tabIndex = covered ? -1 : 0
+    if (covered) element.setAttribute('aria-hidden', 'true')
+    else element.removeAttribute('aria-hidden')
+  })
 }
 const draw = () => {
   if (!map) return
@@ -66,6 +77,7 @@ const draw = () => {
     marker.getElement().dataset.markerKey = key
     if (key === focused) restoredFocus = marker.getElement()
   }
+  updateMarkerAccess()
   if (focused) (restoredFocus || container.value)?.focus({ preventScroll: true })
 }
 const focusCity = () => {
@@ -105,6 +117,7 @@ const initialize = async () => {
 const retry = () => { if (tiles && map) { error.value = false; loading.value = true; tiles.redraw() } else initialize() }
 watch(() => [props.cities, props.selected], draw)
 watch(() => props.focus, focusCity)
+watch(() => props.obscuredHeight, updateMarkerAccess)
 watch(() => props.bounds, bounds => {
   if (!map) return
   if (!bounds) publishBounds(true)

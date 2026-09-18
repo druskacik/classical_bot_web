@@ -1,4 +1,9 @@
 const slovak = {
+  "Filters": "Filtre",
+  "About the map": "O mape",
+  "In this area": "V tejto oblasti",
+  "Back to map": "Späť na mapu",
+  "Show concerts": "Zobraziť koncerty",
   "Full programme": "Celý program",
   "Done": "Hotovo",
   "Radius": "Okolie",
