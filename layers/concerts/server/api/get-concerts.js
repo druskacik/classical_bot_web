@@ -1,3 +1,5 @@
+import { getAreaCities } from '../utils/area-cities.js'
+import { resolveArea, publicArea } from '../utils/concert-area.js'
 import { concertFilterCacheInput } from '../utils/data-cache-keys.js'
 import { cachedConcertData } from '../utils/concert-data-cache.js'
 import { concertSite } from '#concert-site'
@@ -12,6 +14,7 @@ export default defineEventHandler(async (event) => {
     const query = getQuery(event)
     const page = parsePage(query.page)
     const filters = parseConcertFilters(query, concertSite.country)
+    if (filters.area) filters.area = resolveArea(filters.area, await getAreaCities(), concertSite.locale)
     const { city } = filters
 
     return await cachedConcertData('concerts', { filters: concertFilterCacheInput(filters), page }, async () => {
@@ -89,6 +92,7 @@ export default defineEventHandler(async (event) => {
           composers: composersByConcert[concert.id] || [],
           works: worksByConcert.get(String(concert.id)) || [],
         })),
+        ...(filters.area ? { area: publicArea(filters.area) } : {}),
         page,
         pageSize: PAGE_SIZE,
         total,

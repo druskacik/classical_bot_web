@@ -14,6 +14,7 @@ const items = computed(() => [
         })),
         slot: 'countries'
     },
+    { label: 'Map', href: '/map' },
     { label: 'Composers', href: '/composers' },
     { label: 'Sources', href: '/sources' },
     { label: 'Blog', href: '/blog' },

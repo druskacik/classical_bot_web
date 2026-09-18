@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 export default defineNuxtConfig({
   $meta: { name: 'concerts' },
   alias: { '#concert-site': fileURLToPath(new URL('./shared/site.js', import.meta.url)) },
+  runtimeConfig: { public: { areaMapTileUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', areaMapAttribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' } },
   compatibilityDate: '2024-11-01',
   nitro: {
     compressPublicAssets: true,

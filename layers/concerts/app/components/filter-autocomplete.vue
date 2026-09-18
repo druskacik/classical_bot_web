@@ -5,8 +5,9 @@
     </label>
 
     <div
-      class="flex min-h-11 flex-wrap items-center gap-1.5 border-b border-gray-300 bg-transparent py-1.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25"
+      class="flex min-h-11 items-center gap-2 border-b border-gray-300 bg-transparent py-1.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25"
     >
+      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
       <span
         v-for="option in selectedOptions"
         :key="option.value"
@@ -29,8 +30,9 @@
         type="search"
         maxlength="100"
         autocomplete="off"
-        :placeholder="selectedOptions.length ? (type === 'city' ? t('Change city…') : t('Add another…')) : placeholder"
-        class="min-w-32 flex-1 bg-transparent py-1 text-sm text-gray-900 outline-none placeholder:text-gray-400"
+        :placeholder="selectedOptions.length ? (['city', 'area-city'].includes(type) ? t('Change city…') : t('Add another…')) : placeholder"
+        :class="compact ? 'min-w-0 w-full' : 'min-w-32'"
+        class="flex-1 bg-transparent py-1 text-sm text-gray-900 outline-none placeholder:text-gray-400"
         role="combobox"
         aria-autocomplete="list"
         :aria-expanded="open"
@@ -42,6 +44,10 @@
         @focus="openOptions"
         @keydown="handleKeydown"
       >
+      </div>
+      <div v-if="$slots.trailing" class="shrink-0" @focusin="closeOptions">
+        <slot name="trailing" />
+      </div>
     </div>
 
     <div
@@ -99,6 +105,7 @@
 <script setup>
 const { t, availableOptions: describeOptions } = useConcertText()
 const props = defineProps({
+  compact: Boolean,
   type: { type: String, required: true },
   label: { type: String, required: true },
   placeholder: { type: String, required: true },
@@ -109,7 +116,7 @@ const props = defineProps({
   modelValue: { type: Array, required: true },
 })
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'select'])
 const root = ref(null)
 const search = ref('')
 const open = ref(false)
@@ -129,7 +136,7 @@ const availableOptions = computed(() => options.value.filter(
 ))
 
 const optionChipLabel = (option) => {
-  if (props.type === 'city') return option.label
+  if (['city', 'area-city'].includes(props.type)) return option.label
   return option.secondaryLabel ? `${option.secondaryLabel} — ${option.label}` : option.label
 }
 
@@ -150,7 +157,7 @@ const loadOptions = async () => {
   loading.value = true
   loadError.value = false
   try {
-    const response = await $fetch('/api/get-concert-filter-options', {
+    const response = await $fetch(props.type === 'area-city' ? '/api/get-area-cities' : '/api/get-concert-filter-options', {
       params: {
         ...props.context,
         type: props.type,
@@ -208,7 +215,9 @@ const handleKeydown = (event) => {
   } else if (event.key === 'Enter') {
     event.preventDefault()
     selectActiveOption()
-  } else if (event.key === 'Escape') {
+  } else if (event.key === 'Escape' && open.value) {
+    event.stopPropagation()
+    event.preventDefault()
     closeOptions()
   }
 }
@@ -239,6 +248,7 @@ const select = (option) => {
   const value = String(option.value)
   selectedOptions.value = [...selectedOptions.value, { ...option, value }]
   emit('update:modelValue', [...props.modelValue, value])
+  emit('select', option)
   search.value = ''
   closeOptions()
 }

@@ -14,6 +14,7 @@ const items = computed(() => [
         : [{ label: 'Žiadne mestá s nadchádzajúcimi koncertmi.', disabled: true }],
     slot: 'countries',
   },
+  { label: 'Mapa', href: '/map' },
   { label: 'Zdroje', href: '/zdroje' },
   { label: 'O projekte', href: '/blog/o-projekte' },
   { label: 'Kontakt', href: '/kontakt' },

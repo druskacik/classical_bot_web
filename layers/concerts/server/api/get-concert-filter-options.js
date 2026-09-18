@@ -1,3 +1,5 @@
+import { getAreaCities } from '../utils/area-cities.js'
+import { resolveArea } from '../utils/concert-area.js'
 import { concertFilterCacheInput } from '../utils/data-cache-keys.js'
 import { cachedConcertData } from '../utils/concert-data-cache.js'
 import { concertSite } from '#concert-site'
@@ -18,6 +20,7 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: 'Type must be country, city, composer, or work' })
     }
     const filters = parseConcertFilters(query, concertSite.country)
+    if (filters.area) filters.area = resolveArea(filters.area, await getAreaCities(), concertSite.locale)
     // Retain the canonical-city parameter used by existing API callers.
     if (query.cityId !== undefined) {
       const id = first(query.cityId)

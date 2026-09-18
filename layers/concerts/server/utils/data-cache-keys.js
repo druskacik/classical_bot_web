@@ -1,6 +1,8 @@
 // Inputs have already passed endpoint validation. Keep key normalization separate
 // from query inputs: set-like filters can be sorted without changing result order.
 export const concertFilterCacheInput = filters => ({
+  ...(filters.bounds ? { bounds: filters.bounds } : {}),
+  ...(filters.area ? { area: { cityId: filters.area.cityId || null, latitude: filters.area.latitude, longitude: filters.area.longitude, radiusKm: filters.area.radiusKm } } : {}),
   country: filters.country,
   siteCountry: filters.siteCountry || null,
   city: filters.city,

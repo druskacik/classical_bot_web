@@ -1,6 +1,6 @@
 <template>
-  <section :aria-label="t('Concert filters')" :class="['py-2', fixedCity && 'md:grid md:grid-cols-3 md:items-start md:gap-x-6']">
-    <div :class="['grid gap-x-6 gap-y-4', fixedCity ? 'md:grid-cols-1' : fixedCountry ? 'md:grid-cols-2' : 'md:grid-cols-3']">
+  <section :aria-label="t('Concert filters')" class="py-2">
+    <div :class="['grid gap-x-6 gap-y-4', fixedCountry ? 'md:grid-cols-2' : 'md:grid-cols-3']">
       <label v-if="!fixedCountry" class="block">
         <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">{{ t('Country') }}</span>
         <select
@@ -18,16 +18,7 @@
         <span v-if="countriesError" class="mt-2 block text-xs text-gray-600">{{ t('Countries could not be loaded.') }} <button type="button" class="cursor-pointer text-primary underline" @click="$emit('retry-countries')">{{ t('Try again') }}</button></span>
       </label>
 
-      <FilterAutocomplete
-        v-if="!fixedCity"
-        type="city"
-        :context="optionContext"
-        :label="t('City')"
-        :placeholder="t('Any city')"
-        :country="effectiveCountry"
-        :model-value="city ? [city] : []"
-        @update:model-value="update('city', $event.at(-1) || null)"
-      />
+      <CityRadius ref="cityControl" :city="fixedCity || city" :radius="radius" :country="effectiveCountry" :context="cityContext" @change="$emit('city-radius', $event)" />
 
       <div>
         <label class="block">
@@ -56,12 +47,12 @@
       {{ t('Composer or work') }}
       <UIcon :name="musicExpanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" class="size-4" aria-hidden="true" />
     </button>
-    <div :id="musicId" :class="[musicExpanded ? 'grid' : 'hidden', 'mt-3 gap-5 md:grid md:grid-cols-2', fixedCity ? 'md:col-span-2 md:mt-0 md:gap-6' : 'md:mt-5']">
+    <div :id="musicId" :class="[musicExpanded ? 'grid' : 'hidden', 'mt-3 gap-5 md:grid md:grid-cols-2', 'md:mt-5']">
       <FilterAutocomplete
         type="composer"
         :context="optionContext"
         :show-count="false"
-        :city-id="fixedCityId"
+        :city-id="radius ? null : fixedCityId"
         :label="t('Composer')"
         :placeholder="t('Search composers')"
         :country="effectiveCountry"
@@ -72,7 +63,7 @@
         type="work"
         :context="optionContext"
         :show-count="false"
-        :city-id="fixedCityId"
+        :city-id="radius ? null : fixedCityId"
         :label="t('Work')"
         :placeholder="t('Search works or composers')"
         :country="effectiveCountry"
@@ -91,8 +82,12 @@
 <script setup>
 const { t, locale, activeFilters } = useConcertText()
 import { concertDatePreset, formatConcertDateRange, resolveConcertDateMode } from '../utils/concert-discovery.js'
+import { clearAreaQuery, hasAreaQuery } from '../../shared/utils/concert-area.js'
 
 const props = defineProps({
+  radius: { type: Number, default: 0 },
+  bounds: { type: String, default: null },
+  areaQuery: { type: Object, default: () => ({}) },
   countries: { type: Array, required: true },
   countriesLoading: Boolean,
   countriesError: Boolean,
@@ -108,7 +103,11 @@ const props = defineProps({
   works: { type: Array, required: true },
 })
 
-const emit = defineEmits(['update', 'clear', 'retry-countries'])
+const emit = defineEmits(['update', 'clear', 'retry-countries', 'city-radius'])
+const { concertSite } = useAppConfig()
+const siteCountry = concertSite.country
+const cityControl = ref(null)
+defineExpose({ editArea: () => cityControl.value?.focusRadius() })
 const musicId = useId()
 const musicExpanded = ref(Boolean(props.composers.length || props.works.length))
 watch(() => [props.composers.join(','), props.works.join(',')], () => {
@@ -131,14 +130,20 @@ const selectDateMode = (mode) => {
   emit('update', { changes: { ...range, datePreset: ['today', 'week', 'weekend'].includes(mode) ? mode : null } })
 }
 const optionContext = computed(() => ({
-  city: props.fixedCity || props.city || undefined,
+  bounds: props.bounds || undefined,
+  ...(hasAreaQuery(props.areaQuery) ? props.areaQuery : {
+    radius: props.radius > 0 ? String(props.radius) : undefined,
+    city: props.fixedCity || props.city || undefined,
+  }),
   dateFrom: props.dateFrom || undefined,
   dateTo: props.dateTo || undefined,
   composers: props.composers.join(',') || undefined,
   works: props.works.join(',') || undefined,
 }))
-const effectiveCountry = computed(() => props.fixedCountry || props.country || null)
+const cityContext = computed(() => ({ ...optionContext.value, ...clearAreaQuery(), radius: undefined, city: undefined }))
+const effectiveCountry = computed(() => props.radius ? null : props.fixedCountry || props.country || null)
 const activeFilterCount = computed(() => [
+  props.radius,
   !props.fixedCountry && props.country,
   !props.fixedCity && props.city,
   props.dateFrom,

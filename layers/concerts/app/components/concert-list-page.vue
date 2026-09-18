@@ -4,6 +4,11 @@
 
     <div class="mx-auto mt-5 max-w-6xl">
       <ConcertFilters
+        ref="filterControls"
+        :radius="radius"
+        :area-query="activeAreaQuery"
+        :bounds="firstValue(route.query.bounds) || null"
+        @city-radius="changeCityRadius"
         :countries="filterCountries"
         :countries-loading="countryOptionsStatus === 'pending'"
         :countries-error="countryOptionsStatus === 'error'"
@@ -12,7 +17,7 @@
         :fixed-city="cityPage?.id || cityPage?.filterValue || null"
         :fixed-city-id="cityPage?.id || null"
         :country="filters.country"
-        :city="filters.city"
+        :city="filters.city || concertPage?.area?.cityId || null"
         :date-from="filters.dateFrom"
         :date-to="filters.dateTo"
         :date-preset="filters.datePreset"
@@ -22,11 +27,12 @@
         @clear="clearFilters"
       />
 
+      <p v-if="route.query.bounds" class="mt-3 flex items-center gap-4 text-sm text-gray-600">{{ t('Map area') }} <button type="button" class="min-h-11 text-primary hover:underline" @click="updateFilter({ key: 'bounds', value: null })">{{ t('Remove map area') }}</button></p>
       <div ref="resultsHeading" class="mt-3 flex min-h-8 items-center justify-between gap-4" tabindex="-1">
         <p v-if="concertPage" class="text-sm text-gray-600" aria-live="polite">
           {{ resultSummary }}
         </p>
-        <span v-if="concertStatus === 'pending' && concertPage" class="text-xs text-gray-400">{{ t('Updating…') }}</span>
+        <NuxtLink :to="{ path: '/map', query: cleanConcertQuery({ ...route.query, city: filters.city || undefined, country: undefined, page: undefined }) }" class="ml-auto inline-flex min-h-11 items-center gap-2 text-sm text-primary hover:underline"><UIcon name="i-lucide-map" class="size-4" />{{ t('Explore map') }}</NuxtLink>
       </div>
 
       <div v-if="concertStatus === 'pending' && !concertPage" class="py-10">
@@ -85,6 +91,7 @@
       <div v-else class="py-16 text-center">
         <p class="font-serif text-xl text-gray-800">{{ cityPage && !hasRemovableFilters ? t('No upcoming concerts listed in {city}.', { city: cityPage.name }) : t('No upcoming concerts match these filters.') }}</p>
         <div class="mt-3 flex flex-wrap justify-center gap-x-6 gap-y-2">
+          <button v-if="radius" type="button" class="min-h-11 cursor-pointer text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" @click="filterControls?.editArea()">{{ t('Increase distance') }}</button>
           <button v-if="filters.dateFrom || filters.dateTo" type="button" class="min-h-11 cursor-pointer text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" @click="updateFilter({ changes: { dateFrom: null, dateTo: null } })">{{ t('Try any date') }}</button>
           <button v-if="filters.composers.length || filters.works.length" type="button" class="min-h-11 cursor-pointer text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" @click="updateFilter({ changes: { composers: [], works: [] } })">{{ t('Remove music filters') }}</button>
         </div>
@@ -97,7 +104,8 @@
 
 <script setup>
 const { t, locale, plural } = useConcertText()
-import { cleanConcertQuery, updateConcertQuery } from '../utils/concert-discovery.js'
+import { cleanConcertQuery, updateConcertQuery, cityRadiusLocation } from '../utils/concert-discovery.js'
+import { AREA_KEYS, hasAreaQuery, clearAreaQuery } from '../../shared/utils/concert-area.js'
 import { createConcertDateFormatting } from '../utils/concert-dates.js'
 const props = defineProps({
   title: { type: String, required: true },
@@ -109,11 +117,15 @@ const { concertSite } = useAppConfig()
 const route = useRoute()
 const router = useRouter()
 const resultsHeading = ref(null)
+const filterControls = ref(null)
 const firstValue = value => Array.isArray(value) ? value[0] : value
 const listValue = value => typeof firstValue(value) === 'string'
   ? [...new Set(firstValue(value).split(',').map(item => item.trim()).filter(Boolean))]
   : []
 
+const activeAreaQuery = computed(() => Object.fromEntries(AREA_KEYS.filter(key => route.query[key] !== undefined).map(key => [key, route.query[key]])))
+const unresolvedArea = computed(() => hasAreaQuery(route.query) ? { cityId: firstValue(route.query.nearCity) || null, latitude: route.query.nearLat === undefined ? null : Number(firstValue(route.query.nearLat)), longitude: route.query.nearLng === undefined ? null : Number(firstValue(route.query.nearLng)), radiusKm: Number(firstValue(route.query.radiusKm)), label: null } : null)
+const radius = computed(() => Number(firstValue(route.query.radius) || firstValue(route.query.radiusKm)) || 0)
 const filters = computed(() => ({
   country: props.countryCode || firstValue(route.query.country) || null,
   city: props.cityPage?.id || props.cityPage?.filterValue || firstValue(route.query.city) || null,
@@ -126,11 +138,14 @@ const filters = computed(() => ({
 }))
 
 const hasRemovableFilters = computed(() => Boolean(
-  filters.value.dateFrom || filters.value.dateTo || filters.value.composers.length || filters.value.works.length,
+  unresolvedArea.value || filters.value.dateFrom || filters.value.dateTo || filters.value.composers.length || filters.value.works.length,
 ))
 
 const requestParams = computed(() => ({
-  country: filters.value.country || undefined,
+  ...activeAreaQuery.value,
+  bounds: route.query.bounds,
+  radius: route.query.radius,
+  country: unresolvedArea.value || radius.value ? undefined : filters.value.country || undefined,
   city: filters.value.city || undefined,
   dateFrom: filters.value.dateFrom || undefined,
   dateTo: filters.value.dateTo || undefined,
@@ -150,6 +165,9 @@ const [
 ] = await Promise.all([countriesRequest, concertsRequest])
 
 const countryOptionParams = computed(() => ({
+  ...activeAreaQuery.value,
+  bounds: route.query.bounds,
+  ...(radius.value && !unresolvedArea.value ? { city: filters.value.city, radius: String(radius.value) } : {}),
   type: 'country',
   dateFrom: requestParams.value.dateFrom,
   dateTo: requestParams.value.dateTo,
@@ -210,6 +228,8 @@ const paginationItems = computed(() => {
 const updateFilter = async ({ key, value, changes }) => {
   await router.push({ query: updateConcertQuery(route.query, changes || { [key]: value }) })
 }
+
+const changeCityRadius = async ({ city, radius }) => { await router.push(cityRadiusLocation(route.query, city, radius)) }
 
 const clearFilters = async () => {
   await router.push({ query: {} })

@@ -40,7 +40,7 @@ const sourceModule = source => `data:text/javascript,${encodeURIComponent(source
 const hooks = registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier === '#concert-site') return { shortCircuit: true, url: sourceModule('export const concertSite = globalThis.cacheEndpointFixtures.site') }
-    if (specifier.endsWith('/utils/connection.js')) return { shortCircuit: true, url: sourceModule('export default globalThis.cacheEndpointFixtures.db') }
+    if (specifier.endsWith('/connection.js')) return { shortCircuit: true, url: sourceModule('export default globalThis.cacheEndpointFixtures.db') }
     if (specifier.endsWith('/utils/city-catalogue.js')) return { shortCircuit: true, url: sourceModule('export const getCityCatalogue = async () => globalThis.cacheEndpointFixtures.catalogue') }
     if (specifier.startsWith('#layers/concerts/')) return nextResolve(new URL(`../layers/concerts/${specifier.slice('#layers/concerts/'.length)}`, import.meta.url).href, context)
     return nextResolve(specifier, context)

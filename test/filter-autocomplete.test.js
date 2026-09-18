@@ -26,7 +26,7 @@ const renderer = Vue.createRenderer({
 const find = (node, tag) => node.tag === tag ? node : node.children?.map(child => find(child, tag)).find(Boolean)
 const settle = async () => { await Vue.nextTick(); await new Promise(resolve => setTimeout(resolve, 250)); await Vue.nextTick() }
 
-for (const type of ['composer', 'city', 'work']) {
+for (const type of ['composer', 'city', 'work', 'area-city']) {
   test(`${type} suggestions update during composition, clear, and ordinary typing`, async () => {
     const requests = []
     const selections = []
@@ -34,7 +34,7 @@ for (const type of ['composer', 'city', 'work']) {
       const { ref, computed, watch, nextTick, useId, onMounted, onUnmounted } = Vue;
       ${executable}
     `)(Vue, async (_url, { params }) => {
-      requests.push(params)
+      requests.push({ ...params, endpoint: _url })
       return { items: [{ value: '1', label: 'Mozart' }] }
     }, () => ({ t: text => text, availableOptions: count => String(count) }), {
       addEventListener() {}, removeEventListener() {}, getElementById() {},
@@ -51,10 +51,11 @@ for (const type of ['composer', 'city', 'work']) {
       await Vue.nextTick()
       input.props.onInput({ target: { value: 'Moz' }, isComposing: true })
       await settle()
+      assert.equal(requests.at(-1).endpoint, type === 'area-city' ? '/api/get-area-cities' : '/api/get-concert-filter-options')
       assert.equal(requests.at(-1).q, 'Moz', 'search before compositionend or Enter')
       assert.equal(input.props.value, 'Moz')
 
-      const key = (key, extra = {}) => input.props.onKeydown({ key, preventDefault() {}, ...extra })
+      const key = (key, extra = {}) => input.props.onKeydown({ key, preventDefault() {}, stopPropagation() {}, ...extra })
       key('ArrowDown')
       key('Enter', { isComposing: true })
       key('Enter', { keyCode: 229 })

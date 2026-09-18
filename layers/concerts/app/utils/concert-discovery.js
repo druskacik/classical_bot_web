@@ -1,3 +1,4 @@
+import { clearAreaQuery, hasAreaQuery, areaQuery } from '../../shared/utils/concert-area.js'
 import { getCountryPath } from './countries.js'
 
 export const cleanConcertQuery = query => Object.fromEntries(
@@ -6,6 +7,7 @@ export const cleanConcertQuery = query => Object.fromEntries(
 
 export const updateConcertQuery = (query, changes) => cleanConcertQuery({
   ...query,
+  ...((Object.hasOwn(changes, 'city') || Object.hasOwn(changes, 'country')) && !hasAreaQuery(changes) ? { ...clearAreaQuery(), radius: undefined, bounds: undefined, cityName: undefined } : {}),
   ...Object.fromEntries(Object.entries(changes).map(([key, value]) => [
     key, Array.isArray(value) ? value.join(',') : value,
   ])),
@@ -79,3 +81,20 @@ export const formatConcertDateRange = (from, to, locale = 'en-GB', labels = { fr
   if (from && to) return from === to ? format(from) : `${format(from)} – ${format(to)}`
   return from ? `${labels.from} ${format(from)}` : `${labels.until} ${format(to)}`
 }
+
+export const concertAreaLocation = (query, area) => ({
+  path: '/',
+  query: updateConcertQuery(query, { ...clearAreaQuery(), ...areaQuery(area), city: undefined, country: undefined }),
+})
+export const normalizeAreaLocation = (path, query) => hasAreaQuery(query) && path !== '/map' && (path !== '/' || query.city !== undefined || query.country !== undefined)
+  ? { path: '/', query: cleanConcertQuery({ ...query, city: undefined, country: undefined, page: undefined }) }
+  : null
+
+// Location controls leave fixed city/country routes; music and dates travel with them.
+export const cityRadiusLocation = (query, city, radius = 0) => ({
+  path: '/',
+  query: updateConcertQuery(query, {
+    ...clearAreaQuery(), city: city || undefined, country: undefined,
+    radius: city && Number(radius) > 0 ? String(radius) : undefined,
+  }),
+})

@@ -1,5 +1,5 @@
 // Preserve the original /<local city name> URLs. Identity never depends on inventory.
-const RESERVED = new Set(['blog', 'kontakt', 'zdroje', 'api', '_nuxt', 'sitemap.xml', 'robots.txt'])
+const RESERVED = new Set(['map', 'blog', 'kontakt', 'zdroje', 'api', '_nuxt', 'sitemap.xml', 'robots.txt'])
 export function buildLocalCityCatalogue(rows, country) {
   const cities = rows.filter(row => row.country_code === country).map(row => ({
     id: String(row.id), name: row.local_name || row.english_name,

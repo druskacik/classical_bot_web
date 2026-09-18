@@ -1,3 +1,5 @@
+import { parseMapBounds } from '../../shared/utils/concert-map.js'
+import { parseArea } from './concert-area.js'
 import { normalizeCountryCode } from './countries.js'
 import { applyPublicConcertScope } from './public-concerts.js'
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
@@ -82,6 +84,13 @@ export const parseCity = (value) => {
 
 export const applyFilters = (builder, filters) => {
   applyPublicConcertScope(builder, filters.country, null, filters.siteCountry)
+  if (filters.bounds) {
+    const { west, south, east, north } = filters.bounds
+    builder.whereBetween('canonical_city.latitude', [south, north])
+    if (west <= east) builder.whereBetween('canonical_city.longitude', [west, east])
+    else builder.where(inner => inner.where('canonical_city.longitude', '>=', west).orWhere('canonical_city.longitude', '<=', east))
+  }
+  if (filters.area) builder.whereIn('cc.city_id', filters.area.cityIds)
   if (filters.city?.id) builder.where('cc.city_id', filters.city.id)
   else if (filters.city?.name) {
     if (filters.city.country) {
@@ -129,6 +138,9 @@ export const applyFilters = (builder, filters) => {
 }
 
 export const parseConcertFilters = (query, siteCountry = null) => {
+  let bounds
+  try { bounds = parseMapBounds(query.bounds) } catch (error) { throw createError({ statusCode: 400, statusMessage: error.message }) }
+  const area = parseArea(query)
   const countryValue = firstQueryValue(query.country)
   const country = countryValue ? normalizeCountryCode(countryValue) : null
   if (countryValue && !country) {
@@ -148,7 +160,7 @@ export const parseConcertFilters = (query, siteCountry = null) => {
     throw createError({ statusCode: 400, statusMessage: 'End date must not be before start date' })
   }
 
-  const city = parseCity(query.city)
+  const city = area ? null : parseCity(query.city)
   if ((siteCountry || country) && city?.country && (siteCountry || country) !== city.country) {
     throw createError({
       statusCode: 400,
@@ -157,6 +169,8 @@ export const parseConcertFilters = (query, siteCountry = null) => {
   }
 
   return {
+    ...(bounds ? { bounds } : {}),
+    ...(area ? { area } : {}),
     country: siteCountry || country,
     ...(siteCountry ? { siteCountry } : {}),
     city,

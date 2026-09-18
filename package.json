@@ -30,6 +30,7 @@
     "better-sqlite3": "^12.11.1",
     "dotenv": "^17.4.2",
     "knex": "^3.1.0",
+    "leaflet": "^1.9.4",
     "nodemailer": "^10.0.3",
     "nuxt": "^4.5.1",
     "objection": "^3.1.5",
@@ -41,6 +42,7 @@
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.121",
     "@lhci/cli": "0.15.1",
+    "@types/leaflet": "^1.9.22",
     "typescript": "^6.0.3",
     "vue-tsc": "^3.3.9"
   },
