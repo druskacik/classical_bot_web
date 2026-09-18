@@ -9,7 +9,6 @@
           <UIcon :name="modelValue === 'read' ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" class="size-5 shrink-0" />
           <span class="sr-only">{{ modelValue === 'read' ? t('Back to map') : t('Show concerts') }}</span>
         </button>
-        <button v-if="modelValue !== 'explore'" type="button" class="panel-back" @click="change('explore')">{{ t('Back to map') }}</button>
       </div>
       <div v-if="modelValue === 'read' || (modelValue === 'preview' && selected)" class="flex items-center justify-between gap-3 text-sm text-primary">
         <button v-if="selected" type="button" class="min-h-11" @click="$emit('clear')">{{ t('Show area') }}</button>
@@ -165,7 +164,6 @@ const cancelDrag = () => {
 .panel-heading { display: flex; gap: .75rem; align-items: center; }
 .panel-toggle { display: flex; flex: 1; min-width: 0; min-height: 68px; gap: .75rem; align-items: center; justify-content: space-between; text-align: left; cursor: pointer; }
 .panel-toggle > span:first-child { min-width: 0; overflow-wrap: anywhere; }
-.panel-back { min-height: 44px; font-size: var(--text-xs); color: var(--ui-primary); cursor: pointer; }
 .is-explore .panel-toggle > span:first-child > span:first-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .is-mobile :deep(.map-programme) { flex: 1; border-top: 1px solid var(--color-gray-200); opacity: 1; transition: opacity 160ms ease-out; }
 .is-explore:not(.is-dragging) :deep(.map-programme) { visibility: hidden; opacity: 0; }

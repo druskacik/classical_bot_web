@@ -4,7 +4,7 @@ ClassicalBot and Classical SK share these controls and retain the existing **Qui
 
 ## City radius
 
-**Radius** is a compact pill inside the right edge of the **City** field, sharing its label and underline. It is disabled until a city is selected. **City only** (zero or an unset radius) applies the existing exact-city filter. Presets are **25, 50, 100, 200, and 500 km**; **Custom…** accepts whole numbers from **0–500 km** inside that same pill and applies them with the check button or Enter. Escape cancels the edit; saved custom values return to a `+ 42 km` pill. Custom editing adds no extra form row. Presets apply immediately. Clearing the city clears its radius.
+**Radius** is a compact pill inside the right edge of the **City** field, sharing its label and underline. It is disabled until a city is selected. **+ 0 km** (zero or an unset radius) applies the existing exact-city filter. Presets are **25, 50, 100, 200, and 500 km**; **Custom…** accepts whole numbers from **0–500 km** inside that same pill and applies them with the check button or Enter. Escape cancels the edit; saved custom values return to a `+ 42 km` pill. Custom editing adds no extra form row. Presets apply immediately. Clearing the city clears its radius.
 
 Positive radii measure approximate straight-line distance from stored city coordinates, not venue locations or travel distance. Concerts without a matching city with valid coordinates are excluded. Classical SK always restricts results to Slovakia. Date, composer, and work filters continue to narrow the results.
 
