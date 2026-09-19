@@ -1,13 +1,43 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-25T23:29:31Z",
+  "generatedAt": "2026-09-19T09:07:04.555Z",
   "title": "Design System: ClassicalBot",
   "extensions": {
     "colorMeta": {
       "programme-blue": {
         "role": "primary",
         "displayName": "Programme Blue",
+        "canonical": "oklch(62.3% 0.214 259.815)",
+        "tonalRamp": [
+          "oklch(28.2% 0.091 267.935)",
+          "oklch(37.9% 0.146 265.522)",
+          "oklch(42.4% 0.199 265.638)",
+          "oklch(48.8% 0.243 264.376)",
+          "oklch(54.6% 0.245 262.881)",
+          "oklch(70.7% 0.165 254.624)",
+          "oklch(88.2% 0.059 254.128)",
+          "oklch(97% 0.014 254.604)"
+        ]
+      },
+      "programme-blue-strong": {
+        "role": "primary",
+        "displayName": "Programme Blue Strong",
         "canonical": "oklch(54.6% 0.245 262.881)",
+        "tonalRamp": [
+          "oklch(28.2% 0.091 267.935)",
+          "oklch(37.9% 0.146 265.522)",
+          "oklch(42.4% 0.199 265.638)",
+          "oklch(48.8% 0.243 264.376)",
+          "oklch(54.6% 0.245 262.881)",
+          "oklch(70.7% 0.165 254.624)",
+          "oklch(88.2% 0.059 254.128)",
+          "oklch(97% 0.014 254.604)"
+        ]
+      },
+      "programme-blue-deep": {
+        "role": "primary",
+        "displayName": "Programme Blue Deep",
+        "canonical": "oklch(48.8% 0.243 264.376)",
         "tonalRamp": [
           "oklch(28.2% 0.091 267.935)",
           "oklch(37.9% 0.146 265.522)",
@@ -26,26 +56,161 @@
         "tonalRamp": [
           "oklch(13% 0.028 261.692)",
           "oklch(21% 0.034 264.665)",
+          "oklch(27.8% 0.033 256.848)",
           "oklch(37.3% 0.034 259.733)",
-          "oklch(55.1% 0.027 264.364)",
+          "oklch(44.6% 0.03 256.802)",
           "oklch(70.7% 0.022 261.325)",
-          "oklch(87.2% 0.01 258.338)",
-          "oklch(96.7% 0.003 264.542)",
-          "#ffffff"
+          "oklch(92.8% 0.006 264.531)",
+          "oklch(98.5% 0.002 247.839)"
+        ]
+      },
+      "gallery-mist": {
+        "role": "neutral",
+        "displayName": "Gallery Mist",
+        "canonical": "oklch(98.5% 0.002 247.839)",
+        "tonalRamp": [
+          "oklch(13% 0.028 261.692)",
+          "oklch(21% 0.034 264.665)",
+          "oklch(27.8% 0.033 256.848)",
+          "oklch(37.3% 0.034 259.733)",
+          "oklch(44.6% 0.03 256.802)",
+          "oklch(70.7% 0.022 261.325)",
+          "oklch(92.8% 0.006 264.531)",
+          "oklch(98.5% 0.002 247.839)"
+        ]
+      },
+      "slate-soft": {
+        "role": "neutral",
+        "displayName": "Slate Soft",
+        "canonical": "oklch(96.7% 0.003 264.542)",
+        "tonalRamp": [
+          "oklch(13% 0.028 261.692)",
+          "oklch(21% 0.034 264.665)",
+          "oklch(27.8% 0.033 256.848)",
+          "oklch(37.3% 0.034 259.733)",
+          "oklch(44.6% 0.03 256.802)",
+          "oklch(70.7% 0.022 261.325)",
+          "oklch(92.8% 0.006 264.531)",
+          "oklch(98.5% 0.002 247.839)"
+        ]
+      },
+      "slate-faint": {
+        "role": "neutral",
+        "displayName": "Slate Faint",
+        "canonical": "oklch(70.7% 0.022 261.325)",
+        "tonalRamp": [
+          "oklch(13% 0.028 261.692)",
+          "oklch(21% 0.034 264.665)",
+          "oklch(27.8% 0.033 256.848)",
+          "oklch(37.3% 0.034 259.733)",
+          "oklch(44.6% 0.03 256.802)",
+          "oklch(70.7% 0.022 261.325)",
+          "oklch(92.8% 0.006 264.531)",
+          "oklch(98.5% 0.002 247.839)"
+        ]
+      },
+      "slate-divider": {
+        "role": "neutral",
+        "displayName": "Slate Divider",
+        "canonical": "oklch(92.8% 0.006 264.531)",
+        "tonalRamp": [
+          "oklch(13% 0.028 261.692)",
+          "oklch(21% 0.034 264.665)",
+          "oklch(27.8% 0.033 256.848)",
+          "oklch(37.3% 0.034 259.733)",
+          "oklch(44.6% 0.03 256.802)",
+          "oklch(70.7% 0.022 261.325)",
+          "oklch(92.8% 0.006 264.531)",
+          "oklch(98.5% 0.002 247.839)"
+        ]
+      },
+      "slate-field": {
+        "role": "neutral",
+        "displayName": "Slate Field",
+        "canonical": "oklch(87.2% 0.01 258.338)",
+        "tonalRamp": [
+          "oklch(13% 0.028 261.692)",
+          "oklch(21% 0.034 264.665)",
+          "oklch(27.8% 0.033 256.848)",
+          "oklch(37.3% 0.034 259.733)",
+          "oklch(44.6% 0.03 256.802)",
+          "oklch(70.7% 0.022 261.325)",
+          "oklch(92.8% 0.006 264.531)",
+          "oklch(98.5% 0.002 247.839)"
+        ]
+      },
+      "slate-muted": {
+        "role": "neutral",
+        "displayName": "Slate Muted",
+        "canonical": "oklch(55.1% 0.027 264.364)",
+        "tonalRamp": [
+          "oklch(13% 0.028 261.692)",
+          "oklch(21% 0.034 264.665)",
+          "oklch(27.8% 0.033 256.848)",
+          "oklch(37.3% 0.034 259.733)",
+          "oklch(44.6% 0.03 256.802)",
+          "oklch(70.7% 0.022 261.325)",
+          "oklch(92.8% 0.006 264.531)",
+          "oklch(98.5% 0.002 247.839)"
+        ]
+      },
+      "slate-secondary": {
+        "role": "neutral",
+        "displayName": "Slate Secondary",
+        "canonical": "oklch(44.6% 0.03 256.802)",
+        "tonalRamp": [
+          "oklch(13% 0.028 261.692)",
+          "oklch(21% 0.034 264.665)",
+          "oklch(27.8% 0.033 256.848)",
+          "oklch(37.3% 0.034 259.733)",
+          "oklch(44.6% 0.03 256.802)",
+          "oklch(70.7% 0.022 261.325)",
+          "oklch(92.8% 0.006 264.531)",
+          "oklch(98.5% 0.002 247.839)"
+        ]
+      },
+      "slate-body": {
+        "role": "neutral",
+        "displayName": "Slate Body",
+        "canonical": "oklch(37.3% 0.034 259.733)",
+        "tonalRamp": [
+          "oklch(13% 0.028 261.692)",
+          "oklch(21% 0.034 264.665)",
+          "oklch(27.8% 0.033 256.848)",
+          "oklch(37.3% 0.034 259.733)",
+          "oklch(44.6% 0.03 256.802)",
+          "oklch(70.7% 0.022 261.325)",
+          "oklch(92.8% 0.006 264.531)",
+          "oklch(98.5% 0.002 247.839)"
         ]
       },
       "slate-ink": {
         "role": "neutral",
-        "displayName": "Ink Slate",
+        "displayName": "Slate Ink",
         "canonical": "oklch(21% 0.034 264.665)",
         "tonalRamp": [
           "oklch(13% 0.028 261.692)",
           "oklch(21% 0.034 264.665)",
+          "oklch(27.8% 0.033 256.848)",
           "oklch(37.3% 0.034 259.733)",
           "oklch(44.6% 0.03 256.802)",
-          "oklch(55.1% 0.027 264.364)",
           "oklch(70.7% 0.022 261.325)",
-          "oklch(87.2% 0.01 258.338)",
+          "oklch(92.8% 0.006 264.531)",
+          "oklch(98.5% 0.002 247.839)"
+        ]
+      },
+      "slate-deep": {
+        "role": "neutral",
+        "displayName": "Slate Deep",
+        "canonical": "oklch(13% 0.028 261.692)",
+        "tonalRamp": [
+          "oklch(13% 0.028 261.692)",
+          "oklch(21% 0.034 264.665)",
+          "oklch(27.8% 0.033 256.848)",
+          "oklch(37.3% 0.034 259.733)",
+          "oklch(44.6% 0.03 256.802)",
+          "oklch(70.7% 0.022 261.325)",
+          "oklch(92.8% 0.006 264.531)",
           "oklch(98.5% 0.002 247.839)"
         ]
       }
@@ -70,6 +235,14 @@
       "label": {
         "displayName": "Label",
         "purpose": "Uppercase filter labels and compact context."
+      },
+      "compact": {
+        "displayName": "Compact",
+        "purpose": "Controls and metadata."
+      },
+      "chip": {
+        "displayName": "Chip",
+        "purpose": "Removable filter selections."
       }
     },
     "shadows": [
@@ -82,13 +255,28 @@
     "motion": [
       {
         "name": "state-fast",
-        "value": "150ms ease",
+        "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
         "purpose": "Subtle color and border feedback for small controls."
       },
       {
         "name": "content-update",
-        "value": "200ms ease",
+        "value": "200ms cubic-bezier(0.4, 0, 0.2, 1)",
         "purpose": "Opacity feedback while concert results refresh."
+      },
+      {
+        "name": "cover-feedback",
+        "value": "180ms ease-out",
+        "purpose": "Composer cover brightness feedback; disabled for reduced motion."
+      },
+      {
+        "name": "map-panel",
+        "value": "240ms cubic-bezier(.22,1,.36,1)",
+        "purpose": "Mobile map panel movement; disabled for reduced motion."
+      },
+      {
+        "name": "map-programme",
+        "value": "160ms ease-out",
+        "purpose": "Mobile programme opacity; disabled for reduced motion."
       }
     ],
     "breakpoints": [
@@ -113,7 +301,7 @@
       "refersTo": "text-action",
       "description": "The restrained action style used for clearing filters and retrying loads.",
       "html": "<button class=\"ds-text-action\" type=\"button\">Clear filters</button>",
-      "css": ".ds-text-action { appearance: none; border: 0; background: transparent; padding: 0; color: oklch(54.6% 0.245 262.881); font: 400 0.875rem/1.25rem Lato, sans-serif; cursor: pointer; } .ds-text-action:hover { text-decoration: underline; } .ds-text-action:focus-visible { border-radius: 0.125rem; outline: 2px solid oklch(54.6% 0.245 262.881); outline-offset: 2px; }"
+      "css": ".ds-text-action { appearance: none; border: 0; background: transparent; padding: 0; color: var(--ui-primary, oklch(62.3% 0.214 259.815)); font: 400 0.875rem/1.25rem Lato, sans-serif; cursor: pointer; } .ds-text-action:hover { text-decoration: underline; } .ds-text-action:focus-visible { border-radius: var(--radius-sm, 0.25rem); outline: 2px solid var(--ui-primary, oklch(62.3% 0.214 259.815)); outline-offset: 2px; }"
     },
     {
       "name": "Underlined Field",
@@ -121,7 +309,7 @@
       "refersTo": "field-underline",
       "description": "The flat, rule-based field used throughout concert filtering.",
       "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Country</span><select class=\"ds-field-control\"><option>All countries</option></select></label>",
-      "css": ".ds-field { display: block; color: oklch(13% 0.028 261.692); font-family: Lato, sans-serif; } .ds-field-label { display: block; margin-bottom: 0.375rem; color: oklch(55.1% 0.027 264.364); font-size: 0.75rem; line-height: 1rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; } .ds-field-control { width: 100%; height: 2.75rem; border: 0; border-bottom: 1px solid oklch(87.2% 0.01 258.338); border-radius: 0; background: transparent; color: oklch(21% 0.034 264.665); font: 400 0.875rem/1.25rem Lato, sans-serif; outline: none; } .ds-field-control:focus-visible { border-color: oklch(54.6% 0.245 262.881); box-shadow: 0 0 0 2px color-mix(in oklch, oklch(54.6% 0.245 262.881) 25%, transparent); }"
+      "css": ".ds-field { display: block; color: var(--color-gray-950, oklch(13% 0.028 261.692)); font-family: Lato, sans-serif; } .ds-field-label { display: block; margin-bottom: 0.375rem; color: var(--color-gray-500, oklch(55.1% 0.027 264.364)); font-size: 0.75rem; line-height: 1rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; } .ds-field-control { width: 100%; height: 2.75rem; border: 0; border-bottom: 1px solid var(--color-gray-300, oklch(87.2% 0.01 258.338)); border-radius: 0; background: transparent; color: var(--color-gray-900, oklch(21% 0.034 264.665)); font: 400 0.875rem/1.25rem Lato, sans-serif; outline: none; } .ds-field-control:focus-visible { border-color: var(--ui-primary, oklch(62.3% 0.214 259.815)); box-shadow: 0 0 0 2px color-mix(in oklch, var(--ui-primary, oklch(62.3% 0.214 259.815)) 25%, transparent); }"
     },
     {
       "name": "Filter Chip",
@@ -129,40 +317,54 @@
       "refersTo": "filter-chip",
       "description": "A removable pale-blue token for active composer, work, or city filters.",
       "html": "<span class=\"ds-filter-chip\"><span>Claude Debussy</span><button type=\"button\" aria-label=\"Remove Claude Debussy filter\">×</button></span>",
-      "css": ".ds-filter-chip { display: inline-flex; max-width: 100%; align-items: center; border-radius: 9999px; background: color-mix(in oklch, oklch(54.6% 0.245 262.881) 10%, transparent); padding: 0.125rem 0.125rem 0.125rem 0.625rem; color: oklch(54.6% 0.245 262.881); font: 400 0.75rem/1rem Lato, sans-serif; } .ds-filter-chip button { display: inline-flex; width: 1.75rem; height: 1.75rem; align-items: center; justify-content: center; margin-left: 0.25rem; border: 0; border-radius: 9999px; background: transparent; color: inherit; font-size: 1rem; cursor: pointer; } .ds-filter-chip button:hover { background: color-mix(in oklch, oklch(54.6% 0.245 262.881) 10%, transparent); } .ds-filter-chip button:focus-visible { outline: 2px solid oklch(54.6% 0.245 262.881); outline-offset: 1px; }"
+      "css": ".ds-filter-chip { display: inline-flex; max-width: 100%; align-items: center; border-radius: 9999px; background: color-mix(in oklch, var(--ui-primary, oklch(62.3% 0.214 259.815)) 10%, transparent); padding: 0.125rem 0.125rem 0.125rem 0.625rem; color: var(--ui-primary, oklch(62.3% 0.214 259.815)); font: 400 0.75rem/1rem Lato, sans-serif; } .ds-filter-chip button { display: inline-flex; width: 1.75rem; height: 1.75rem; align-items: center; justify-content: center; margin-left: 0.25rem; border: 0; border-radius: 9999px; background: transparent; color: inherit; font-size: 1rem; cursor: pointer; } .ds-filter-chip button:hover { background: color-mix(in oklch, var(--ui-primary, oklch(62.3% 0.214 259.815)) 10%, transparent); } .ds-filter-chip button:focus-visible { outline: 2px solid var(--ui-primary, oklch(62.3% 0.214 259.815)); outline-offset: 1px; } @media (pointer: coarse) { .ds-filter-chip button { width: 2.75rem; height: 2.75rem; } }"
     },
     {
       "name": "Concert Row",
       "kind": "custom",
       "refersTo": "concert-row",
       "description": "The signature flat listing pattern for a date, concert title, and structured metadata.",
-      "html": "<article class=\"ds-concert-row\"><div class=\"ds-concert-date\">Wednesday, 17 September 2026<br><span>19:30</span></div><div><a class=\"ds-concert-title\" href=\"#\">Orchestral concert</a><div class=\"ds-concert-meta\"><span class=\"ds-badge-outline\">Prague</span><span class=\"ds-badge-solid\">Rudolfinum</span></div><p class=\"ds-composer\">Antonín Dvořák</p></div></article>",
-      "css": ".ds-concert-row { display: grid; grid-template-columns: 14rem minmax(0, 1fr); gap: 0; border: 1px solid oklch(92.8% 0.006 264.531); background: #fff; padding: 1rem 1.5rem; color: oklch(21% 0.034 264.665); font-family: Lato, sans-serif; } .ds-concert-row:hover { background: oklch(98.5% 0.002 247.839); } .ds-concert-date, .ds-concert-title, .ds-composer { font-size: 0.875rem; line-height: 1.25rem; } .ds-concert-date span, .ds-composer { color: oklch(55.1% 0.027 264.364); } .ds-concert-title { color: oklch(21% 0.034 264.665); font-weight: 500; text-decoration: none; } .ds-concert-title:hover { text-decoration: underline; } .ds-concert-title:focus-visible { border-radius: 0.125rem; outline: 2px solid oklch(54.6% 0.245 262.881); outline-offset: 2px; } .ds-concert-meta { display: inline-flex; flex-wrap: wrap; gap: 0.5rem; margin-left: 0.5rem; } .ds-badge-outline, .ds-badge-solid { display: inline-flex; border-radius: 0.375rem; padding: 0.25rem 0.5rem; font-size: 0.75rem; line-height: 1rem; font-weight: 500; } .ds-badge-outline { color: oklch(54.6% 0.245 262.881); box-shadow: inset 0 0 0 1px color-mix(in oklch, oklch(54.6% 0.245 262.881) 50%, transparent); } .ds-badge-solid { background: oklch(54.6% 0.245 262.881); color: #fff; } .ds-composer { margin: 0.5rem 0 0; font-weight: 500; } @media (max-width: 63.999rem) { .ds-concert-row { grid-template-columns: 1fr; gap: 0.5rem; } .ds-concert-meta { display: flex; margin: 0.5rem 0; } }"
+      "html": "<article class=\"ds-concert-row\"><div class=\"ds-concert-date\">Thursday, 17 September 2026<br><span>19:30</span></div><div class=\"ds-concert-content\"><a class=\"ds-concert-title\" href=\"#\">Orchestral concert</a><div class=\"ds-concert-meta\"><span class=\"ds-badge-outline\">Prague</span><span class=\"ds-badge-solid\">Rudolfinum</span></div><div class=\"ds-programme\"><a href=\"#\">Antonín Dvořák</a><a href=\"#\">Symphony No. 9</a></div></div></article>",
+      "css": ".ds-concert-row { display: grid; grid-template-columns: 14rem minmax(0, 1fr); gap: 0; border: 1px solid var(--color-gray-200, oklch(92.8% 0.006 264.531)); background: #fff; padding: 1rem 1.5rem; color: var(--color-gray-900, oklch(21% 0.034 264.665)); font-family: Lato, sans-serif; } .ds-concert-row:hover { background: var(--color-gray-50, oklch(98.5% 0.002 247.839)); } .ds-concert-date, .ds-concert-title, .ds-composer { font-size: 0.875rem; line-height: 1.25rem; } .ds-concert-date span, .ds-composer { color: var(--color-gray-500, oklch(55.1% 0.027 264.364)); } .ds-concert-title { color: var(--color-gray-900, oklch(21% 0.034 264.665)); font-weight: 500; text-decoration: none; } .ds-concert-title:hover { text-decoration: underline; } .ds-concert-title:focus-visible { border-radius: var(--radius-sm, 0.25rem); outline: 2px solid var(--ui-primary, oklch(62.3% 0.214 259.815)); outline-offset: 2px; } .ds-concert-meta { display: inline-flex; flex-wrap: wrap; gap: 0.5rem; margin-left: 0.5rem; } .ds-badge-outline, .ds-badge-solid { display: inline-flex; border-radius: 0.375rem; padding: 0.25rem 0.5rem; font-size: 0.75rem; line-height: 1rem; font-weight: 500; } .ds-badge-outline { color: var(--ui-primary, oklch(62.3% 0.214 259.815)); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--ui-primary, oklch(62.3% 0.214 259.815)) 50%, transparent); } .ds-badge-solid { background: var(--ui-primary, oklch(62.3% 0.214 259.815)); color: #fff; } .ds-composer { margin: 0.5rem 0 0; font-weight: 500; } @media (max-width: 63.999rem) { .ds-concert-row { grid-template-columns: 1fr; gap: 0.5rem; } .ds-concert-meta { display: flex; margin: 0.5rem 0; } } .ds-concert-content { min-width: 0; overflow-wrap: anywhere; } .ds-concert-title { display: block; font-size: 1rem; line-height: 1.5rem; } .ds-concert-meta { display: flex; margin: .5rem 0; } .ds-badge-solid { background: var(--color-gray-100, #f3f4f6); color: var(--color-gray-700, #374151); } .ds-programme { display: grid; gap: .25rem 1rem; font-size: .875rem; } .ds-programme a { color: var(--color-gray-800, #1f2937); padding: .125rem 0; text-decoration: none; line-height: 1.25rem; } .ds-programme a:first-child { color: var(--color-gray-600, #4b5563); font-weight: 600; } .ds-programme a:hover { text-decoration: underline; text-underline-offset: 4px; } .ds-programme a:focus-visible { outline: 2px solid var(--ui-primary, #3b82f6); outline-offset: 2px; } @media (min-width: 640px) { .ds-programme { grid-template-columns: 11rem minmax(0,1fr); } .ds-programme a:first-child { font-weight: 400; } } @media (max-width: 639px) { .ds-concert-row { padding-inline: 1rem; } } @media (pointer: coarse) { .ds-programme a { min-height: 2.75rem; } }"
     },
     {
       "name": "Primary Navigation",
       "kind": "nav",
-      "description": "A quiet white bar pairing the ClassicalBot mark with simple public navigation.",
-      "html": "<nav class=\"ds-nav\"><a class=\"ds-brand\" href=\"#\"><svg viewBox=\"0 0 40 40\" aria-hidden=\"true\"><path d=\"M29.5 10.25A13.75 13.75 0 1 0 29.5 28.75\"/><path d=\"M17.5 14.75H32M15.75 20H34M17.5 25.25H32\"/></svg><span>ClassicalBot</span></a><div class=\"ds-nav-links\"><a href=\"#\">Countries</a><a href=\"#\">Sources</a><a href=\"#\">About</a></div></nav>",
-      "css": ".ds-nav { display: flex; height: 4rem; align-items: center; justify-content: space-between; background: #fff; color: oklch(21% 0.034 264.665); font-family: Lato, sans-serif; } .ds-brand { display: inline-flex; align-items: center; gap: 0.625rem; color: inherit; text-decoration: none; } .ds-brand svg { width: 2rem; height: 2rem; fill: none; stroke: currentColor; stroke-linecap: round; stroke-width: 1.75; } .ds-brand span { font: 400 1.35rem/1 Playfair Display, serif; letter-spacing: -0.025em; } .ds-nav-links { display: flex; gap: 1.5rem; } .ds-nav-links a { color: oklch(44.6% 0.03 256.802); font-size: 0.875rem; text-decoration: none; } .ds-nav-links a:hover { color: oklch(21% 0.034 264.665); } .ds-brand:focus-visible, .ds-nav-links a:focus-visible { border-radius: 0.125rem; outline: 2px solid oklch(54.6% 0.245 262.881); outline-offset: 4px; }"
+      "description": "Desktop navigation excerpt using the shared brand mark and current destinations.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-brand\" href=\"#\"><svg viewBox=\"0 0 40 40\" aria-hidden=\"true\"><path d=\"M29.5 10.25A13.75 13.75 0 1 0 29.5 28.75\" stroke-width=\"2.25\"/><path d=\"M17.5 14.75H32M15.75 20H34M17.5 25.25H32\" stroke-width=\"1.5\"/></svg><span>ClassicalBot</span></a><div class=\"ds-nav-links\"><a href=\"#\">Countries</a><a href=\"#\">Map</a><a href=\"#\">Composers</a><a href=\"#\">Sources</a><a href=\"#\">About</a></div></nav>",
+      "css": ".ds-nav { display: flex; height: 4rem; align-items: center; justify-content: space-between; background: #fff; color: var(--color-gray-900, oklch(21% 0.034 264.665)); font-family: Lato, sans-serif; } .ds-brand { display: inline-flex; align-items: center; gap: 0.625rem; color: inherit; text-decoration: none; } .ds-brand svg { width: 2rem; height: 2rem; fill: none; stroke: currentColor; stroke-linecap: round;  } .ds-brand span { font: 400 1.35rem/1 Playfair Display, serif; letter-spacing: -0.025em; } .ds-nav-links { display: flex; gap: 1.5rem; } .ds-nav-links a { color: var(--color-gray-600, oklch(44.6% 0.03 256.802)); font-size: 0.875rem; text-decoration: none; } .ds-nav-links a:hover { color: var(--color-gray-900, oklch(21% 0.034 264.665)); } .ds-brand:focus-visible, .ds-nav-links a:focus-visible { border-radius: var(--radius-sm, 0.25rem); outline: 2px solid var(--ui-primary, oklch(62.3% 0.214 259.815)); outline-offset: 4px; } .ds-nav { gap: 1.5rem; } .ds-nav-links { flex-wrap: wrap; }"
     },
     {
       "name": "Autocomplete Overlay",
       "kind": "custom",
       "description": "The temporary elevated list used to search cities, composers, and works.",
       "html": "<div class=\"ds-listbox\" role=\"listbox\"><button class=\"ds-option\" role=\"option\"><span><strong>La mer</strong><small>Claude Debussy</small></span><span class=\"ds-count\">18</span></button><button class=\"ds-option\" role=\"option\"><span><strong>Nocturnes</strong><small>Claude Debussy</small></span><span class=\"ds-count\">7</span></button></div>",
-      "css": ".ds-listbox { max-height: 16rem; overflow-y: auto; border: 1px solid oklch(92.8% 0.006 264.531); background: #fff; padding: 0.25rem 0; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); font-family: Lato, sans-serif; } .ds-option { display: flex; width: 100%; align-items: flex-start; justify-content: space-between; gap: 1rem; border: 0; background: transparent; padding: 0.5rem 0.75rem; text-align: left; cursor: pointer; } .ds-option:hover, .ds-option:focus { background: oklch(98.5% 0.002 247.839); outline: none; } .ds-option strong { display: block; color: oklch(21% 0.034 264.665); font-size: 0.875rem; line-height: 1.25rem; font-weight: 400; } .ds-option small, .ds-count { display: block; color: oklch(55.1% 0.027 264.364); font-size: 0.75rem; line-height: 1rem; } .ds-count { padding-top: 0.125rem; font-variant-numeric: tabular-nums; }"
+      "css": ".ds-listbox { max-height: 16rem; overflow-y: auto; border: 1px solid var(--color-gray-200, oklch(92.8% 0.006 264.531)); background: #fff; padding: 0.25rem 0; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); font-family: Lato, sans-serif; } .ds-option { display: flex; width: 100%; align-items: flex-start; justify-content: space-between; gap: 1rem; border: 0; background: transparent; padding: 0.5rem 0.75rem; text-align: left; cursor: pointer; } .ds-option:hover, .ds-option:focus { background: var(--color-gray-50, oklch(98.5% 0.002 247.839)); outline: none; } .ds-option strong { display: block; color: var(--color-gray-900, oklch(21% 0.034 264.665)); font-size: 0.875rem; line-height: 1.25rem; font-weight: 400; } .ds-option small, .ds-count { display: block; color: var(--color-gray-500, oklch(55.1% 0.027 264.364)); font-size: 0.75rem; line-height: 1rem; } .ds-count { padding-top: 0.125rem; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Pagination",
+      "kind": "button",
+      "description": "Square page control with an explicit current-page border.",
+      "html": "<button type=\"button\" class=\"ds-page\" aria-current=\"page\" aria-label=\"Page 1\">1</button>",
+      "css": ".ds-page { display: inline-flex; width: 2.5rem; height: 2.5rem; align-items: center; justify-content: center; background: transparent; border: 1px solid transparent; color: var(--color-gray-600, #4b5563); font: 400 .875rem/1.25rem Lato, sans-serif; transition: border-color 150ms, color 150ms; } .ds-page[aria-current=\"page\"] { border-color: var(--color-gray-900, #111827); color: var(--color-gray-950, #030712); } .ds-page:hover:not(:disabled) { border-color: var(--color-gray-300, #d1d5db); color: var(--color-gray-950, #030712); } .ds-page:focus-visible { outline: 2px solid var(--ui-primary, #3b82f6); outline-offset: 2px; } .ds-page:disabled { opacity: .3; cursor: not-allowed; }"
+    },
+    {
+      "name": "Composer Gallery Entry",
+      "kind": "custom",
+      "description": "The existing missing-cover state, serif name, and compact concert count.",
+      "html": "<a class=\"ds-gallery-entry\" href=\"#\"><div class=\"ds-cover\" aria-hidden=\"true\">Claude Debussy</div><h2>Claude Debussy</h2><p>Upcoming concerts</p></a>",
+      "css": ".ds-gallery-entry { display: block; color: var(--color-gray-950, #030712); text-decoration: none; } .ds-cover { display: flex; aspect-ratio: 1; align-items: center; justify-content: center; background: var(--color-gray-50, #f9fafb); padding: 1.5rem; text-align: center; font: 400 1.875rem/2.25rem \"Playfair Display\", serif; transition: filter 180ms ease-out; } .ds-gallery-entry h2 { margin: 1rem 0 0; font: 400 1.5rem/2rem \"Playfair Display\", serif; } .ds-gallery-entry p { margin: .25rem 0 0; color: var(--color-gray-600, #4b5563); font: 400 .875rem/1.25rem Lato, sans-serif; } .ds-gallery-entry:hover .ds-cover { filter: brightness(.97); } .ds-gallery-entry:hover h2 { text-decoration: underline; } .ds-gallery-entry:focus-visible { outline: 2px solid var(--color-blue-600, #2563eb); outline-offset: 4px; border-radius: 2px; } @media (prefers-reduced-motion: reduce) { .ds-cover { transition: none; } }"
     }
   ],
   "narrative": {
     "northStar": "The Quiet Programme",
-    "overview": "ClassicalBot behaves like a carefully typeset concert programme that happens to contain a worldwide catalogue. The interface is calm, cultured, and direct: expressive serif headings establish an editorial voice while compact sans-serif controls and structured rows keep discovery fast.\n\nThe system is refined and restrained rather than ornamental. Gallery-white space, slate typography, fine rules, and measured blue interaction cues let programme data provide the visual interest. Colorful source and location badges are purposeful indexing signals, not decoration.",
+    "overview": "ClassicalBot behaves like a carefully typeset concert programme that happens to contain a worldwide catalogue. The interface is calm, cultured, and direct: expressive serif headings establish an editorial voice while compact sans-serif controls and structured rows keep discovery fast.\n\nThe system is refined and restrained rather than ornamental. Gallery-white space, slate typography, fine rules, and measured blue interaction cues let programme data provide the visual interest. Colorful location badges and neutral source badges are purposeful indexing signals, not decoration.",
     "keyCharacteristics": [
       "Light, editorial surfaces with generous whitespace.",
       "Serif hierarchy paired with compact, practical controls.",
       "Fine dividers and underlines instead of enclosing cards.",
       "Programme Blue reserved for links, focus, and active interaction.",
-      "Colorful badges used to scan structured concert metadata."
+      "Colorful location badges and quiet source labels used to scan structured concert metadata."
     ],
     "rules": [
       {
@@ -186,16 +388,26 @@
         "section": "typography"
       },
       {
+        "name": "The Open Margin Rule",
+        "body": "Create hierarchy with whitespace and alignment before adding a container, background, or border.",
+        "section": "layout"
+      },
+      {
         "name": "The Flat-by-Default Rule",
         "body": "Resting page content has no shadow; elevation marks a temporary layer, never ordinary grouping.",
         "section": "elevation"
+      },
+      {
+        "name": "The Earned Curve Rule",
+        "body": "Rounded shapes identify compact metadata or removable selections; structural surfaces remain square.",
+        "section": "shapes"
       }
     ],
     "dos": [
       "Do let programme data and typography create the hierarchy.",
       "Do preserve Gallery White space and fine Slate rules between dense information.",
       "Do reserve Programme Blue for navigation, focus, and active interaction.",
-      "Do keep controls at least 2.75rem tall and preserve explicit keyboard focus.",
+      "Do keep filter fields and coarse-pointer programme targets at least 2.75rem tall and preserve explicit keyboard focus; pagination currently uses 2.5rem targets.",
       "Do keep interface copy short, factual, and useful."
     ],
     "donts": [
