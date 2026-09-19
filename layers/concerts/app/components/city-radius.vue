@@ -7,12 +7,19 @@
           <span aria-hidden="true">km</span>
           <button type="submit" :disabled="!valid" :aria-label="t('Set')" class="flex size-7 items-center justify-center rounded-full hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40"><UIcon name="i-lucide-check" class="size-4" /></button>
         </form>
-        <select v-else :id="id" ref="control" :aria-label="t('Radius')" :value="String(radius || 0)" :disabled="!city" class="h-8 max-w-28 cursor-pointer rounded-full border-0 bg-primary/10 px-2.5 text-xs text-primary outline-none hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default disabled:bg-gray-100 disabled:text-gray-500" @change="choose($event.target.value)">
-          <option value="0">+ 0 km</option>
-          <option v-for="km in presets" :key="km" :value="String(km)">+ {{ km }} km</option>
-          <option v-if="radius > 0 && !presets.includes(radius)" :value="String(radius)">+ {{ radius }} km</option>
-          <option value="custom">{{ t('Custom…') }}</option>
-        </select>
+        <div v-else class="radius-select relative flex h-8 items-center text-xs">
+          <span aria-hidden="true" class="invisible flex items-center gap-1 whitespace-nowrap px-2.5">
+            + {{ radius || 0 }} km
+            <span class="size-3" />
+          </span>
+          <select :id="id" ref="control" :aria-label="t('Radius')" :value="String(radius || 0)" :disabled="!city" class="absolute inset-0 size-full appearance-none cursor-pointer rounded-full border-0 bg-primary/10 pl-2.5 pr-6 text-xs text-primary outline-none hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default disabled:bg-gray-100 disabled:text-gray-500" @change="choose($event.target.value)">
+            <option value="0">+ 0 km</option>
+            <option v-for="km in presets" :key="km" :value="String(km)">+ {{ km }} km</option>
+            <option v-if="radius > 0 && !presets.includes(radius)" :value="String(radius)">+ {{ radius }} km</option>
+            <option value="custom">{{ t('Custom…') }}</option>
+          </select>
+          <UIcon name="i-lucide-chevron-down" class="pointer-events-none absolute right-2.5 size-3" :class="city ? 'text-primary' : 'text-gray-500'" />
+        </div>
       </div>
     </template>
   </FilterAutocomplete>
@@ -49,7 +56,7 @@ defineExpose({ focusRadius: () => control.value?.focus() })
 .radius-number::-webkit-inner-spin-button,
 .radius-number::-webkit-outer-spin-button { appearance: none; margin: 0; }
 @media (pointer: coarse) {
-  select, form { min-height: 2.75rem; }
+  .radius-select, form { min-height: 2.75rem; }
   form button { min-width: 2.75rem; min-height: 2.75rem; }
 }
 </style>
