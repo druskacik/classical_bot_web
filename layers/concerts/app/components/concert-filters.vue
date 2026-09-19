@@ -1,6 +1,6 @@
 <template>
-  <section :aria-label="t('Concert filters')" class="py-2">
-    <div :class="['grid gap-x-6 gap-y-4', fixedCountry ? 'md:grid-cols-2' : 'md:grid-cols-3']">
+  <section :aria-label="t('Concert filters')" class="py-1 sm:py-2">
+    <div :class="['grid gap-x-6 gap-y-2 sm:gap-y-4', fixedCountry ? 'md:grid-cols-2' : 'md:grid-cols-3']">
       <label v-if="!fixedCountry" class="block">
         <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">{{ t('Country') }}</span>
         <select
@@ -43,11 +43,11 @@
       </div>
     </div>
 
-    <button type="button" class="mt-3 flex min-h-11 cursor-pointer items-center gap-2 text-sm text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary md:hidden" :aria-expanded="musicExpanded" :aria-controls="musicId" @click="musicExpanded = !musicExpanded">
+    <button type="button" class="mt-1 flex min-h-11 cursor-pointer items-center gap-2 text-sm text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:mt-3 md:hidden" :aria-expanded="musicExpanded" :aria-controls="musicId" @click="musicExpanded = !musicExpanded">
       {{ t('Composer or work') }}
       <UIcon :name="musicExpanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" class="size-4" aria-hidden="true" />
     </button>
-    <div :id="musicId" :class="[musicExpanded ? 'grid' : 'hidden', 'mt-3 gap-5 md:grid md:grid-cols-2', 'md:mt-5']">
+    <div :id="musicId" :class="[musicExpanded ? 'grid' : 'hidden', 'mt-1 gap-3 sm:mt-3 sm:gap-5 md:grid md:grid-cols-2', 'md:mt-5']">
       <FilterAutocomplete
         type="composer"
         :context="optionContext"

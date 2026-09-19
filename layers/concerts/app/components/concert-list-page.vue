@@ -1,8 +1,8 @@
 <template>
-  <main class="container mx-auto px-4 py-5 sm:py-8 sm:px-6 lg:px-8">
-    <h1 class="mx-auto max-w-4xl text-center font-serif text-3xl text-gray-950 sm:text-4xl">{{ title }}</h1>
+  <main class="container mx-auto px-4 py-4 sm:py-8 sm:px-6 lg:px-8">
+    <h1 :class="!countryCode && !cityPage ? 'text-2xl' : 'text-3xl'" class="mx-auto max-w-4xl text-center font-serif text-gray-950 sm:text-4xl">{{ title }}</h1>
 
-    <div class="mx-auto mt-5 max-w-6xl">
+    <div class="mx-auto mt-3 max-w-6xl sm:mt-5">
       <ConcertFilters
         ref="filterControls"
         :radius="radius"
@@ -28,11 +28,11 @@
       />
 
       <p v-if="route.query.bounds" class="mt-3 flex items-center gap-4 text-sm text-gray-600">{{ t('Map area') }} <button type="button" class="min-h-11 text-primary hover:underline" @click="updateFilter({ key: 'bounds', value: null })">{{ t('Remove map area') }}</button></p>
-      <div ref="resultsHeading" class="mt-3 flex min-h-8 items-center justify-between gap-4" tabindex="-1">
+      <div ref="resultsHeading" class="mt-1 flex min-h-8 items-center justify-between gap-4 sm:mt-3" tabindex="-1">
         <p v-if="concertPage" class="text-sm text-gray-600" aria-live="polite">
           {{ resultSummary }}
         </p>
-        <NuxtLink :to="concertMapLocation(route.query, filters.city)" class="ml-auto inline-flex min-h-11 items-center gap-2 text-sm text-primary hover:underline"><UIcon name="i-lucide-map" class="size-4" />{{ t('Explore map') }}</NuxtLink>
+        <NuxtLink :to="concertMapLocation(route.query, filters.city)" class="ml-auto inline-flex min-h-11 items-center gap-2 text-sm text-primary hover:underline"><UIcon name="i-lucide-map" class="size-4" />{{ t('Map') }}</NuxtLink>
       </div>
 
       <div v-if="concertStatus === 'pending' && !concertPage" class="py-10">
@@ -49,8 +49,8 @@
         :class="['transition-opacity duration-200', concertStatus === 'pending' ? 'opacity-55' : 'opacity-100']"
         :aria-busy="concertStatus === 'pending'"
       >
-        <div v-for="(concertGroup, month) in groupedConcerts" :key="month" class="mt-4 sm:mt-6">
-          <h2 class="mb-4 font-serif text-2xl capitalize text-gray-900">{{ month }}</h2>
+        <div v-for="(concertGroup, month) in groupedConcerts" :key="month" class="mt-3 sm:mt-6">
+          <h2 class="mb-2 font-serif text-2xl capitalize text-gray-900 sm:mb-4">{{ month }}</h2>
           <ConcertsTable :concerts="concertGroup" :show-country="!countryCode" :current-city-id="cityPage?.id || null" />
         </div>
 

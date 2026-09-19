@@ -15,7 +15,7 @@ const slovak = {
   "Set": "Nastaviť",
   "Straight-line distance from the city centre.": "Vzdušná vzdialenosť od centra mesta.",
   "Only concerts in Slovakia": "Iba koncerty na Slovensku",
-  "Explore map": "Mapa",
+  "Map": "Mapa",
   "Increase distance": "Zväčšiť vzdialenosť",
   "Concert map": "Mapa koncertov",
   "Concert map. Use arrow keys to pan, plus and minus to zoom.": "Mapa koncertov. Posúvajte šípkami, približujte a odďaľujte klávesmi plus a mínus.",
