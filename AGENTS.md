@@ -10,3 +10,4 @@ Nuxt 4 frontend for discovering upcoming classical-music concerts worldwide. Con
 - `.env` contains production credentials. Never open, print, or log it; let the runtime load it implicitly.
 - Keep the restrained light editorial design and English interface. The crawler/database remains the source of truth for concert and source data.
 - When unsure about Nuxt-specific setup, consult the docs via the Nuxt MCPs
+- Use Playwright MCP for local browser testing, including Impeccable and sub-agents; use the Browser skill only when explicitly requested.
