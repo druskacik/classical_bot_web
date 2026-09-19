@@ -57,7 +57,7 @@
               :to="composerPath(composer.name)"
               :prefetch="false"
               rel="nofollow"
-              class="composer-link inline-block py-0.5 text-sm font-medium text-gray-500 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              class="composer-link inline-block min-h-6 max-w-full py-0.5 text-sm font-semibold leading-5 text-gray-600 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:font-normal [@media(pointer:coarse)]:min-h-11"
             >
               {{ composer.name }}
             </NuxtLink>

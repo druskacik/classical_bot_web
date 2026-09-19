@@ -1,33 +1,32 @@
 <template>
-  <div v-if="works.length" class="text-sm [overflow-wrap:anywhere]">
-    <div>
-      <div>
-        <div v-for="group in groups" :key="group.key" class="grid gap-x-4 border-b border-gray-100 py-1.5 last:border-0 sm:grid-cols-[11rem_minmax(0,1fr)]">
+  <ul v-if="works.length" class="list-none space-y-3 text-sm [overflow-wrap:anywhere] sm:space-y-0">
+    <li v-for="group in groups" :key="group.key" class="grid min-w-0 gap-x-4 gap-y-1 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-y-0 sm:py-1.5">
+      <NuxtLink
+        v-if="group.composer"
+        :to="composerPath(group.composer.name)"
+        :prefetch="false"
+        rel="nofollow"
+        class="min-h-6 min-w-0 max-w-full justify-self-start self-start py-0.5 font-semibold leading-5 text-gray-600 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:font-normal [@media(pointer:coarse)]:min-h-11"
+      >{{ group.composer.name }}</NuxtLink>
+      <ul
+        v-if="group.works.length"
+        class="min-w-0 list-none sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-3"
+        :class="group.composer ? 'pl-3 sm:pl-0' : 'sm:col-start-2'"
+      >
+        <li v-for="(work, index) in group.works" :key="work.id" class="min-w-0 max-w-full">
+          <span v-if="index" aria-hidden="true" class="mr-3 hidden text-gray-400 sm:inline">·</span>
           <NuxtLink
-            v-if="group.composer"
-            :to="composerPath(group.composer.name)"
+            :to="workPath(work.id)"
             :prefetch="false"
             rel="nofollow"
-            class="min-h-6 justify-self-start self-start py-0.5 leading-5 text-gray-600 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary [@media(pointer:coarse)]:min-h-11"
-          >{{ group.composer.name }}</NuxtLink>
-          <ul v-if="group.works.length" class="flex min-w-0 list-none flex-wrap items-baseline gap-x-3" :class="!group.composer && 'sm:col-start-2'">
-            <li v-for="(work, index) in group.works" :key="work.id" class="max-w-full">
-              <span v-if="index" aria-hidden="true" class="mr-3 text-gray-400">·</span>
-              <NuxtLink
-                :to="workPath(work.id)"
-                :prefetch="false"
-                rel="nofollow"
-                class="inline-flex min-h-6 max-w-full items-center py-0.5 leading-5 text-gray-800 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary [@media(pointer:coarse)]:min-h-11"
-                :aria-label="t('Find concerts featuring {work}', { work: work.composer ? `${work.composer.name}: ${work.title}` : work.title })"
-              >{{ work.title }}</NuxtLink>
-              <span v-if="matches(work)" class="ml-2 text-xs text-gray-600">{{ t('Matches filter') }}</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-  </div>
+            class="inline-flex min-h-6 max-w-full items-center py-0.5 leading-5 text-gray-800 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary [@media(pointer:coarse)]:min-h-11"
+            :aria-label="t('Find concerts featuring {work}', { work: work.composer ? `${work.composer.name}: ${work.title}` : work.title })"
+          >{{ work.title }}</NuxtLink>
+          <span v-if="matches(work)" class="ml-2 text-xs text-gray-600">{{ t('Matches filter') }}</span>
+        </li>
+      </ul>
+    </li>
+  </ul>
 </template>
 
 <script setup>
