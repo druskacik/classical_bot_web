@@ -244,7 +244,8 @@ useConcertListSeo({ title: () => `${t('Concert map')} — ${concertSite.name}`, 
    positioned ancestor they extend the document below the footer. */
 .map-programme { position: relative; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; overflow-wrap: anywhere; background: white; scrollbar-color: var(--color-gray-300) white; scrollbar-width: thin; }
 .map-concert { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); gap: 1rem; padding: 1.25rem; overflow-wrap: anywhere; }
-.map-page :is(button, a, input, select):focus-visible { outline: 2px solid var(--ui-primary); outline-offset: 3px; }
+/* Autocomplete inputs already show focus on their surrounding field. */
+.map-page :is(button, a, input:not([role="combobox"]), select):focus-visible { outline: 2px solid var(--ui-primary); outline-offset: 3px; }
 .map-page ::selection { background: var(--color-blue-100); color: var(--color-gray-950); }
 @media (max-width: 64rem) { .map-workspace { grid-template-columns: minmax(0, 1fr) minmax(0, 21rem); } }
 /* Mobile keeps one stable map viewport behind the programme panel. */
