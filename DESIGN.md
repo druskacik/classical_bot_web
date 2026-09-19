@@ -227,7 +227,7 @@ The form language is predominantly square and rule-based. Lists, dropdowns, and 
 - **Shadow Strategy:** None.
 - **Border:** Fine Slate Divider row separators without an enclosure.
 - **Internal Padding:** 1.5rem vertically below 640px and 1.75rem above; no horizontal padding.
-- **Behavior:** Date and time form the stable scan column; the regular serif title sits on its own line, followed by colored location badges, quiet source text, and programme data. Programme groups stack on mobile and use an 11rem composer column from 640px. Composer names are semibold on mobile and regular from 640px; work links wrap naturally. Coarse-pointer programme links have 2.75rem minimum targets.
+- **Behavior:** Date and time form the stable scan column; the regular serif title sits on its own line, followed by colored location badges, quiet source text, and programme data. Programme groups stack on mobile and use an 11rem composer column from 640px. Composer names are semibold on mobile and regular from 640px; work links wrap naturally. Mobile programme links have 1.5rem minimum targets with 0.25rem between composer and works and 0.75rem between groups; coarse-pointer programme links from 640px have 2.75rem minimum targets.
 
 ### Shared Concert Discovery
 
@@ -268,7 +268,7 @@ All homepage, country, and city discovery routes use the same shared presentatio
 - **Do** let programme data and typography create the hierarchy.
 - **Do** preserve Gallery White space and fine Slate rules between dense information.
 - **Do** reserve Programme Blue for navigation, focus, and active interaction.
-- **Do** keep filter fields and coarse-pointer programme targets at least 2.75rem tall and preserve explicit keyboard focus; concert-list pagination uses 2.75rem targets.
+- **Do** keep filter fields at least 2.75rem tall and mobile programme text links at least 1.5rem tall and preserve explicit keyboard focus; concert-list pagination uses 2.75rem targets.
 - **Do** keep interface copy short, factual, and useful.
 
 ### Don't:

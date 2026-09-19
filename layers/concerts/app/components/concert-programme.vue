@@ -6,7 +6,7 @@
         :to="composerPath(group.composer.name)"
         :prefetch="false"
         rel="nofollow"
-        class="min-h-6 min-w-0 max-w-full justify-self-start self-start py-0.5 font-semibold leading-5 text-gray-600 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:font-normal [@media(pointer:coarse)]:min-h-11"
+        class="inline-flex min-h-6 min-w-0 max-w-full items-center justify-self-start self-start py-0.5 font-semibold leading-5 text-gray-600 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:font-normal [@media(min-width:640px)_and_(pointer:coarse)]:min-h-11"
       >{{ group.composer.name }}</NuxtLink>
       <ul
         v-if="group.works.length"
@@ -19,7 +19,7 @@
             :to="workPath(work.id)"
             :prefetch="false"
             rel="nofollow"
-            class="inline-flex min-h-6 max-w-full items-center py-0.5 leading-5 text-gray-800 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary [@media(pointer:coarse)]:min-h-11"
+            class="inline-flex min-h-6 max-w-full items-center py-0.5 leading-5 text-gray-800 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary [@media(min-width:640px)_and_(pointer:coarse)]:min-h-11"
             :aria-label="t('Find concerts featuring {work}', { work: work.composer ? `${work.composer.name}: ${work.title}` : work.title })"
           >{{ work.title }}</NuxtLink>
           <span v-if="matches(work)" class="ml-2 text-xs text-gray-600">{{ t('Matches filter') }}</span>

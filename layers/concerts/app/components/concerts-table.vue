@@ -61,7 +61,7 @@
               :to="composerPath(composer.name)"
               :prefetch="false"
               rel="nofollow"
-              class="composer-link inline-block min-h-6 max-w-full py-0.5 text-sm font-semibold leading-5 text-gray-600 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:font-normal [@media(pointer:coarse)]:min-h-11"
+              class="composer-link inline-block min-h-6 max-w-full py-0.5 text-sm font-semibold leading-5 text-gray-600 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:font-normal [@media(min-width:640px)_and_(pointer:coarse)]:min-h-11"
             >
               {{ composer.name }}
             </NuxtLink>
@@ -193,11 +193,12 @@ const composerPath = composer => concertComposerLocation(route, composer)
 
 @media (max-width: 639px) {
   .calendar-day { font-size: 1.875rem; }
+  .concert-list .entry-metadata { row-gap: 0.25rem; }
   .concert-list .entry-layout { grid-template-columns: 2.75rem minmax(0, 1fr); gap: 1rem; }
   .concert-list .concert-entry { padding: 1.5rem 0; }
   .concert-list .entry-title { font-size: 1.5rem; }
 }
-@media (pointer: coarse) {
+@media (min-width: 640px) and (pointer: coarse) {
   .concert-list .entry-metadata > a { min-height: 2.75rem; }
 }
 
