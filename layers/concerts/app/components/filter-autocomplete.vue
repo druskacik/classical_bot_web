@@ -263,7 +263,10 @@ const handleOutsideClick = (event) => {
 
 watch(search, () => {
   invalidateOptions()
-  if (open.value) debounceTimer = setTimeout(loadOptions, 220)
+  if (open.value) {
+    loading.value = true
+    debounceTimer = setTimeout(loadOptions, 220)
+  }
 })
 
 const invalidateOptions = () => {
