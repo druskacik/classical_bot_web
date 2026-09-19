@@ -83,8 +83,8 @@
         @click="select(option)"
       >
         <span class="min-w-0">
-          <span class="block truncate text-sm text-gray-900">{{ option.label }}</span>
-          <span v-if="option.secondaryLabel" class="block truncate text-xs text-gray-500">
+          <span class="block whitespace-normal [overflow-wrap:anywhere] text-sm text-gray-900">{{ option.label }}</span>
+          <span v-if="option.secondaryLabel" class="block whitespace-normal [overflow-wrap:anywhere] text-xs text-gray-500">
             {{ option.secondaryLabel }}
           </span>
         </span>
