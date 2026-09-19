@@ -5,7 +5,7 @@
     </label>
 
     <div
-      class="flex min-h-11 items-center gap-2 border-b border-gray-300 bg-transparent py-1.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25"
+      class="filter-input-frame flex min-h-11 items-center gap-2 border-b border-gray-300 bg-transparent py-1.5 focus-within:border-primary"
     >
       <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
       <span
@@ -295,3 +295,10 @@ onUnmounted(() => {
   document.removeEventListener('click', handleOutsideClick)
 })
 </script>
+
+<style scoped>
+.filter-input-frame:focus-within {
+  border-bottom-width: 2px;
+  padding-bottom: 5px;
+}
+</style>

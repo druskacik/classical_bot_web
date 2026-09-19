@@ -1,6 +1,6 @@
 <template>
-  <main class="container mx-auto px-4 py-4 sm:py-8 sm:px-6 lg:px-8">
-    <h1 :class="!countryCode && !cityPage ? 'text-2xl' : 'text-3xl'" class="mx-auto max-w-4xl text-center font-serif text-gray-950 sm:text-4xl">{{ title }}</h1>
+  <main class="concert-list-page container mx-auto px-4 py-4 sm:py-8 sm:px-6 lg:px-8">
+    <h1 :class="{ 'home-title': !countryCode && !cityPage }" class="mx-auto max-w-4xl text-center font-serif text-gray-950 sm:text-4xl">{{ title }}</h1>
 
     <div class="mx-auto mt-3 max-w-6xl sm:mt-5">
       <ConcertFilters
@@ -28,7 +28,7 @@
       />
 
       <p v-if="route.query.bounds" class="mt-3 flex items-center gap-4 text-sm text-gray-600">{{ t('Map area') }} <button type="button" class="min-h-11 text-primary hover:underline" @click="updateFilter({ key: 'bounds', value: null })">{{ t('Remove map area') }}</button></p>
-      <div ref="resultsHeading" class="mt-1 flex min-h-8 items-center justify-between gap-4 sm:mt-3" tabindex="-1">
+      <div ref="resultsHeading" class="results-heading mt-1 flex min-h-8 items-center justify-between gap-4 sm:mt-3" tabindex="-1">
         <p v-if="concertPage" class="text-sm text-gray-600" aria-live="polite">
           {{ resultSummary }}
         </p>
@@ -49,8 +49,8 @@
         :class="['transition-opacity duration-200', concertStatus === 'pending' ? 'opacity-55' : 'opacity-100']"
         :aria-busy="concertStatus === 'pending'"
       >
-        <div v-for="(concertGroup, month) in groupedConcerts" :key="month" class="mt-3 sm:mt-6">
-          <h2 class="mb-2 font-serif text-2xl capitalize text-gray-900 sm:mb-4">{{ month }}</h2>
+        <div v-for="(concertGroup, month) in groupedConcerts" :key="month" class="concert-month mt-3 sm:mt-6">
+          <h2 class="month-heading mb-2 font-serif text-2xl capitalize text-gray-900 sm:mb-4">{{ month }}</h2>
           <ConcertsTable :concerts="concertGroup" :show-country="!countryCode" :current-city-id="cityPage?.id || null" />
         </div>
 
@@ -62,7 +62,7 @@
             :aria-label="t('Previous page')"
             @click="goToPage(concertPage.page - 1)"
           >
-            ←
+            <UIcon name="i-lucide-arrow-left" class="size-4" aria-hidden="true" />
           </button>
           <template v-for="item in paginationItems" :key="item.key">
             <span v-if="item.ellipsis" class="px-2 text-gray-400" aria-hidden="true">…</span>
@@ -84,7 +84,7 @@
             :aria-label="t('Next page')"
             @click="goToPage(concertPage.page + 1)"
           >
-            →
+            <UIcon name="i-lucide-arrow-right" class="size-4" aria-hidden="true" />
           </button>
         </nav>
       </div>
@@ -242,15 +242,58 @@ const goToPage = async (page) => {
   })
   await nextTick()
   resultsHeading.value?.focus({ preventScroll: true })
-  resultsHeading.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  resultsHeading.value?.scrollIntoView({ behavior: reduceMotion ? 'instant' : 'smooth', block: 'start' })
 }
 </script>
 
 <style scoped>
+.concert-list-page {
+  --ui-primary: var(--color-blue-600);
+  max-width: 80rem;
+  padding-top: 2.5rem;
+  padding-bottom: 4rem;
+  caret-color: var(--ui-primary);
+}
+
+.concert-list-page > h1 {
+  max-width: 72rem;
+  text-align: center;
+  font-size: 2.25rem;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.concert-list-page > div { margin-top: 2rem; }
+.concert-list-page .results-heading { margin-top: 1rem; }
+.concert-list-page .month-heading {
+  margin-bottom: 0;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-gray-900);
+}
+.concert-list-page :deep(a) { text-underline-offset: 0.2em; }
+.concert-list-page :deep(a:focus-visible),
+.concert-list-page :deep(button:focus-visible) { outline: 2px solid var(--ui-primary); outline-offset: 3px; }
+.concert-list-page :deep(::selection) { background: var(--color-blue-100); color: var(--color-gray-950); }
+
+@media (max-width: 639px) {
+  .concert-list-page { padding-top: 1rem; }
+  .concert-list-page > h1 { font-size: 1.875rem; line-height: 1.2; }
+  .concert-list-page > h1.home-title { font-size: 1.5rem; line-height: 1.333333; }
+  .concert-list-page > div { margin-top: 0.75rem; }
+  .concert-list-page .results-heading { margin-top: 0.25rem; }
+  .concert-list-page .month-heading { padding-bottom: 0.75rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .concert-list-page :deep(*) { transition: none; scroll-behavior: auto; }
+}
+
 .pagination-link {
   display: inline-flex;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  cursor: pointer;
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;

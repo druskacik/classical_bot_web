@@ -1,5 +1,5 @@
 <template>
-  <ul v-if="works.length" class="list-none space-y-3 text-sm [overflow-wrap:anywhere] sm:space-y-0">
+  <ul v-if="works.length" class="concert-programme list-none space-y-3 text-sm [overflow-wrap:anywhere] sm:space-y-0">
     <li v-for="group in groups" :key="group.key" class="grid min-w-0 gap-x-4 gap-y-1 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-y-0 sm:py-1.5">
       <NuxtLink
         v-if="group.composer"
@@ -59,3 +59,17 @@ const groups = computed(() => {
 const workPath = id => concertWorkLocation(route, id)
 const composerPath = name => concertComposerLocation(route, name)
 </script>
+
+<style scoped>
+.concert-programme {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-gray-200);
+}
+.concert-programme > li { column-gap: 1.5rem; }
+.concert-programme > li > a { color: var(--color-gray-700); }
+.concert-programme > li > ul a { color: var(--color-gray-900); }
+@media (max-width: 639px) {
+  .concert-programme { margin-top: 0; padding-top: 0; border-top: 0; }
+}
+</style>

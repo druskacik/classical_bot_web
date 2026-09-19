@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-19T09:07:04.555Z",
+  "generatedAt": "2026-09-19T10:39:10.431620+00:00",
   "title": "Design System: ClassicalBot",
   "extensions": {
     "colorMeta": {
@@ -354,6 +354,20 @@
       "description": "The existing missing-cover state, serif name, and compact concert count.",
       "html": "<a class=\"ds-gallery-entry\" href=\"#\"><div class=\"ds-cover\" aria-hidden=\"true\">Claude Debussy</div><h2>Claude Debussy</h2><p>Upcoming concerts</p></a>",
       "css": ".ds-gallery-entry { display: block; color: var(--color-gray-950, #030712); text-decoration: none; } .ds-cover { display: flex; aspect-ratio: 1; align-items: center; justify-content: center; background: var(--color-gray-50, #f9fafb); padding: 1.5rem; text-align: center; font: 400 1.875rem/2.25rem \"Playfair Display\", serif; transition: filter 180ms ease-out; } .ds-gallery-entry h2 { margin: 1rem 0 0; font: 400 1.5rem/2rem \"Playfair Display\", serif; } .ds-gallery-entry p { margin: .25rem 0 0; color: var(--color-gray-600, #4b5563); font: 400 .875rem/1.25rem Lato, sans-serif; } .ds-gallery-entry:hover .ds-cover { filter: brightness(.97); } .ds-gallery-entry:hover h2 { text-decoration: underline; } .ds-gallery-entry:focus-visible { outline: 2px solid var(--color-blue-600, #2563eb); outline-offset: 4px; border-radius: 2px; } @media (prefers-reduced-motion: reduce) { .ds-cover { transition: none; } }"
+    },
+    {
+      "name": "Concert Discovery Row",
+      "kind": "custom",
+      "description": "Shared concert-list open white row: narrow date column, serif title, colored city/country badges, and ruled composer/work pairs. Centered page heading and transparent unboxed filters; see .impeccable/surfaces/route-home.md.",
+      "html": "<article class=\"ds-ledger\"><div class=\"ds-ledger-date\"><span>Sat</span><strong>19</strong><span>19:30</span></div><div class=\"ds-ledger-content\"><a class=\"ds-ledger-title\" href=\"#\">Orchestral concert</a><div class=\"ds-ledger-meta\"><a class=\"ds-ledger-badge\" href=\"#\">Prague</a><a class=\"ds-ledger-badge\" href=\"#\">Czechia</a><span>Concert source</span></div><div class=\"ds-ledger-programme\"><a href=\"#\">Antonín Dvořák</a><a href=\"#\">Symphony No. 9</a></div></div></article>",
+      "css": ".ds-ledger { display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: 1.5rem; padding: 1.75rem 0; background: #fff; border-bottom: 1px solid var(--color-gray-200, #e5e7eb); font-family: Lato, sans-serif; color: var(--color-gray-900, #111827); } .ds-ledger-date { text-align: center; font-size: .875rem; line-height: 1.5; color: var(--color-gray-600, #4b5563); } .ds-ledger-date strong { display: block; font-size: 2.25rem; line-height: 1.15; font-weight: 400; font-variant-numeric: tabular-nums; color: var(--color-gray-900, #111827); } .ds-ledger-date span:last-child { display: block; margin-top: .5rem; } .ds-ledger-content { min-width: 0; overflow-wrap: anywhere; } .ds-ledger a { text-decoration: none; text-underline-offset: .2em; } .ds-ledger a:hover { text-decoration: underline; } .ds-ledger a:focus-visible { outline: 2px solid var(--color-blue-600, #2563eb); outline-offset: 3px; } .ds-ledger-title { display: block; font: 400 1.5rem/1.35 \"Playfair Display\", serif; color: inherit; } .ds-ledger-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; margin-top: .5rem; font-size: .875rem; color: var(--color-gray-600, #4b5563); } .ds-ledger-meta > * { display: inline-flex; align-items: center; min-height: 1.75rem; } .ds-ledger-badge { border: 1px solid currentColor; border-radius: .375rem; padding: .25rem .5rem; font-size: .75rem; font-weight: 500; } .ds-ledger-meta a { color: var(--color-blue-600, #2563eb); } .ds-ledger-programme { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: 0 1.5rem; margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--color-gray-200, #e5e7eb); font-size: .875rem; } .ds-ledger-programme a { min-width: 0; min-height: 1.5rem; padding: .125rem 0; line-height: 1.25rem; color: var(--color-gray-900, #111827); } .ds-ledger-programme a:first-child { font-weight: 400; color: var(--color-gray-700, #374151); } @media (max-width: 639px) { .ds-ledger { grid-template-columns: 2.75rem minmax(0, 1fr); gap: 1rem; padding: 1.5rem 0; }  .ds-ledger-programme { grid-template-columns: 1fr; row-gap: .25rem; } .ds-ledger-programme a:first-child { font-weight: 600; } } @media (pointer: coarse) { .ds-ledger-meta a, .ds-ledger-programme a { min-height: 2.75rem; } }"
+    },
+    {
+      "name": "Concert Discovery Pagination",
+      "kind": "button",
+      "description": "Shared concert-list 44px pagination; Lucide arrows have accessible button names. Reduced motion removes transitions and makes pagination scroll immediate; see route-home.md.",
+      "html": "<button type=\"button\" class=\"ds-page\" aria-current=\"page\" aria-label=\"Page 1\">1</button>",
+      "css": ".ds-page { display: inline-flex; width: 2.5rem; height: 2.5rem; align-items: center; justify-content: center; background: transparent; border: 1px solid transparent; color: var(--color-gray-600, #4b5563); font: 400 .875rem/1.25rem Lato, sans-serif; transition: border-color 150ms, color 150ms; } .ds-page[aria-current=\"page\"] { border-color: var(--color-gray-900, #111827); color: var(--color-gray-950, #030712); } .ds-page:hover:not(:disabled) { border-color: var(--color-gray-300, #d1d5db); color: var(--color-gray-950, #030712); } .ds-page:focus-visible { outline: 2px solid var(--ui-primary, #3b82f6); outline-offset: 2px; } .ds-page:disabled { opacity: .3; cursor: not-allowed; } .ds-page { width: 2.75rem; height: 2.75rem; cursor: pointer; } .ds-page:focus-visible { outline-color: var(--color-blue-600, #2563eb); outline-offset: 3px; } @media (prefers-reduced-motion: reduce) { .ds-page { transition: none; scroll-behavior: auto; } }"
     }
   ],
   "narrative": {
@@ -374,7 +388,7 @@
       },
       {
         "name": "The Gallery Rule",
-        "body": "Default surfaces remain white, with Gallery Mist appearing only as a subtle response to interaction.",
+        "body": "Default surfaces remain white, with Gallery Mist used for subtle interaction feedback.",
         "section": "colors"
       },
       {
@@ -407,7 +421,7 @@
       "Do let programme data and typography create the hierarchy.",
       "Do preserve Gallery White space and fine Slate rules between dense information.",
       "Do reserve Programme Blue for navigation, focus, and active interaction.",
-      "Do keep filter fields and coarse-pointer programme targets at least 2.75rem tall and preserve explicit keyboard focus; pagination currently uses 2.5rem targets.",
+      "Do keep filter fields and coarse-pointer programme targets at least 2.75rem tall and preserve explicit keyboard focus; concert-list pagination uses 2.75rem targets.",
       "Do keep interface copy short, factual, and useful."
     ],
     "donts": [

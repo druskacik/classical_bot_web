@@ -1,6 +1,6 @@
 <template>
-  <section :aria-label="t('Concert filters')" class="py-1 sm:py-2">
-    <div :class="['grid gap-x-6 gap-y-2 sm:gap-y-4', fixedCountry ? 'md:grid-cols-2' : 'md:grid-cols-3']">
+  <section :aria-label="t('Concert filters')" class="concert-filters py-1 sm:py-2">
+    <div :class="['location-fields grid gap-x-6 gap-y-2 sm:gap-y-4', fixedCountry ? 'md:grid-cols-2' : 'md:grid-cols-3']">
       <label v-if="!fixedCountry" class="block">
         <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">{{ t('Country') }}</span>
         <select
@@ -47,7 +47,7 @@
       {{ t('Composer or work') }}
       <UIcon :name="musicExpanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" class="size-4" aria-hidden="true" />
     </button>
-    <div :id="musicId" :class="[musicExpanded ? 'grid' : 'hidden', 'mt-1 gap-3 sm:mt-3 sm:gap-5 md:grid md:grid-cols-2', 'md:mt-5']">
+    <div :id="musicId" class="music-fields md:grid md:grid-cols-2" :class="musicExpanded ? 'grid' : 'hidden'">
       <FilterAutocomplete
         type="composer"
         :context="optionContext"
@@ -154,3 +154,27 @@ const activeFilterCount = computed(() => [
 
 const update = (key, value) => emit('update', { key, value })
 </script>
+
+<style scoped>
+.concert-filters .music-fields {
+  margin-top: 1.25rem;
+  gap: 1.5rem;
+}
+.concert-filters :deep(label),
+.concert-filters :deep(label > span) { color: var(--color-gray-600); }
+.concert-filters :deep(input::placeholder) { color: var(--color-gray-600); opacity: 1; }
+.concert-filters :deep(select) { cursor: pointer; }
+.concert-filters :deep(select:disabled) { cursor: default; }
+.concert-filters :deep(button) { cursor: pointer; }
+.concert-filters :deep(select.border-b:focus-visible),
+.concert-filters :deep(input[type='date']:focus-visible) {
+  outline: none;
+  box-shadow: none;
+  border-bottom-color: var(--ui-primary);
+  border-bottom-width: 2px;
+}
+
+@media (max-width: 767px) {
+  .concert-filters .music-fields { margin-top: 0.25rem; gap: 1rem; }
+}
+</style>

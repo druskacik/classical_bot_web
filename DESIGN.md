@@ -124,7 +124,7 @@ Programme Blue sits against Gallery White and a cool Slate hierarchy; the palett
 - **Strong Programme Blue:** Explicit accent for composer actions, mobile map actions, and editorial rules.
 - **Deep Programme Blue:** The stronger hover state for editorial links.
 
-The default interaction accent follows Nuxt UI’s light-mode primary color. Composer surfaces override it with Strong Programme Blue. The historical Slate names below describe the application’s gray utilities; Nuxt UI’s own neutral palette is configured separately as slate.
+The default interaction accent follows Nuxt UI’s light-mode primary color. Composer surfaces and concert-list pages override it with Strong Programme Blue. The historical Slate names below describe the application’s gray utilities; Nuxt UI’s own neutral palette is configured separately as slate.
 
 ### Neutral
 
@@ -144,7 +144,7 @@ The default interaction accent follows Nuxt UI’s light-mode primary color. Com
 
 **The Programme Blue Rule.** Programme Blue communicates navigation, focus, or active state; it does not become a decorative surface wash.
 
-**The Gallery Rule.** Default surfaces remain white, with Gallery Mist appearing only as a subtle response to interaction.
+**The Gallery Rule.** Default surfaces remain white, with Gallery Mist used for subtle interaction feedback.
 
 ## Typography
 
@@ -175,7 +175,7 @@ Composer index headings grow from 2.25rem to 3rem; composer detail headings reac
 
 Pages use a centered responsive container with 1rem outer padding, expanding to 1.5rem and 2rem at wider breakpoints. Primary concert content is capped at 72rem, while reading surfaces narrow to approximately 48rem and introductory copy to approximately 42rem.
 
-The spacing rhythm is based on 0.25rem increments, with 1rem row padding and 1.5rem primary filter gaps. Discovery pages use 1.25rem vertical padding on small screens and 2rem from 640px; month groups start 1rem apart, increasing to 1.5rem. Primary filters stack on mobile and form three columns from 768px, or two when country is fixed. Composer and work filters form a separate two-column row from 768px and collapse behind a disclosure on mobile. Concert rows gain a 14rem date column from 1024px.
+The spacing rhythm is based on 0.25rem increments, with 1rem row padding and 1.5rem primary filter gaps. Discovery pages use 1.25rem vertical padding on small screens and 2rem from 640px; month groups start 1rem apart, increasing to 1.5rem. Primary filters stack on mobile and form three columns from 768px, or two when country is fixed. Composer and work filters form a separate two-column row from 768px; on mobile, they sit behind the “Composer or work” disclosure, expanded when either has a selection, without a separator above them. Concert rows use a 5rem date column, narrowing to 2.75rem below 640px.
 
 Composer galleries use one, two, and three columns at the base, 640px, and 1024px sizes, with 2rem horizontal gaps and 2.5–3rem vertical gaps. The map is a dedicated viewport workspace capped at 120rem, with a side programme on desktop and a movable bottom panel on mobile; its detailed behavior belongs to the map surface brief.
 
@@ -223,11 +223,20 @@ The form language is predominantly square and rule-based. Lists, dropdowns, and 
 ### Concert Rows
 
 - **Corner Style:** Square.
-- **Background:** Gallery White with Gallery Mist on hover.
+- **Background:** Gallery White, including on hover.
 - **Shadow Strategy:** None.
-- **Border:** A fine Slate Divider enclosure with matching row separators.
-- **Internal Padding:** 1rem on small screens; horizontal padding increases to 1.5rem from 640px.
-- **Behavior:** Date and time form the stable scan column; the medium-weight title sits on its own line, followed by badges and programme data. Programme groups stack on mobile and use an 11rem composer column from 640px. Composer names are semibold on mobile and regular from 640px; work links wrap naturally. Coarse-pointer programme links have 2.75rem minimum targets.
+- **Border:** Fine Slate Divider row separators without an enclosure.
+- **Internal Padding:** 1.5rem vertically below 640px and 1.75rem above; no horizontal padding.
+- **Behavior:** Date and time form the stable scan column; the regular serif title sits on its own line, followed by colored location badges, quiet source text, and programme data. Programme groups stack on mobile and use an 11rem composer column from 640px. Composer names are semibold on mobile and regular from 640px; work links wrap naturally. Coarse-pointer programme links have 2.75rem minimum targets.
+
+### Shared Concert Discovery
+
+All homepage, country, and city discovery routes use the same shared presentation, including Classical SK. There is no presentation opt-in prop. The shared surface contract is recorded in [.impeccable/surfaces/route-home.md](.impeccable/surfaces/route-home.md).
+
+- **Ground and structure:** The discovery filters retain their original transparent, unboxed surface without an extra heading. Concert rows stay Gallery White without an enclosure or hover fill. Strong Programme Blue marks interaction. City and country retain their colored outline badges; hovering a linked badge adds a light tint in its own color without underlining, while keyboard focus retains its outline. Sources use quiet text.
+- **Hierarchy:** Centered regular serif page heading (2.25rem, 1.2 line-height; 1.875rem below 640px), regular serif concert titles (1.5rem, 1.35 line-height), and tabular sans-serif day numbers (2.25rem, 1.15 line-height). The date column leads into title, metadata, and a ruled programme with composer names semibold below 640px and regular from 640px, alongside linked works.
+- **Responsive layout:** Content stays within 72rem inside an 80rem outer container. The date column is 5rem with a 1.5rem gap, narrowing below 640px to 2.75rem with a 1rem gap. Below 768px all five filter fields stack; Composer and Work remain visible. Below 640px programme pairs and location/source metadata stack naturally.
+- **Interaction:** Focused concert-list autocomplete and date/country fields use a single two-pixel blue underline without a surrounding ring. Square pagination targets are 2.75rem (44px), with Lucide arrows and accessible button names. Keyboard focus uses a two-pixel blue outline with a three-pixel offset. Reduced motion removes concert-list transitions and makes pagination scrolling immediate; ordinary pagination uses smooth scrolling and returns focus to the results summary.
 
 ### Navigation
 
@@ -248,7 +257,7 @@ The form language is predominantly square and rule-based. Lists, dropdowns, and 
 
 ### Pagination and Updating
 
-- **Style:** Square 2.5rem page buttons with transparent resting borders, an Ink Slate active border, and quieter disabled states.
+- **Style:** Square 2.75rem page buttons with transparent resting borders, an Ink Slate active border, and quieter disabled states.
 - **Interaction:** Border and text changes take 150ms; refreshing results fade to 55% opacity over 200ms while keeping their layout.
 - **Map motion:** The mobile panel uses a 240ms transform transition and 160ms programme fade; both are disabled for reduced-motion preferences.
 
@@ -259,7 +268,7 @@ The form language is predominantly square and rule-based. Lists, dropdowns, and 
 - **Do** let programme data and typography create the hierarchy.
 - **Do** preserve Gallery White space and fine Slate rules between dense information.
 - **Do** reserve Programme Blue for navigation, focus, and active interaction.
-- **Do** keep filter fields and coarse-pointer programme targets at least 2.75rem tall and preserve explicit keyboard focus; pagination currently uses 2.5rem targets.
+- **Do** keep filter fields and coarse-pointer programme targets at least 2.75rem tall and preserve explicit keyboard focus; concert-list pagination uses 2.75rem targets.
 - **Do** keep interface copy short, factual, and useful.
 
 ### Don't:
