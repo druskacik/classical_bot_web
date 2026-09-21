@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { cityQueryValues } from '../layers/concerts/shared/utils/city-query.js'
-import { concertMapLocation, mapListLocation, normalizeMapQuery } from '../layers/concerts/app/utils/concert-discovery.js'
+import { concertMapLocation, mapListLocation } from '../layers/concerts/app/utils/concert-discovery.js'
 
 test('readable identities account for same-country English and local aliases across the full catalogue', () => {
   const values = cityQueryValues([
@@ -25,15 +25,4 @@ test('list/map round trip retains readable city, radius and complete date/music 
   assert.deepEqual(map, { path: '/map', query })
   assert.deepEqual(mapListLocation({ ...map.query, bounds: '4,52,6,53', page: '2' }), { path: '/', query })
   assert.deepEqual(mapListLocation({ bounds: '4,52,6,53', datePreset: 'week' }), { path: '/', query: { bounds: '4,52,6,53', datePreset: 'week' } })
-})
-
-test('legacy normalization preserves identity and radius, and is idempotent', () => {
-  const query = { mapCity: '973', cityName: 'Frankfort,US', bounds: '1,2,3,4', page: '3' }
-  const normalized = normalizeMapQuery(query)
-  assert.deepEqual(normalized, { city: '973', bounds: '1,2,3,4', page: '3' })
-  assert.deepEqual(normalizeMapQuery(normalized), normalized)
-  assert.throws(() => normalizeMapQuery({ ...query, city: 'Amsterdam,NL' }), { statusCode: 400 })
-  assert.deepEqual(normalizeMapQuery({ nearCity: '143', radiusKm: '50' }), { city: '143', radius: '50' })
-  const point = { nearLat: '52', nearLng: '5', radius: '50' }
-  assert.deepEqual(mapListLocation(normalizeMapQuery(point)).query, point)
 })

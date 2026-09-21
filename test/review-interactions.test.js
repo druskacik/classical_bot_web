@@ -1,9 +1,8 @@
+import { compileComponent, renderer } from '../test-support/vue.js'
 import * as queryHelpers from '../layers/concerts/shared/utils/concert-query.js'
 import { useConcertQuery } from '../layers/concerts/app/composables/useConcertQuery.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { parse, compileScript } from '@vue/compiler-sfc'
 import * as Vue from 'vue'
 import { createConcertText } from '../layers/concerts/app/utils/concert-text.js'
 import * as discovery from '../layers/concerts/app/utils/concert-discovery.js'
@@ -14,7 +13,6 @@ import { parseConcertFilters } from '../layers/concerts/server/utils/concert-fil
 import { parseArea } from '../layers/concerts/server/utils/concert-area.js'
 
 globalThis.createError = fields => Object.assign(new Error(fields.statusMessage), fields)
-const renderer = Vue.createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode() {}, nextSibling() {} })
 async function mount(path, props, route = Vue.reactive({ query: {} }), fetcher = async () => ({ items: [] })) {
   const mounted = []
   const dataRequests = []
@@ -28,27 +26,21 @@ async function mount(path, props, route = Vue.reactive({ query: {} }), fetcher =
       return mediaQueries.get(query)
     },
   }
-  const { descriptor } = parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
-  const executable = compileScript(descriptor, { id: 'review-test' }).content
-    .replace(/import \{([^}]+)\} from ['"]([^'"]+)['"]/g, (_, names, source) =>
-      `const { ${names.replace(/ as /g, ': ')} } = ${source === 'vue' ? 'Vue' : 'utilities'}`)
-    .replace('export default', 'return')
-  const component = new Function('Vue', 'utilities', 'route', '$fetch', 'mounted', 'dataRequests', 'window', `
-    const { ref, computed, watch, useId, nextTick, onBeforeUnmount } = Vue;
-    const onMounted = callback => mounted.push(callback);
-    const useConcertText = () => utilities.createConcertText('en-GB');
-    const useAppConfig = () => ({ concertSite: {} });
-    const useRoute = () => route;
-    const useRouter = () => ({ push: location => { route.query = location.query }, replace: location => { route.query = location.query } });
-    const definePageMeta = () => {};
-    const useConcertListSeo = () => {};
-    const useCountries = () => Promise.resolve({ data: ref([]) });
-    const useAsyncData = (key, handler) => { dataRequests.push({ key, handler }); return { data: ref({ items: [] }), status: ref('success'), error: ref(null), refresh() {} } };
-    ${executable}
-  `)(Vue, { ...discovery, ...area, ...map, ...dates, ...queryHelpers, useConcertQuery, createConcertText }, route, fetcher, mounted, dataRequests, browserWindow)
+  const component = compileComponent(path, {
+    ...discovery, ...area, ...map, ...dates, ...queryHelpers, useConcertQuery,
+    onMounted: callback => mounted.push(callback), window: browserWindow, $fetch: fetcher,
+    useRoute: () => route,
+    useRouter: () => ({ push: location => { route.query = location.query }, replace: location => { route.query = location.query } }),
+    definePageMeta() {}, useConcertListSeo() {},
+    useCountries: () => Promise.resolve({ data: Vue.ref([]) }),
+    useAsyncData: (key, handler) => {
+      dataRequests.push({ key, handler })
+      return { data: Vue.ref({ items: [] }), status: Vue.ref('success'), error: Vue.ref(null), refresh() {} }
+    },
+  })
   let result
   const app = renderer.createApp({ setup() { result = component.setup(props, { emit() {}, expose() {} }); return () => null } })
-  app.mount({})
+  app.mount({ children: [] })
   const state = await result
   const ready = Promise.all(mounted.map(callback => callback()))
   return { state, ready, dataRequests, unmount: () => app.unmount() }
@@ -124,7 +116,7 @@ test('map pagination resets only its programme scrollport, including route histo
   }
 })
 
-test('map links preserve legacy IDs and generate readable city filters for unambiguous selections', async () => {
+test('map links preserve numeric IDs and generate readable city filters for unambiguous selections', async () => {
   const route = Vue.reactive({ query: { city: '2', composers: 'Bach', dateFrom: '2026-10-01' } })
   const view = await mount('../layers/concerts/app/pages/map.vue', {}, route, async () => ({ items: [
     { value: '2', label: 'Bratislava', englishName: 'Bratislava', country_code: 'SK' },
@@ -136,7 +128,6 @@ test('map links preserve legacy IDs and generate readable city filters for unamb
     view.state.selectCity(view.state.mapData.value.items[0])
     assert.equal(view.state.listLocation.value.query.city, 'Vienna,AT')
     assert.equal(route.query.city, 'Vienna,AT')
-    assert.equal(route.query.cityName, undefined)
     assert.equal(parseConcertFilters(view.state.listLocation.value.query).city.name, 'Vienna')
     assert.equal(view.state.selectedCity.value, '25')
     view.state.jump({ value: '1', label: 'Praha', englishName: 'Prague', country_code: 'CZ', cityQuery: 'Prague,CZ' })
@@ -224,22 +215,13 @@ test('map component marks initialization, history fitBounds and resize events as
     eachLayer(callback) { markerLayers.forEach(callback) },
   }
   const leaflet = { map: () => leafletMap, control: { zoom: () => layer, scale: () => layer }, layerGroup: () => layer, tileLayer: () => layer }
-  const { descriptor } = parse(readFileSync(new URL('../layers/concerts/app/components/concert-map.client.vue', import.meta.url), 'utf8'))
-  const executable = compileScript(descriptor, { id: 'leaflet-restoration' }).content
-    .replace(/import \{([^}]+)\} from ['"][^'"]+['"]/, 'const { $1 } = utilities')
-    .replace("import('leaflet')", 'Promise.resolve({ default: leaflet })')
-    .replace("import('leaflet/dist/leaflet.css')", 'Promise.resolve()')
-    .replace('export default', 'return')
-  const component = new Function('Vue', 'utilities', 'leaflet', 'ResizeObserver', `
-    const { ref, watch, onMounted, onBeforeUnmount } = Vue;
-    const useConcertText = () => utilities.createConcertText('en-GB');
-    const useAppConfig = () => ({ concertSite: {} });
-    const useRuntimeConfig = () => ({ public: {} });
-    ${executable}
-  `)(Vue, { ...map, createConcertText }, leaflet, class { constructor(callback) { resizeCallback = callback } observe() {} disconnect() {} })
+  const component = compileComponent('../layers/concerts/app/components/concert-map.client.vue', {
+    ...map,
+    ResizeObserver: class { constructor(callback) { resizeCallback = callback } observe() {} disconnect() {} },
+  }, { modules: { leaflet: { default: leaflet }, 'leaflet/dist/leaflet.css': {} } })
   const props = Vue.reactive({ cities: [], bounds: '10,40,20,50', selected: null, focus: null, obscuredHeight: 0 })
   const app = renderer.createApp({ setup() { component.setup(props, { emit: (...args) => events.push(args), expose() {} }); return () => null } })
-  app.mount({})
+  app.mount({ children: [] })
   try {
     await new Promise(resolve => setTimeout(resolve, 0))
     assert.deepEqual(events.at(-1), ['bounds', '9,39,21,51', { restoring: true }])
@@ -320,11 +302,9 @@ test('same-name cities retain distinct identity in generated map and list links'
     for (const id of ['100', '101']) {
       view.state.selectCity({ id, name: 'Springfield', englishName: 'Springfield', country: 'US' })
       assert.equal(route.query.city, id)
-      assert.equal(route.query.cityName, undefined)
       assert.equal(parseConcertFilters(view.state.listLocation.value.query).city.id, Number(id))
     }
     view.state.clearCity()
-    assert.equal(route.query.cityName, undefined)
   } finally { view.unmount() }
 })
 
@@ -343,8 +323,6 @@ test('Amsterdam round trip preserves name-based programme results, radius and da
     view.state.moveMap('4,52,6,53')
     await new Promise(resolve => setTimeout(resolve, 350))
     assert.deepEqual(view.state.listLocation.value.query, original)
-    assert.equal(route.query.mapCity, undefined)
-    assert.equal(route.query.cityName, undefined)
     assert.equal(view.state.listParams.value.bounds, undefined, 'viewport must not clip a selected city/radius')
     view.state.selectCity({ id: '25', name: 'Vienna', cityQuery: 'Vienna,AT' })
     assert.equal(route.query.radius, undefined, 'selecting a new marker starts an exact-city search')

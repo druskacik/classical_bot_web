@@ -5,20 +5,8 @@ export const querySelections = value => typeof firstQueryValue(value) === 'strin
 export const cleanConcertQuery = query => Object.fromEntries(Object.entries(query)
   .filter(([, value]) => value !== undefined && value !== null && value !== ''))
 const scalarKeys = ['country', 'city', 'nearLat', 'nearLng', 'radius', 'bounds', 'dateFrom', 'dateTo', 'datePreset', 'page']
-const conflict = key => { throw Object.assign(new Error(`Conflicting ${key} query values`), { statusCode: 400, statusMessage: `Conflicting ${key} query values` }) }
-
-// The only compatibility boundary. Never interpret a display label as city identity.
 export function normalizeConcertQuery(input) {
   const query = { ...input }
-  for (const [alias, key] of [['mapCity', 'city'], ['nearCity', 'city'], ['radiusKm', 'radius']]) {
-    if (query[alias] !== undefined) {
-      const value = firstQueryValue(query[alias])
-      if (query[key] !== undefined && String(firstQueryValue(query[key])).trim() !== String(value).trim()) conflict(key)
-      query[key] = value
-      delete query[alias]
-    }
-  }
-  delete query.cityName
   for (const key of scalarKeys) if (query[key] !== undefined) query[key] = firstQueryValue(query[key])
   for (const key of ['composers', 'works']) if (query[key] !== undefined) query[key] = querySelections(query[key]).join(',')
   return query

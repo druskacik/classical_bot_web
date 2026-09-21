@@ -1,22 +1,18 @@
+import { compileComponent, renderer } from '../test-support/vue.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { parse, compileScript } from '@vue/compiler-sfc'
 import * as Vue from 'vue'
 import { cityRadiusLocation } from '../layers/concerts/app/utils/concert-discovery.js'
 import { parseConcertFilters, applyFilters } from '../layers/concerts/server/utils/concert-filters.js'
 import { resolveArea } from '../layers/concerts/server/utils/concert-area.js'
 import knex from 'knex'
 globalThis.createError = fields => Object.assign(new Error(fields.statusMessage), fields)
-const { descriptor } = parse(readFileSync(new URL('../layers/concerts/app/components/city-radius.vue', import.meta.url), 'utf8'))
-const executable = compileScript(descriptor, { id: 'radius-test' }).content.replace('export default', 'return')
-const renderer = Vue.createRenderer({ createComment: text => ({ text }), createElement: tag => ({ tag }), createText: text => ({ text }), insert() {}, remove() {}, parentNode() {}, nextSibling() {}, setText() {}, setElementText() {}, patchProp() {} })
 function mount(props) {
   const emitted = []
-  const component = new Function('Vue', 'useConcertText', 'useAppConfig', `const { ref, computed, watch, nextTick, useId } = Vue; ${executable}`)(Vue, () => ({ t: text => text }), () => ({ concertSite: { country: null } }))
+  const component = compileComponent('../layers/concerts/app/components/city-radius.vue')
   let state
   const app = renderer.createApp({ setup() { state = component.setup(props, { emit: (...args) => emitted.push(args), expose() {} }); return () => null } })
-  app.mount({})
+  app.mount({ children: [] })
   return { state, emitted, unmount: () => app.unmount() }
 }
 test('inline radius defaults to city only; custom edits require an explicit valid submission', async () => {
@@ -50,7 +46,7 @@ test('city/radius navigation removes fixed geography and page while preserving d
   assert.equal(cityRadiusLocation(location.query, '2', 0).query.radius, undefined)
   assert.equal(cityRadiusLocation(location.query, null, 100).query.radius, undefined)
 })
-test('zero radius means exact city; positive radius resolves canonical and legacy cities across borders', () => {
+test('zero radius means exact city; positive radius resolves numeric and readable cities across borders', () => {
   const cities = [
     { id: 2, english_name: 'Bratislava', local_name: 'Bratislava', country_code: 'SK', latitude: 48.14816, longitude: 17.10674 },
     { id: 25, english_name: 'Vienna', local_name: 'Wien', country_code: 'AT', latitude: 48.20849, longitude: 16.37208 },

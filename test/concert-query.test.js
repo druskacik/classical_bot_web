@@ -6,24 +6,17 @@ import { useConcertQuery } from '../layers/concerts/app/composables/useConcertQu
 import { parseConcertFilters } from '../layers/concerts/server/utils/concert-filters.js'
 
 globalThis.createError = details => Object.assign(new Error(details.statusMessage), details)
+globalThis.defineNuxtRouteMiddleware = handler => handler
+globalThis.navigateTo = (location, options) => ({ location, options })
+const middleware = (await import('../layers/concerts/app/middleware/area-search.global.js')).default
 
-test('one boundary canonicalizes aliases, retains identity and rejects conflicting duplicates', () => {
-  for (const [input, expected] of [
-    [{ mapCity: '123', cityName: 'Vienna' }, { city: '123' }],
-    [{ nearCity: '123', radiusKm: '50' }, { city: '123', radius: '50' }],
-    [{ nearLat: '0', nearLng: '0', radiusKm: '50' }, { nearLat: '0', nearLng: '0', radius: '50' }],
-    [{ city: '123', mapCity: '123', radius: '50', radiusKm: '50' }, { city: '123', radius: '50' }],
-    [{ city: ['Vienna,AT', 'Prague,CZ'], composers: [' Bach, Mozart, Bach, ', 'Other'], works: '1, 2,1' }, { city: 'Vienna,AT', composers: 'Bach,Mozart', works: '1,2' }],
-  ]) {
-    const original = structuredClone(input)
-    assert.deepEqual(normalizeConcertQuery(input), expected)
-    assert.deepEqual(normalizeConcertQuery(expected), expected)
-    assert.deepEqual(input, original, 'does not mutate input')
-  }
-  for (const input of [{ city: '1', mapCity: '2' }, { nearCity: '1', mapCity: '2' }, { radius: '50', radiusKm: '100' }]) {
-    assert.throws(() => normalizeConcertQuery(input), { statusCode: 400 })
-    assert.throws(() => parseConcertFilters(input), { statusCode: 400 })
-  }
+test('current query normalization trims selections without changing city identity or mutating input', () => {
+  const input = { city: ['Vienna,AT', 'Prague,CZ'], composers: [' Bach, Mozart, Bach, ', 'Other'], works: '1, 2,1' }
+  const original = structuredClone(input)
+  const expected = { city: 'Vienna,AT', composers: 'Bach,Mozart', works: '1,2' }
+  assert.deepEqual(normalizeConcertQuery(input), expected)
+  assert.deepEqual(normalizeConcertQuery(expected), expected)
+  assert.deepEqual(input, original)
 })
 
 test('serialization omits defaults and empty selections, preserves unrelated values, and is idempotent', () => {
@@ -63,31 +56,19 @@ test('route composable follows history and chooses push versus replace without m
   assert.equal(state.query.value.city, 'Vienna,AT')
 })
 
-test('page middleware replaces canonical URLs once, preserves hashes, and leaves fixed routes when expanding', async () => {
-  globalThis.defineNuxtRouteMiddleware = handler => handler
-  globalThis.navigateTo = (location, options) => ({ location, options })
-  const middleware = (await import('../layers/concerts/app/middleware/area-search.global.js')).default
-  const old = { path: '/map', query: { mapCity: '123', cityName: 'Label', radiusKm: '50', page: '1', utm_source: 'test' }, hash: '#programme' }
-  const result = middleware(old)
+test('page middleware replaces canonical URLs once, preserves hashes, and leaves fixed routes when expanding', () => {
+  const input = { path: '/map', query: { city: '123', radius: '50', page: '1', utm_source: 'test' }, hash: '#programme' }
+  const result = middleware(input)
   assert.deepEqual(result, { location: { path: '/map', query: { city: '123', radius: '50', utm_source: 'test' }, hash: '#programme' }, options: { replace: true } })
   assert.equal(middleware(result.location), undefined)
   assert.deepEqual(middleware({ path: '/austria/vienna', query: { city: 'Vienna,AT', radius: '50', composers: 'Bach' }, hash: '#results' }).location,
     { path: '/', query: { city: 'Vienna,AT', radius: '50', composers: 'Bach' }, hash: '#results' })
-  assert.throws(() => middleware({ ...old, query: { city: '1', nearCity: '2' } }), { statusCode: 400 })
 })
 
-test('radius-only fixed-city links retain their route origin, pagination, filters and hash', async () => {
-  globalThis.defineNuxtRouteMiddleware = handler => handler
-  globalThis.navigateTo = (location, options) => ({ location, options })
-  const middleware = (await import('../layers/concerts/app/middleware/area-search.global.js')).default
+test('radius-only fixed-city links retain their route origin, pagination, filters and hash', () => {
   for (const path of ['/austria/vienna', '/Bratislava']) {
     const query = { radius: '50', page: '2', composers: 'Bach', dateFrom: '2026-10-01' }
     const location = { path, query, hash: '#programme' }
     assert.equal(middleware(location), undefined)
-    const { radius, ...rest } = query
-    const legacy = middleware({ ...location, query: { ...rest, radiusKm: radius } })
-    assert.deepEqual(legacy.location, location)
-    assert.deepEqual(legacy.options, { replace: true })
-    assert.equal(middleware(legacy.location), undefined)
   }
 })

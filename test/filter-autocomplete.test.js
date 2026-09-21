@@ -1,42 +1,19 @@
+import { compileComponent, renderer } from '../test-support/vue.js'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { parse, compileScript } from '@vue/compiler-sfc'
 import * as Vue from 'vue'
 
-// Mount the actual SFC with a lightweight host so native input/composition
-// event sequences can be checked without a browser or database.
-const { descriptor } = parse(readFileSync(new URL('../layers/concerts/app/components/filter-autocomplete.vue', import.meta.url), 'utf8'))
-const compiled = compileScript(descriptor, { id: 'autocomplete-test', inlineTemplate: true }).content
-const executable = compiled.replace(/import \{([^}]+)\} from ["']vue["']/g, (_, names) =>
-  `const { ${names.replace(/ as /g, ': ')} } = Vue`,
-).replace('export default', 'return')
-const renderer = Vue.createRenderer({
-  createElement: tag => ({ tag, props: {}, children: [] }),
-  createText: text => ({ text }),
-  createComment: text => ({ text }),
-  setText: (node, text) => { node.text = text },
-  setElementText: (node, text) => { node.text = text },
-  parentNode: node => node.parent,
-  nextSibling: () => null,
-  patchProp: (node, key, previous, value) => { node.props[key] = value },
-  insert(node, parent) { node.parent = parent; parent.children.push(node) },
-  remove(node) { node.parent.children = node.parent.children.filter(child => child !== node) },
-})
 const find = (node, tag) => node.tag === tag ? node : node.children?.map(child => find(child, tag)).find(Boolean)
 const settle = async () => { await Vue.nextTick(); await new Promise(resolve => setTimeout(resolve, 250)); await Vue.nextTick() }
 
 test('search feedback stays pending through debounce and ignores superseded responses', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] })
   const requests = []
-  const component = new Function('Vue', '$fetch', 'useConcertText', 'document', `
-    const { ref, computed, watch, nextTick, useId, onMounted, onUnmounted } = Vue;
-    ${executable}
-  `)(Vue, (_url, { params }) => new Promise((resolve, reject) => {
-    requests.push({ params, resolve, reject })
-  }), () => ({ t: text => text, availableOptions: count => `${count} options available` }), {
-    addEventListener() {}, removeEventListener() {}, getElementById() {},
-  })
+  const component = compileComponent('../layers/concerts/app/components/filter-autocomplete.vue', {
+    $fetch: (_url, { params }) => new Promise((resolve, reject) => requests.push({ params, resolve, reject })),
+    useConcertText: () => ({ t: text => text, availableOptions: count => `${count} options available` }),
+    document: { addEventListener() {}, removeEventListener() {}, getElementById() {} },
+  }, { inlineTemplate: true })
   const root = { children: [] }
   const app = renderer.createApp(component, { type: 'city', label: 'City', placeholder: 'Search', modelValue: [] })
   const allText = node => [node.text || '', ...(node.children || []).map(allText)].join(' ')
@@ -109,15 +86,13 @@ for (const type of ['composer', 'city', 'work', 'area-city']) {
   test(`${type} suggestions update during composition, clear, and ordinary typing`, async () => {
     const requests = []
     const selections = []
-    const component = new Function('Vue', '$fetch', 'useConcertText', 'document', `
-      const { ref, computed, watch, nextTick, useId, onMounted, onUnmounted } = Vue;
-      ${executable}
-    `)(Vue, async (_url, { params }) => {
-      requests.push({ ...params, endpoint: _url })
-      return { items: [{ value: '1', label: 'Mozart' }] }
-    }, () => ({ t: text => text, availableOptions: count => String(count) }), {
-      addEventListener() {}, removeEventListener() {}, getElementById() {},
-    })
+    const component = compileComponent('../layers/concerts/app/components/filter-autocomplete.vue', {
+      $fetch: async (_url, { params }) => {
+        requests.push({ ...params, endpoint: _url })
+        return { items: [{ value: '1', label: 'Mozart' }] }
+      },
+      document: { addEventListener() {}, removeEventListener() {}, getElementById() {} },
+    }, { inlineTemplate: true })
     const root = { children: [] }
     const app = renderer.createApp(component, {
       type, label: type, placeholder: 'Search', modelValue: [],

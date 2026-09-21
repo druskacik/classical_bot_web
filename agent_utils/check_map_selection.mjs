@@ -11,7 +11,7 @@ try {
   for (const [width, height] of [[1440, 900], [390, 844]]) {
     const page = await browser.newPage()
     await page.setViewport({ width, height, hasTouch: width < 768 })
-    for (const selection of ['nearLat=52.37&nearLng=4.9&radiusKm=50', 'city=UnknownCity,NL']) {
+    for (const selection of ['nearLat=52.37&nearLng=4.9&radius=50', 'city=UnknownCity,NL']) {
       const query = `${selection}&bounds=4,52,6,53&dateFrom=2026-10-01&datePreset=custom&composers=Bach`
       await page.goto(`${origin}/map?${query}`, { waitUntil: 'networkidle2' })
       await page.waitForSelector('.leaflet-container')
@@ -24,7 +24,7 @@ try {
       await page.evaluate(container => [...document.querySelectorAll(`${container} button`)].find(button => button.textContent.trim() === 'Show area').click(), container)
       await page.waitForFunction(() => {
         const query = new URL(location.href).searchParams
-        return !query.has('city') && !query.has('nearLat') && !query.has('nearLng') && !query.has('radiusKm')
+        return !query.has('city') && !query.has('nearLat') && !query.has('nearLng') && !query.has('radius')
       })
       const cleared = new URL(page.url()).searchParams
       assert.equal(cleared.get('dateFrom'), '2026-10-01')

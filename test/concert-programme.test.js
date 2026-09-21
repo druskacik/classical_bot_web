@@ -1,8 +1,7 @@
+import { compileComponent, renderer } from '../test-support/vue.js'
 import { querySelections } from '../layers/concerts/shared/utils/concert-query.js'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
-import { parse, compileScript } from '@vue/compiler-sfc'
 import * as Vue from 'vue'
 import { groupConcertWorks } from '../layers/concerts/server/utils/concert-works.js'
 import { concertWorkLocation, concertComposerLocation } from '../layers/concerts/app/utils/concert-discovery.js'
@@ -27,28 +26,6 @@ test('work navigation preserves route and filters, normalizes IDs and resets pag
   assert.equal(concertWorkLocation({ path: '/', query: { works: ['2,3', '4'] } }, 3).query.works, '2,3')
 })
 
-const { descriptor } = parse(readFileSync(new URL('../layers/concerts/app/components/concert-programme.vue', import.meta.url), 'utf8'))
-const executable = compileScript(descriptor, { id: 'programme-test', inlineTemplate: true }).content
-  .replace(/import \{([^}]+)\} from ["']vue["']/g, (_, names) => `const { ${names.replace(/ as /g, ': ')} } = Vue`)
-  .replace(/import \{ concertWorkLocation, concertComposerLocation \} from '[^']+'/g, '')
-  .replace(/import \{ querySelections \} from '[^']+'/g, '')
-  .replace('export default', 'return')
-const renderer = Vue.createRenderer({
-  createElement: tag => ({ tag, props: {}, children: [] }),
-  createText: text => ({ text }), createComment: () => ({ text: '' }),
-  setText: (node, text) => { node.text = text },
-  setElementText: (node, text) => { node.text = text; node.children = [] },
-  parentNode: node => node.parent, nextSibling: () => null,
-  patchProp: (node, key, previous, value) => { node.props[key] = value },
-  insert(node, parent, anchor) {
-    if (node.parent) node.parent.children = node.parent.children.filter(child => child !== node)
-    node.parent = parent
-    const index = anchor ? parent.children.indexOf(anchor) : -1
-    if (index < 0) parent.children.push(node)
-    else parent.children.splice(index, 0, node)
-  },
-  remove(node) { node.parent.children = node.parent.children.filter(child => child !== node) },
-})
 const all = (node, tag) => [...(node.tag === tag ? [node] : []), ...(node.children || []).flatMap(child => all(child, tag))]
 const text = node => (node.text || '') + (node.children || []).map(text).join('')
 const works = [
@@ -59,7 +36,10 @@ const works = [
 for (const locale of ['en-GB', 'sk-SK']) {
   test(`complete programme and composer-only rows (${locale})`, async () => {
     const route = Vue.reactive({ path: '/', fullPath: '/', query: {} })
-    const component = new Function('Vue', 'useRoute', 'useConcertText', 'concertWorkLocation', 'concertComposerLocation', 'querySelections', `const { ref, computed, watch, useId } = Vue; ${executable}`)(Vue, () => route, () => createConcertText(locale), concertWorkLocation, concertComposerLocation, querySelections)
+    const component = compileComponent('../layers/concerts/app/components/concert-programme.vue', {
+      useRoute: () => route, useConcertText: () => createConcertText(locale),
+      concertWorkLocation, concertComposerLocation, querySelections,
+    }, { inlineTemplate: true })
     const props = Vue.reactive({ works, composers: [{ id: 1, name: 'Bach' }, { id: 8, name: 'Mozart' }] })
     const root = { children: [] }
     const app = renderer.createApp({ render: () => Vue.h(component, props) })
