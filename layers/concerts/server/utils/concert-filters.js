@@ -1,3 +1,4 @@
+import { createError } from 'h3'
 import { firstQueryValue, querySelections as parseCommaSeparatedValues, normalizeConcertQuery } from '../../shared/utils/concert-query.js'
 import { parseMapBounds } from '../../shared/utils/concert-map.js'
 import { parseArea } from './concert-area.js'

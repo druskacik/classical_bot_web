@@ -35,6 +35,8 @@
         <NuxtLink :to="concertMapLocation(concertQuery, filters.city)" class="ml-auto inline-flex min-h-11 items-center gap-2 text-sm text-primary hover:underline"><UIcon name="i-lucide-map" class="size-4" />{{ t('Map') }}</NuxtLink>
       </div>
 
+      <slot name="alerts" :criteria="requestParams" />
+
       <div v-if="concertStatus === 'pending' && !concertPage" class="py-10">
         <UProgress animation="swing" />
       </div>

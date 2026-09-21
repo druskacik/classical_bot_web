@@ -2,7 +2,9 @@
   <ConcertListPage
     :title="`Classical music concerts in ${country.name}`"
     :country-code="country.code"
-  />
+ >
+    <template #alerts="{ criteria }"><AlertSignup :criteria="criteria" /></template>
+  </ConcertListPage>
 </template>
 
 <script setup>

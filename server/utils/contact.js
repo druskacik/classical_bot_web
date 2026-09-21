@@ -1,3 +1,4 @@
+import { mailSettings } from './mail.js'
 import { isIP } from 'node:net'
 import { createError } from 'h3'
 
@@ -20,28 +21,10 @@ export function validateContact(body) {
 }
 
 export function smtpSettings(env = process.env) {
-  const port = Number(env.SMTP_PORT || 587)
-  const secureValue = env.SMTP_SECURE ?? String(port === 465)
-  const from = env.SMTP_FROM?.trim() || 'ClassicalBot'
-  const match = from.match(/^([^<>]+)<([^<>]+)>$/)
-  const sender = match ? { name: match[1].trim(), address: match[2].trim() }
-    : email(from) ? { name: 'ClassicalBot', address: from }
-      : { name: from, address: env.SMTP_USER }
+  const settings = mailSettings(env)
   const to = env.SMTP_TO?.trim() || env.SMTP_USER
-  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS || !Number.isInteger(port) || port < 1 || port > 65535
-    || !['true', 'false'].includes(secureValue) || !singleLine(sender.name) || !email(sender.address) || !email(to)) {
-    throw new Error('Invalid SMTP configuration')
-  }
-  return {
-    transport: {
-      host: env.SMTP_HOST, port, secure: secureValue === 'true', requireTLS: secureValue === 'false',
-      auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
-      connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 15000,
-      disableFileAccess: true, disableUrlAccess: true,
-      logger: false, debug: false,
-    },
-    from: sender, to,
-  }
+  if (!email(to)) throw new Error('Invalid SMTP configuration')
+  return { ...settings, to }
 }
 
 export function contactMail(settings, contact) {

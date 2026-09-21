@@ -1,5 +1,7 @@
 <template>
-  <ConcertListPage title="Classical music concerts around the world" />
+  <ConcertListPage title="Classical music concerts around the world">
+    <template #alerts="{ criteria }"><AlertSignup :criteria="criteria" /></template>
+  </ConcertListPage>
 </template>
 
 <script setup>

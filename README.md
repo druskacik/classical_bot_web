@@ -346,3 +346,7 @@ The global SMTP cap applies regardless of IP trust settings.
 Production accepts the origin from `site.config.js`; local development additionally
 accepts HTTP localhost/127.0.0.1 origins. The endpoint requires an Origin header.
 Run contact validation and HTTP integration tests with `node --test test/contact.test.js`.
+
+## Concert email alerts
+
+The main English site supports confirmed daily email alerts for one saved search per email address. Signup and sending are disabled by default. See [alert deployment and operations](docs/concert-alerts.md) for the crawler-side migration, SMTP reuse, runtime switches, testing, and delivery recovery.

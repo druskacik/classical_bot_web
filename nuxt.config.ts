@@ -2,7 +2,10 @@ import { classicalBotSite } from './site.config.js'
 import { fileURLToPath } from 'node:url'
 export default defineNuxtConfig({
   extends: ['./layers/concerts'],
+  runtimeConfig: { public: { alertsSignupEnabled: false } },
   nitro: {
+    experimental: { tasks: true },
+    scheduledTasks: { '*/15 * * * *': ['concert-alerts'] },
     externals: { inline: [
       fileURLToPath(new URL('./site.config.js', import.meta.url)),
       'nitropack/presets/node/runtime/node-server',

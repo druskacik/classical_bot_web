@@ -1,3 +1,4 @@
+import { createError } from 'h3'
 import { normalizeConcertQuery, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
 import { citiesWithinArea } from '../../shared/utils/concert-area.js'
 

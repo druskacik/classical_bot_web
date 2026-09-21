@@ -3,7 +3,9 @@
     :title="`Classical music concerts in ${city.name}, ${city.countryName}`"
     :country-code="city.countryCode"
     :city-page="city"
-  />
+ >
+    <template #alerts="{ criteria }"><AlertSignup :criteria="criteria" /></template>
+  </ConcertListPage>
 </template>
 
 <script setup>
