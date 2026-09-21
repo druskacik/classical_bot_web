@@ -28,28 +28,28 @@ test('distance boundaries, antimeridian, poles and incomplete coordinates', () =
 })
 test('one complete, validated origin is required; invalid areas cannot broaden a search', () => {
   assert.equal(parseArea({}), null)
-  assert.deepEqual(parseArea({ nearCity: '2', radiusKm: '100' }), { cityId: '2', radiusKm: 100 })
-  assert.deepEqual(parseArea({ nearLat: '0', nearLng: '0', radiusKm: '1' }), { ...origin, radiusKm: 1 })
+  assert.deepEqual(parseArea({ city: '2', radius: '100' }), { origin: '2', radiusKm: 100 })
+  assert.deepEqual(parseArea({ nearLat: '0', nearLng: '0', radius: '1' }), { ...origin, radiusKm: 1 })
   for (const query of [
-    { nearCity: '2' }, { radiusKm: '100' }, { nearCity: '0', radiusKm: '100' },
-    { nearCity: '2', nearLat: '1', nearLng: '1', radiusKm: '100' },
-    { nearLat: '48', radiusKm: '100' }, { nearLat: '', nearLng: '0', radiusKm: '100' },
-    { nearLat: '91', nearLng: '0', radiusKm: '100' }, { nearLat: '0', nearLng: '-181', radiusKm: '100' },
-    { nearLat: 'Infinity', nearLng: '0', radiusKm: '100' }, { nearCity: ['2','1'], radiusKm: '100' },
-    ...['0','501','1.5','NaN',''].map(radiusKm => ({ nearCity: '2', radiusKm })),
-    ...['city','country','cityId'].map(key => ({ nearCity: '2', radiusKm: '100', [key]: key === 'country' ? 'SK' : '2' })),
+    { radius: '100' }, { city: '0', radius: '100' },
+    { city: '2', nearLat: '1', nearLng: '1', radius: '100' },
+    { nearLat: '48', radius: '100' }, { nearLat: '', nearLng: '0', radius: '100' },
+    { nearLat: '91', nearLng: '0', radius: '100' }, { nearLat: '0', nearLng: '-181', radius: '100' },
+    { nearLat: 'Infinity', nearLng: '0', radius: '100' },
+    ...['501','1.5','NaN',''].map(radius => ({ city: '2', radius })),
+    ...['country','cityId'].map(key => ({ city: '2', radius: '100', [key]: key === 'country' ? 'SK' : '2' })),
   ]) assert.throws(() => parseArea(query), { statusCode: 400 }, JSON.stringify(query))
   assert.throws(() => resolveArea({ cityId: '999', radiusKm: 100 }, cities), { statusCode: 400 })
 })
 test('city and point origins agree and shared SQL retains server site scope', () => {
-  const parsed = parseConcertFilters({ nearCity: '2', radiusKm: '100', composers: 'Mozart', works: '1,2' })
+  const parsed = parseConcertFilters({ city: '2', radius: '100', composers: 'Mozart', works: '1,2' })
   const area = resolveArea(parsed.area, cities)
   assert.deepEqual(area.cityIds, ['2', '25'])
   assert.deepEqual(resolveArea({ ...cities[0], cityId: undefined, radiusKm: 100 }, cities).cityIds, area.cityIds)
   assert.equal(publicArea(area).cityIds, undefined)
   const db = knex({ client: 'pg' })
   for (const siteCountry of [null, 'SK']) {
-    const filters = parseConcertFilters({ nearCity: '2', radiusKm: '100', composers: 'Mozart', works: '1,2' }, siteCountry)
+    const filters = parseConcertFilters({ city: '2', radius: '100', composers: 'Mozart', works: '1,2' }, siteCountry)
     filters.area = area
     const query = applyFilters(db('classical_concert as cc'), filters).toSQL()
     assert.match(query.sql, /"cc"\."city_id" in/)
@@ -63,7 +63,7 @@ test('city and point origins agree and shared SQL retains server site scope', ()
   assert.ok(empty.bindings.includes(0))
 })
 test('cache identity follows the origin, distance, resolved coordinates and site', () => {
-  const filters = parseConcertFilters({ nearCity: '2', radiusKm: '100' })
+  const filters = parseConcertFilters({ city: '2', radius: '100' })
   filters.area = resolveArea(filters.area, cities)
   const original = concertFilterCacheInput(filters)
   for (const change of [{ radiusKm: 50 }, { latitude: 1 }, { longitude: 1 }, { cityId: '25' }]) {
@@ -76,18 +76,18 @@ test('area navigation resets geography/page, preserves music/dates, and round tr
   const area = { cityId: '2', radiusKm: 100 }
   const next = concertAreaLocation(query, area)
   assert.equal(next.path, '/')
-  assert.deepEqual(next.query, { composers: 'Mozart', works: '4', datePreset: 'week', dateFrom: '2026-09-17', nearCity: '2', radiusKm: '100' })
+  assert.deepEqual(next.query, { composers: 'Mozart', works: '4', datePreset: 'week', dateFrom: '2026-09-17', city: '2', radius: '100' })
   assert.deepEqual(normalizeAreaLocation('/austria/vienna', next.query), next)
   assert.equal(normalizeAreaLocation('/', next.query), null)
   const pointQuery = concertAreaLocation(next.query, { latitude: 0, longitude: 179.9, radiusKm: 25 }).query
-  assert.equal(pointQuery.nearCity, undefined)
-  assert.deepEqual(areaQuery(parseArea(pointQuery)), { nearLat: '0', nearLng: '179.9', radiusKm: '25' })
-  assert.equal(concertCityLocation(next.query, { city_path: '/austria/vienna' }).query.nearCity, undefined)
-  assert.equal(concertCountryLocation(next.query, 'AT').query.nearCity, undefined)
-  assert.equal(concertComposerLocation({ path: '/', query: next.query }, 'Bach').query.nearCity, '2')
-  assert.equal(concertWorkLocation({ path: '/', query: next.query }, 9).query.nearCity, '2')
-  assert.equal(updateConcertQuery(next.query, { dateFrom: '2026-09-18' }).nearCity, '2')
-  const cleared = updateConcertQuery(next.query, clearAreaQuery())
-  assert.equal(cleared.nearCity, undefined)
+  assert.equal(pointQuery.city, undefined)
+  assert.deepEqual(areaQuery(parseArea(pointQuery)), { nearLat: '0', nearLng: '179.9', radius: '25' })
+  assert.equal(concertCityLocation(next.query, { city_path: '/austria/vienna' }).query.city, undefined)
+  assert.equal(concertCountryLocation(next.query, 'AT').query.city, undefined)
+  assert.equal(concertComposerLocation({ path: '/', query: next.query }, 'Bach').query.city, '2')
+  assert.equal(concertWorkLocation({ path: '/', query: next.query }, 9).query.city, '2')
+  assert.equal(updateConcertQuery(next.query, { dateFrom: '2026-09-18' }).city, '2')
+  const cleared = updateConcertQuery(next.query, { ...clearAreaQuery(), city: undefined })
+  assert.equal(cleared.city, undefined)
   assert.equal(cleared.composers, 'Mozart')
 })

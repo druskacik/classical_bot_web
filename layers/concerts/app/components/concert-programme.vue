@@ -30,6 +30,7 @@
 </template>
 
 <script setup>
+import { querySelections } from '../../shared/utils/concert-query.js'
 import { concertWorkLocation, concertComposerLocation } from '../utils/concert-discovery.js'
 
 const props = defineProps({
@@ -38,10 +39,7 @@ const props = defineProps({
 })
 const { t } = useConcertText()
 const route = useRoute()
-const selectedWorks = computed(() => {
-  const value = Array.isArray(route.query.works) ? route.query.works[0] : route.query.works
-  return new Set(typeof value === 'string' ? value.split(',').map(Number) : [])
-})
+const selectedWorks = computed(() => new Set(querySelections(route.query.works).map(Number)))
 const matches = work => selectedWorks.value.has(Number(work.id))
 const groups = computed(() => {
   const grouped = new Map()

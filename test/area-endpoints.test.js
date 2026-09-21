@@ -41,7 +41,7 @@ test('real area endpoints resolve coordinates, constrain all SQL, cache repeats 
   const previous = process.env.SERVER_DATA_CACHE_ENABLED
   process.env.SERVER_DATA_CACHE_ENABLED = 'true'
   t.after(() => { if (previous === undefined) delete process.env.SERVER_DATA_CACHE_ENABLED; else process.env.SERVER_DATA_CACHE_ENABLED = previous })
-  const query = { nearCity: '2', radiusKm: '100' }
+  const query = { city: '2', radius: '100' }
   for (const country of [null, 'SK']) {
     site.country = country
     site.locale = country ? 'sk-SK' : 'en-GB'
@@ -64,7 +64,7 @@ test('real area endpoints resolve coordinates, constrain all SQL, cache repeats 
     const before = statements.length
     assert.deepEqual(await concerts({ query }), result)
     assert.equal(statements.length, before, 'warm response and city catalogue avoid database reads')
-    await concerts({ query: { ...query, radiusKm: '25' } })
+    await concerts({ query: { ...query, radius: '25' } })
     assert.ok(statements.length > before)
     for (const type of ['composer', 'work', 'country']) {
       statements.length = 0
@@ -91,7 +91,7 @@ test('real area endpoints resolve coordinates, constrain all SQL, cache repeats 
       assert.equal(vienna.secondaryLabel, 'Austria')
     }
     assert.ok((await cities({ query: { q: 'Prague', selected: '2' } })).items.some(item => item.value === '2'))
-    await assert.rejects(concerts({ query: { nearCity: '99999', radiusKm: '100' } }), { statusCode: 400 })
+    await assert.rejects(concerts({ query: { city: '99999', radius: '100' } }), { statusCode: 400 })
     await assert.rejects(facets({ query: { ...query, type: 'composer', cityId: '2' } }), { statusCode: 400 })
   }
 })

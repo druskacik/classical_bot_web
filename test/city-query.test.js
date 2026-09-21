@@ -32,8 +32,8 @@ test('legacy normalization preserves identity and radius, and is idempotent', ()
   const normalized = normalizeMapQuery(query)
   assert.deepEqual(normalized, { city: '973', bounds: '1,2,3,4', page: '3' })
   assert.deepEqual(normalizeMapQuery(normalized), normalized)
-  assert.equal(normalizeMapQuery({ ...query, city: 'Amsterdam,NL' }).city, 'Amsterdam,NL')
+  assert.throws(() => normalizeMapQuery({ ...query, city: 'Amsterdam,NL' }), { statusCode: 400 })
   assert.deepEqual(normalizeMapQuery({ nearCity: '143', radiusKm: '50' }), { city: '143', radius: '50' })
-  const point = { nearLat: '52', nearLng: '5', radiusKm: '50' }
+  const point = { nearLat: '52', nearLng: '5', radius: '50' }
   assert.deepEqual(mapListLocation(normalizeMapQuery(point)).query, point)
 })

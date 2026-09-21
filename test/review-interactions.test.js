@@ -1,3 +1,5 @@
+import * as queryHelpers from '../layers/concerts/shared/utils/concert-query.js'
+import { useConcertQuery } from '../layers/concerts/app/composables/useConcertQuery.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -7,6 +9,7 @@ import { createConcertText } from '../layers/concerts/app/utils/concert-text.js'
 import * as discovery from '../layers/concerts/app/utils/concert-discovery.js'
 import * as area from '../layers/concerts/shared/utils/concert-area.js'
 import * as map from '../layers/concerts/shared/utils/concert-map.js'
+import * as dates from '../layers/concerts/app/utils/concert-dates.js'
 import { parseConcertFilters } from '../layers/concerts/server/utils/concert-filters.js'
 import { parseArea } from '../layers/concerts/server/utils/concert-area.js'
 
@@ -39,9 +42,10 @@ async function mount(path, props, route = Vue.reactive({ query: {} }), fetcher =
     const useRouter = () => ({ push: location => { route.query = location.query }, replace: location => { route.query = location.query } });
     const definePageMeta = () => {};
     const useConcertListSeo = () => {};
-    const useAsyncData = (key, handler) => { dataRequests.push({ key, handler }); return { data: ref({ items: [] }), status: ref('success'), refresh() {} } };
+    const useCountries = () => Promise.resolve({ data: ref([]) });
+    const useAsyncData = (key, handler) => { dataRequests.push({ key, handler }); return { data: ref({ items: [] }), status: ref('success'), error: ref(null), refresh() {} } };
     ${executable}
-  `)(Vue, { ...discovery, ...area, ...map, createConcertText }, route, fetcher, mounted, dataRequests, browserWindow)
+  `)(Vue, { ...discovery, ...area, ...map, ...dates, ...queryHelpers, useConcertQuery, createConcertText }, route, fetcher, mounted, dataRequests, browserWindow)
   let result
   const app = renderer.createApp({ setup() { result = component.setup(props, { emit() {}, expose() {} }); return () => null } })
   app.mount({})
@@ -50,8 +54,8 @@ async function mount(path, props, route = Vue.reactive({ query: {} }), fetcher =
   return { state, ready, dataRequests, unmount: () => app.unmount() }
 }
 
-test('music autocomplete retains coordinate and legacy city areas without mixing radius formats', async () => {
-  const props = Vue.reactive({ areaQuery: { nearLat: '48.15', nearLng: '17.11', radiusKm: '100' }, radius: 100, city: null, composers: ['1'], works: ['2'], dateFrom: '2026-10-01' })
+test('music autocomplete retains coordinate and city areas with the canonical radius format', async () => {
+  const props = Vue.reactive({ areaQuery: { nearLat: '48.15', nearLng: '17.11', radius: '100' }, radius: 100, city: null, composers: ['1'], works: ['2'], dateFrom: '2026-10-01' })
   const view = await mount('../layers/concerts/app/components/concert-filters.vue', props)
   try {
     assert.deepEqual(parseArea(view.state.optionContext.value), { latitude: 48.15, longitude: 17.11, radiusKm: 100 })
@@ -59,10 +63,8 @@ test('music autocomplete retains coordinate and legacy city areas without mixing
     assert.equal(view.state.optionContext.value.works, '2')
     assert.equal(view.state.optionContext.value.dateFrom, '2026-10-01')
     assert.equal(parseArea(view.state.cityContext.value), null, 'city replacement must not remain restricted to the old area')
-    props.areaQuery = { nearCity: '2', radiusKm: '100' }
-    props.city = '2' // Resolved API metadata may also supply the city.
-    assert.deepEqual(parseArea(view.state.optionContext.value), { cityId: '2', radiusKm: 100 })
     props.areaQuery = {}
+    props.city = '2' // Resolved API metadata may also supply the city.
     assert.deepEqual(parseArea(view.state.optionContext.value), { origin: '2', radiusKm: 100 })
     props.radius = 0
     assert.equal(parseArea(view.state.optionContext.value), null)
@@ -91,7 +93,7 @@ test('map pagination resets only its programme scrollport, including route histo
 
  test('map origin lookup resolves names and preserves saved viewport during delayed label lookup', async () => {
   for (const saved of [false, true]) {
-    const query = saved ? { mapCity: '25', bounds: '10,40,20,50', page: '3' } : { city: 'vIeNnA', radius: '100' }
+    const query = saved ? { city: '25', bounds: '10,40,20,50', page: '3' } : { city: 'vIeNnA', radius: '100' }
     const route = Vue.reactive({ query: { ...query } })
     let respond
     const view = await mount('../layers/concerts/app/pages/map.vue', {}, route, async (_url, { params }) => {
@@ -123,7 +125,7 @@ test('map pagination resets only its programme scrollport, including route histo
 })
 
 test('map links preserve legacy IDs and generate readable city filters for unambiguous selections', async () => {
-  const route = Vue.reactive({ query: { mapCity: '2', composers: 'Bach', dateFrom: '2026-10-01' } })
+  const route = Vue.reactive({ query: { city: '2', composers: 'Bach', dateFrom: '2026-10-01' } })
   const view = await mount('../layers/concerts/app/pages/map.vue', {}, route, async () => ({ items: [
     { value: '2', label: 'Bratislava', englishName: 'Bratislava', country_code: 'SK' },
   ] }))
@@ -179,7 +181,7 @@ test('map links preserve legacy IDs and generate readable city filters for unamb
 })
 
 test('Leaflet restoration bounds preserve pagination; only area browsing resets it', async () => {
-  const saved = { mapCity: '25', bounds: '10,40,20,50', page: '3' }
+  const saved = { city: '25', bounds: '10,40,20,50', page: '3' }
   const route = Vue.reactive({ query: { ...saved } })
   const view = await mount('../layers/concerts/app/pages/map.vue', {}, route)
   const settle = () => new Promise(resolve => setTimeout(resolve, 350))
@@ -266,6 +268,9 @@ test('map component marks initialization, history fitBounds and resize events as
       assert.equal(page.state.listLoading.value, false, 'the programme is no longer waiting for bounds')
     } finally { page.unmount() }
   } finally { app.unmount() }
+  const disposedCount = events.length
+  assert.doesNotThrow(() => handlers.moveend())
+  assert.equal(events.length, disposedCount, 'late Leaflet events must not publish after disposal')
 })
 
  test('bare map waits for Leaflet bounds before fetching the programme', async () => {
@@ -285,7 +290,7 @@ test('map component marks initialization, history fitBounds and resize events as
     await programme.handler()
     assert.deepEqual(requests, [{ url: '/api/get-concerts', params: { bounds: '10,40,20,50', page: 1 } }])
     assert.equal(view.state.listLoading.value, false)
-    for (const query of [{ bounds: '0,0,10,10' }, { mapCity: '25' }, { city: 'Vienna,AT' }]) {
+    for (const query of [{ bounds: '0,0,10,10' }, { city: '25' }, { city: 'Vienna,AT' }]) {
       route.query = query
       assert.ok(view.state.listParams.value, 'saved bounds and city links can fetch immediately')
     }
@@ -363,7 +368,7 @@ test('ambiguous readable names stay broad when no single marker can be resolved'
 
 
 test('coordinate and unresolved city selections can be cleared back to the latest viewport', async () => {
-  for (const selection of [{ nearLat: '52.37', nearLng: '4.9', radiusKm: '50' }, { city: 'Frankfort,US' }]) {
+  for (const selection of [{ nearLat: '52.37', nearLng: '4.9', radius: '50' }, { city: 'Frankfort,US' }]) {
     const context = { dateFrom: '2026-10-01', datePreset: 'custom', composers: 'Bach', works: '12' }
     const route = Vue.reactive({ query: { ...selection, ...context, bounds: '4,52,6,53', page: '3' } })
     const view = await mount('../layers/concerts/app/pages/map.vue', {}, route)
@@ -386,4 +391,21 @@ test('coordinate and unresolved city selections can be cleared back to the lates
     } finally { view.unmount() }
   }
   assert.equal(createConcertText('sk-SK').t('Selected area ({radius} km radius)', { radius: 50 }), 'Vybraná oblasť (okruh 50 km)')
+})
+
+test('fixed-city radius requests use the page origin and omit the exact-country constraint', async () => {
+  for (const cityPage of [{ id: '25', countryCode: 'AT', path: '/austria/vienna' }, { id: '2', countryCode: 'SK', path: '/Bratislava' }]) {
+    const route = Vue.reactive({ path: cityPage.path, query: { radius: '50', page: '2', composers: 'Bach' } })
+    const requests = []
+    assert.equal(discovery.normalizeAreaLocation(route.path, route.query), null)
+    const view = await mount('../layers/concerts/app/components/concert-list-page.vue', { title: 'City concerts', countryCode: cityPage.countryCode, cityPage }, route, async (url, { params }) => { requests.push({ url, params }); return { items: [] } })
+    try {
+      await view.dataRequests[0].handler()
+      assert.deepEqual(requests, [{ url: '/api/get-concerts', params: {
+        radius: '50', bounds: undefined, country: undefined, city: cityPage.id,
+        dateFrom: undefined, dateTo: undefined, composers: 'Bach', works: undefined, page: 2,
+      } }])
+      assert.deepEqual(parseConcertFilters(requests[0].params, cityPage.countryCode === 'SK' ? 'SK' : null).area, { origin: cityPage.id, radiusKm: 50 })
+    } finally { view.unmount() }
+  }
 })

@@ -58,11 +58,11 @@ test('Birmingham radius retains unlinked concerts without admitting unrelated or
   const area = filtersFor({ city: 'Birmingham,GB', radius: '25' })
   const expanded = select(area)
   assert.deepEqual(expanded, [...exact, 291])
-  for (const radiusKm of ['25', '50', '100']) {
-    assert.deepEqual(select(filtersFor({ nearCity: '105', radiusKm })), expanded)
+  for (const radius of ['25', '50', '100']) {
+    assert.deepEqual(select(filtersFor({ city: '105', radius })), expanded)
   }
   assert.deepEqual(select(filtersFor({ city: '105', radius: '25' })), expanded)
-  assert.equal(select(filtersFor({ nearLat: '52.48142', nearLng: '-1.89983', radiusKm: '25' })).length, 288)
+  assert.equal(select(filtersFor({ nearLat: '52.48142', nearLng: '-1.89983', radius: '25' })).length, 288)
   assert.deepEqual(select(filtersFor({ city: 'Birmingham,GB', radius: '25', dateFrom: '2099-02-01' })), [])
   assert.deepEqual(select(filtersFor({ city: 'Birmingham,GB', radius: '25' }, 'SK')), [])
   assert.deepEqual(select(filtersFor({ city: 'Birmingham,GB', radius: '25', bounds: '-3,50,-2,54' })), [291])

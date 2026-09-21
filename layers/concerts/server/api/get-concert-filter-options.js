@@ -1,3 +1,4 @@
+import { firstQueryValue as first, querySelections } from '../../shared/utils/concert-query.js'
 import { getAreaCities } from '../utils/area-cities.js'
 import { resolveArea } from '../utils/concert-area.js'
 import { concertFilterCacheInput } from '../utils/data-cache-keys.js'
@@ -10,7 +11,7 @@ import { applyFilters, facetFilters, parseCity, parseConcertFilters } from '../u
 import { getCityCatalogue } from '../utils/city-catalogue.js'
 
 const OPTION_LIMIT = 20
-const first = value => Array.isArray(value) ? value[0] : value
+
 
 export default defineEventHandler(async (event) => {
   try {
@@ -38,7 +39,7 @@ export default defineEventHandler(async (event) => {
     if (concertSite.country) context.country = concertSite.country
     const search = normalizeSearchText(String(first(query.q) || '').trim().slice(0, 100))
     const selectedText = String(first(query.selected) || '').trim()
-    const selected = type === 'city' ? (selectedText ? [selectedText] : []) : selectedText.split(',').filter(Boolean)
+    const selected = type === 'city' ? (selectedText ? [selectedText] : []) : querySelections(selectedText)
     if (type === 'city') selected.forEach(value => parseCity(value))
     return await cachedConcertData('filter-options', { type, filters: concertFilterCacheInput(context), search, selected }, async () => {
       const base = () => applyFilters(knex('classical_concert as cc')

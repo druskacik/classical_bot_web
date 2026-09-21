@@ -82,8 +82,9 @@
 <script setup>
 const { t, locale, activeFilters } = useConcertText()
 import { concertDatePreset, formatConcertDateRange, resolveConcertDateMode } from '../utils/concert-discovery.js'
-import { clearAreaQuery, hasAreaQuery } from '../../shared/utils/concert-area.js'
+import { clearAreaQuery } from '../../shared/utils/concert-area.js'
 
+import { hasCoordinateQuery } from '../../shared/utils/concert-query.js'
 const props = defineProps({
   radius: { type: Number, default: 0 },
   bounds: { type: String, default: null },
@@ -131,7 +132,7 @@ const selectDateMode = (mode) => {
 }
 const optionContext = computed(() => ({
   bounds: props.bounds || undefined,
-  ...(hasAreaQuery(props.areaQuery) ? props.areaQuery : {
+  ...(hasCoordinateQuery(props.areaQuery) ? props.areaQuery : {
     radius: props.radius > 0 ? String(props.radius) : undefined,
     city: props.fixedCity || props.city || undefined,
   }),

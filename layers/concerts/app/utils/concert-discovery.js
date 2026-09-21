@@ -1,20 +1,8 @@
-import { AREA_KEYS, clearAreaQuery, hasAreaQuery, areaQuery } from '../../shared/utils/concert-area.js'
+import { cleanConcertQuery, updateConcertQuery, normalizeConcertQuery, serializeConcertQuery, querySelections, selectionQuery, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
+import { clearAreaQuery, hasAreaQuery, areaQuery } from '../../shared/utils/concert-area.js'
 import { getCountryPath } from './countries.js'
 
-export const cleanConcertQuery = query => Object.fromEntries(
-  Object.entries(query).filter(([, value]) => value !== undefined && value !== null && value !== ''),
-)
-
-export const updateConcertQuery = (query, changes) => cleanConcertQuery({
-  ...query,
-  ...((Object.hasOwn(changes, 'city') || Object.hasOwn(changes, 'country')) && !hasAreaQuery(changes) ? { ...clearAreaQuery(), radius: undefined, bounds: undefined, cityName: undefined } : {}),
-  ...Object.fromEntries(Object.entries(changes).map(([key, value]) => [
-    key, Array.isArray(value) ? value.join(',') : value,
-  ])),
-  ...(Object.hasOwn(changes, 'country') && !Object.hasOwn(changes, 'city') ? { city: undefined } : {}),
-  ...((Object.hasOwn(changes, 'dateFrom') || Object.hasOwn(changes, 'dateTo')) && !Object.hasOwn(changes, 'datePreset') ? { datePreset: undefined } : {}),
-  page: undefined,
-})
+export { cleanConcertQuery, updateConcertQuery } from '../../shared/utils/concert-query.js'
 
 export const concertCityLocation = (query, concert) => ({
   // Fallback cities must leave fixed-location routes so their query takes effect.
@@ -31,14 +19,12 @@ export const concertCountryLocation = (query, country) => ({
 })
 
 export const concertComposerLocation = (route, composer) => {
-  const value = Array.isArray(route.query.composers) ? route.query.composers[0] : route.query.composers
-  const selected = typeof value === 'string' ? value.split(',').map(item => item.trim()).filter(Boolean) : []
+  const selected = querySelections(route.query.composers)
   return { path: route.path, query: updateConcertQuery(route.query, { composers: [...new Set([...selected, composer])] }) }
 }
 
 export const concertWorkLocation = (route, workId) => {
-  const value = Array.isArray(route.query.works) ? route.query.works[0] : route.query.works
-  const selected = typeof value === 'string' ? value.split(',').map(item => item.trim()).filter(Boolean) : []
+  const selected = querySelections(route.query.works)
   const works = [...new Set([...selected.map(Number), Number(workId)])]
     .filter(id => Number.isSafeInteger(id) && id > 0)
   return { path: route.path, query: updateConcertQuery(route.query, { works }) }
@@ -84,10 +70,12 @@ export const formatConcertDateRange = (from, to, locale = 'en-GB', labels = { fr
 
 export const concertAreaLocation = (query, area) => ({
   path: '/',
-  query: updateConcertQuery(query, { ...clearAreaQuery(), ...areaQuery(area), city: undefined, country: undefined }),
+  query: updateConcertQuery(query, { city: undefined, country: undefined, ...clearAreaQuery(), ...areaQuery(area) }),
 })
-export const normalizeAreaLocation = (path, query) => hasAreaQuery(query) && path !== '/map' && (path !== '/' || query.city !== undefined || query.country !== undefined)
-  ? { path: '/', query: cleanConcertQuery({ ...query, city: undefined, country: undefined, page: undefined }) }
+// A radius alone may get its origin from the city page. Keep that route until
+// an explicit city or coordinate origin makes the search self-contained.
+export const normalizeAreaLocation = (path, query) => hasAreaQuery(query) && (Boolean(query.city) || hasCoordinateQuery(query)) && path !== '/map' && (path !== '/' || query.country !== undefined)
+  ? { path: '/', query: cleanConcertQuery({ ...query, country: undefined, page: undefined }) }
   : null
 
 // Location controls leave fixed city/country routes; music and dates travel with them.
@@ -99,30 +87,17 @@ export const cityRadiusLocation = (query, city, radius = 0) => ({
   }),
 })
 
-const firstQuery = value => Array.isArray(value) ? value[0] : value
-
-// Preserve the public filter independently of the ID used to highlight a marker.
-// Legacy IDs stay IDs: cityName is only a label, never identity evidence.
-export const mapSelectionQuery = query => {
-  const city = firstQuery(query.city) || firstQuery(query.mapCity) || firstQuery(query.nearCity)
-  if (city) return cleanConcertQuery({ city, radius: firstQuery(query.radius) ?? (query.nearCity ? firstQuery(query.radiusKm) : undefined) })
-  if (hasAreaQuery(query)) return cleanConcertQuery(Object.fromEntries(AREA_KEYS.map(key => [key, firstQuery(query[key])])))
-  return {}
-}
-
-export const normalizeMapQuery = query => cleanConcertQuery({
-  ...query, ...clearAreaQuery(), city: undefined, radius: undefined,
-  mapCity: undefined, cityName: undefined, country: undefined,
-  ...mapSelectionQuery(query),
-})
-
+// Marker identity stays separate from the public city filter.
+export const mapSelectionQuery = input => selectionQuery(normalizeConcertQuery(input))
+export const normalizeMapQuery = input => serializeConcertQuery({ ...normalizeConcertQuery(input), country: undefined })
 export const concertMapLocation = (query, city) => ({
   path: '/map', query: normalizeMapQuery({ ...query, city: city || undefined, page: undefined }),
 })
-
-export const mapListLocation = query => ({
-  path: '/', query: cleanConcertQuery({
-    ...Object.fromEntries(['dateFrom', 'dateTo', 'datePreset', 'composers', 'works'].map(key => [key, firstQuery(query[key])])),
-    ...(Object.keys(mapSelectionQuery(query)).length ? mapSelectionQuery(query) : { bounds: firstQuery(query.bounds) }),
-  }),
-})
+export const mapListLocation = input => {
+  const query = normalizeConcertQuery(input)
+  const selection = selectionQuery(query)
+  return { path: '/', query: serializeConcertQuery({
+    ...Object.fromEntries(['dateFrom', 'dateTo', 'datePreset', 'composers', 'works'].map(key => [key, query[key]])),
+    ...(Object.keys(selection).length ? selection : { bounds: query.bounds }),
+  }) }
+}

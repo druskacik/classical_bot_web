@@ -26,6 +26,7 @@ const currentBounds = () => {
   return { west: b.getEast() - b.getWest() >= 360 ? -180 : wrap(b.getWest()), south: Math.max(-90, b.getSouth()), east: b.getEast() - b.getWest() >= 360 ? 180 : wrap(b.getEast()), north: Math.min(90, b.getNorth()) }
 }
 const publishBounds = (restoring = restoringViewport) => {
+  if (disposed || !map) return
   lastBounds = serializeMapBounds(currentBounds())
   emit('bounds', lastBounds, { restoring })
 }

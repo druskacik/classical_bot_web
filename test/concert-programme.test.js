@@ -1,3 +1,4 @@
+import { querySelections } from '../layers/concerts/shared/utils/concert-query.js'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
@@ -30,6 +31,7 @@ const { descriptor } = parse(readFileSync(new URL('../layers/concerts/app/compon
 const executable = compileScript(descriptor, { id: 'programme-test', inlineTemplate: true }).content
   .replace(/import \{([^}]+)\} from ["']vue["']/g, (_, names) => `const { ${names.replace(/ as /g, ': ')} } = Vue`)
   .replace(/import \{ concertWorkLocation, concertComposerLocation \} from '[^']+'/g, '')
+  .replace(/import \{ querySelections \} from '[^']+'/g, '')
   .replace('export default', 'return')
 const renderer = Vue.createRenderer({
   createElement: tag => ({ tag, props: {}, children: [] }),
@@ -57,7 +59,7 @@ const works = [
 for (const locale of ['en-GB', 'sk-SK']) {
   test(`complete programme and composer-only rows (${locale})`, async () => {
     const route = Vue.reactive({ path: '/', fullPath: '/', query: {} })
-    const component = new Function('Vue', 'useRoute', 'useConcertText', 'concertWorkLocation', 'concertComposerLocation', `const { ref, computed, watch, useId } = Vue; ${executable}`)(Vue, () => route, () => createConcertText(locale), concertWorkLocation, concertComposerLocation)
+    const component = new Function('Vue', 'useRoute', 'useConcertText', 'concertWorkLocation', 'concertComposerLocation', 'querySelections', `const { ref, computed, watch, useId } = Vue; ${executable}`)(Vue, () => route, () => createConcertText(locale), concertWorkLocation, concertComposerLocation, querySelections)
     const props = Vue.reactive({ works, composers: [{ id: 1, name: 'Bach' }, { id: 8, name: 'Mozart' }] })
     const root = { children: [] }
     const app = renderer.createApp({ render: () => Vue.h(component, props) })

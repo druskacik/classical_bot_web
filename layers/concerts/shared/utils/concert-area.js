@@ -1,9 +1,10 @@
-export const AREA_KEYS = ['nearCity', 'nearLat', 'nearLng', 'radiusKm']
-export const hasAreaQuery = query => AREA_KEYS.some(key => query[key] !== undefined && query[key] !== null)
-export const areaQuery = area => !area ? {} : area.cityId
-  ? { nearCity: String(area.cityId), radiusKm: String(area.radiusKm) }
-  : { nearLat: String(area.latitude), nearLng: String(area.longitude), radiusKm: String(area.radiusKm) }
-export const clearAreaQuery = () => Object.fromEntries(AREA_KEYS.map(key => [key, undefined]))
+import { hasRadiusQuery } from './concert-query.js'
+export const AREA_KEYS = ['nearLat', 'nearLng', 'radius']
+export const hasAreaQuery = hasRadiusQuery
+export const areaQuery = area => !area ? {} : area.cityId || area.origin
+  ? { city: String(area.cityId || area.origin), radius: String(area.radiusKm) }
+  : { nearLat: String(area.latitude), nearLng: String(area.longitude), radius: String(area.radiusKm) }
+export const clearAreaQuery = () => ({ nearLat: undefined, nearLng: undefined, radius: undefined })
 
 export function distanceKm(a, b) {
   const radians = degrees => degrees * Math.PI / 180

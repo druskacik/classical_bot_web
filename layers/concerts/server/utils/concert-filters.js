@@ -1,20 +1,9 @@
+import { firstQueryValue, querySelections as parseCommaSeparatedValues, normalizeConcertQuery } from '../../shared/utils/concert-query.js'
 import { parseMapBounds } from '../../shared/utils/concert-map.js'
 import { parseArea } from './concert-area.js'
 import { normalizeCountryCode } from './countries.js'
 import { applyPublicConcertScope } from './public-concerts.js'
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
-
-const firstQueryValue = value => Array.isArray(value) ? value[0] : value
-
-const parseCommaSeparatedValues = (value) => {
-  const queryValue = firstQueryValue(value)
-  if (typeof queryValue !== 'string') return []
-
-  return [...new Set(queryValue
-    .split(',')
-    .map(item => item.trim())
-    .filter(Boolean))]
-}
 
 export const parsePage = (value) => {
   const queryValue = firstQueryValue(value)
@@ -150,7 +139,8 @@ export const applyFilters = (builder, filters) => {
   return builder
 }
 
-export const parseConcertFilters = (query, siteCountry = null) => {
+export const parseConcertFilters = (input, siteCountry = null) => {
+  const query = normalizeConcertQuery(input)
   let bounds
   try { bounds = parseMapBounds(query.bounds) } catch (error) { throw createError({ statusCode: 400, statusMessage: error.message }) }
   const area = parseArea(query)

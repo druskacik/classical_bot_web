@@ -8,7 +8,7 @@ ClassicalBot and Classical SK share these controls and retain the existing **Qui
 
 Positive radii measure approximate straight-line distance from stored city coordinates, not venue locations or travel distance. Concerts without a matching city with valid coordinates are excluded. Classical SK always restricts results to Slovakia. Date, composer, and work filters continue to narrow the results.
 
-Changing city or radius navigates to `/`, clears conflicting location filters and map bounds, and resets pagination while preserving music and date filters. These URL forms are shareable:
+Changing city or radius navigates to `/`, clears conflicting location filters and map bounds, and resets pagination while preserving music and date filters. A direct fixed-city link such as `/austria/vienna?radius=50` stays on its route when no explicit origin is present: the city page supplies the resolved city ID. These URL forms are shareable:
 
 ```text
 /?city=<city-id>
@@ -16,7 +16,7 @@ Changing city or radius navigates to `/`, clears conflicting location filters an
 /?city=Vienna,AT&radius=100
 ```
 
-The API accepts an unambiguous city name (optionally followed by its country code) or city ID. A positive radius requires a resolvable city with coordinates. Invalid, fractional, or out-of-range radii return HTTP 400, as do positive-radius combinations with `country` or `cityId`. Empty areas return no concerts. The older `nearCity` or `nearLat`/`nearLng` plus `radiusKm` URL forms remain supported for existing links; they cannot be mixed with the new radius format.
+The API accepts an unambiguous city name (optionally followed by its country code) or city ID. A positive radius requires a resolvable city with coordinates. Invalid, fractional, or out-of-range radii return HTTP 400, as do positive-radius combinations with `country` or `cityId`. Empty areas return no concerts. Coordinate searches use `nearLat`/`nearLng` with `radius` (1–500 km). City searches use `city` with optional `radius` (0–500 km; generated URLs omit zero). One shared boundary converts `nearCity` and `mapCity` to `city`, and `radiusKm` to `radius`; `cityName` is discarded. Equivalent aliases are accepted; conflicting values return HTTP 400. Pages replace old URLs without adding a history entry, while API requests normalize internally. Repeated scalar parameters use their first value. Composer/work selections are trimmed and deduplicated in encounter order.
 
 ## Explore map
 

@@ -25,8 +25,8 @@
       <FilterAutocomplete type="composer" :label="t('Composer')" :placeholder="t('Search composers')" :show-count="false" :context="musicContext" :model-value="composers" @update:model-value="setFilter('composers', $event)" />
       <FilterAutocomplete type="work" :label="t('Work')" :placeholder="t('Search works or composers')" :show-count="false" :context="musicContext" :model-value="works" @update:model-value="setFilter('works', $event)" />
       <div v-if="dateMode === 'custom'" class="col-span-full flex flex-wrap gap-4 text-sm">
-        <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('From') }} <input type="date" :value="route.query.dateFrom || ''" :max="route.query.dateTo || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="setFilter('dateFrom', $event.target.value)"></label>
-        <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('To') }} <input type="date" :value="route.query.dateTo || ''" :min="route.query.dateFrom || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="setFilter('dateTo', $event.target.value)"></label>
+        <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('From') }} <input type="date" :value="concertQuery.dateFrom || ''" :max="concertQuery.dateTo || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="setFilter('dateFrom', $event.target.value)"></label>
+        <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('To') }} <input type="date" :value="concertQuery.dateTo || ''" :min="concertQuery.dateFrom || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="setFilter('dateTo', $event.target.value)"></label>
       </div>
       <button v-if="mobile && hasMusicDates" type="button" class="min-h-11 text-left text-primary" @click="resetFilters">{{ t('Clear filters') }}</button>
     </component>
@@ -85,17 +85,18 @@
 </template>
 <script setup>
 definePageMeta({ layout: 'map' })
-import { mapSelectionQuery, normalizeMapQuery, mapListLocation, cleanConcertQuery, concertDatePreset, resolveConcertDateMode } from '../utils/concert-discovery.js'
+import { mapSelectionQuery, mapListLocation, concertDatePreset, resolveConcertDateMode } from '../utils/concert-discovery.js'
+import { firstQueryValue as first, querySelections as values, clearLocationQuery, musicQuery } from '../../shared/utils/concert-query.js'
+import { useConcertQuery } from '../composables/useConcertQuery.js'
 import { parseMapBounds } from '../../shared/utils/concert-map.js'
 const { t, locale } = useConcertText()
 const { concertSite } = useAppConfig()
 const route = useRoute()
 const router = useRouter()
-const first = value => Array.isArray(value) ? value[0] : value
-const values = value => typeof first(value) === 'string' ? first(value).split(',').filter(Boolean) : []
-const composers = computed(() => values(route.query.composers))
-const works = computed(() => values(route.query.works))
-const selectionQuery = computed(() => mapSelectionQuery(route.query))
+const { query: concertQuery, update: updateQuery } = useConcertQuery(route, router)
+const composers = computed(() => values(concertQuery.value.composers))
+const works = computed(() => values(concertQuery.value.works))
+const selectionQuery = computed(() => mapSelectionQuery(concertQuery.value))
 const hasSelection = computed(() => Object.keys(selectionQuery.value).length > 0)
 const cityQuery = computed(() => selectionQuery.value.city || null)
 const jumpCity = ref(null)
@@ -108,7 +109,7 @@ const panelState = ref('explore')
 const panelHeight = ref(0)
 const filterDialog = ref(null)
 const filterTrigger = ref(null)
-const filterCount = computed(() => Number(Boolean(route.query.dateFrom || route.query.dateTo || route.query.datePreset)) + composers.value.length + works.value.length)
+const filterCount = computed(() => Number(Boolean(concertQuery.value.dateFrom || concertQuery.value.dateTo || concertQuery.value.datePreset)) + composers.value.length + works.value.length)
 const revealConcerts = () => { if (mobile.value) panelState.value = shortScreen.value ? 'read' : 'preview' }
 let mobileQuery, shortQuery
 const syncScreen = () => {
@@ -132,17 +133,17 @@ watch(filtersOpen, async open => {
   if (open) filterDialog.value?.showModal()
   else { filterDialog.value?.close(); filterTrigger.value?.focus() }
 })
-const resolvingOrigin = ref(Boolean(route.query.city || route.query.nearCity || route.query.mapCity))
-const bounds = computed(() => { try { return parseMapBounds(first(route.query.bounds)) ? first(route.query.bounds) : null } catch { return null } })
-const page = computed(() => Math.max(1, Number(first(route.query.page)) || 1))
+const resolvingOrigin = ref(Boolean(concertQuery.value.city))
+const bounds = computed(() => { try { return parseMapBounds(first(concertQuery.value.bounds)) ? first(concertQuery.value.bounds) : null } catch { return null } })
+const page = computed(() => Math.max(1, Number(first(concertQuery.value.page)) || 1))
 const programmePanel = ref(null)
 watch(page, () => { if (programmePanel.value) programmePanel.value.scrollTop = 0 }, { flush: 'post' })
-const musicContext = computed(() => cleanConcertQuery({ dateFrom: first(route.query.dateFrom), dateTo: first(route.query.dateTo), composers: composers.value.join(','), works: works.value.join(',') }))
+const musicContext = computed(() => musicQuery(concertQuery.value))
 const hasMusicDates = computed(() => Object.keys(musicContext.value).length > 0)
 const now = ref(null)
 const customDates = ref(false)
 onMounted(() => { now.value = new Date() })
-const dateMode = computed(() => customDates.value ? 'custom' : resolveConcertDateMode(first(route.query.datePreset), first(route.query.dateFrom), first(route.query.dateTo), now.value))
+const dateMode = computed(() => customDates.value ? 'custom' : resolveConcertDateMode(first(concertQuery.value.datePreset), first(concertQuery.value.dateFrom), first(concertQuery.value.dateTo), now.value))
 const { data: mapData, status: mapStatus, refresh: refreshMap } = await useAsyncData(computed(() => `map:${JSON.stringify(musicContext.value)}`), () => $fetch('/api/get-concert-map', { params: musicContext.value }))
 const cityQueryValue = city => city?.cityQuery || String(city?.id || city?.value || '')
 const resolvedQuery = ref(null)
@@ -155,7 +156,7 @@ const selectedCityDetails = computed(() => {
 const selectedCity = computed(() => selectedCityDetails.value?.id || (/^\d+$/.test(cityQuery.value || '') ? cityQuery.value : null))
 const selectedName = computed(() => selectedCityDetails.value?.name || null)
 const selectionTitle = computed(() => selectedName.value || cityQuery.value || (hasSelection.value
-  ? t('Selected area ({radius} km radius)', { radius: selectionQuery.value.radiusKm }) : null))
+  ? t('Selected area ({radius} km radius)', { radius: selectionQuery.value.radius }) : null))
 const listParams = computed(() => {
   const selection = selectionQuery.value
   if (!Object.keys(selection).length && !bounds.value) return null
@@ -167,13 +168,10 @@ const { data: concerts, status: listStatus, refresh: refreshList } = await useAs
   ? $fetch('/api/get-concerts', { params: listParams.value })
   : Promise.resolve({ items: [], total: 0, totalPages: 0 }))
 const listLoading = computed(() => !listParams.value || listStatus.value === 'pending')
-const listLocation = computed(() => mapListLocation(route.query))
-const navigate = (changes, replace = false) => router[replace ? 'replace' : 'push']({ path: '/map', query: cleanConcertQuery({ ...normalizeMapQuery(route.query), page: undefined, bounds: latestBounds || bounds.value || undefined, ...changes }) })
-// Upgrade old map links without adding a history entry or changing their filter.
-onMounted(() => watch(() => route.query, query => {
-  const normalized = normalizeMapQuery(query)
-  if (JSON.stringify(query) !== JSON.stringify(normalized)) router.replace({ path: '/map', query: normalized })
-}, { immediate: true }))
+const listLocation = computed(() => mapListLocation(concertQuery.value))
+const navigate = (changes, replace = false) => updateQuery({ bounds: latestBounds || bounds.value || undefined, ...changes }, {
+  path: '/map', replace, clearBounds: false, resetPage: !Object.hasOwn(changes, 'page'),
+})
 let moveTimer
 let latestBounds = bounds.value
 const moveMap = (value, { restoring = false } = {}) => {
@@ -183,13 +181,13 @@ const moveMap = (value, { restoring = false } = {}) => {
   if (restoring && bounds.value) return
   latestBounds = value
   if (value === bounds.value) return
-  moveTimer = setTimeout(() => { if (!resolvingOrigin.value) navigate({ bounds: value, page: restoring || Object.keys(selectionQuery.value).length ? route.query.page : undefined }, true) }, 300)
+  moveTimer = setTimeout(() => { if (!resolvingOrigin.value) navigate({ bounds: value, page: restoring || Object.keys(selectionQuery.value).length ? concertQuery.value.page : undefined }, true) }, 300)
 }
-const clearSelection = { city: undefined, radius: undefined, nearCity: undefined, nearLat: undefined, nearLng: undefined, radiusKm: undefined }
+const clearSelection = clearLocationQuery()
 const selectCity = city => { revealConcerts(); clearTimeout(moveTimer); jumpCity.value = city.id; resolvedOrigin.value = city; resolvedQuery.value = cityQueryValue(city); navigate({ ...clearSelection, city: resolvedQuery.value }) }
 const jump = city => { const selected = { ...city, id: String(city.value), name: city.label }; selectCity(selected); focus.value = selected }
 const clearCity = () => { revealConcerts(); clearTimeout(moveTimer); jumpCity.value = null; navigate(clearSelection) }
-const setFilter = (key, value) => { clearTimeout(moveTimer); navigate({ [key]: Array.isArray(value) ? value.join(',') : value || undefined, ...(['dateFrom', 'dateTo'].includes(key) ? { datePreset: undefined } : {}) }) }
+const setFilter = (key, value) => { clearTimeout(moveTimer); navigate({ [key]: value || undefined }) }
 const setDate = mode => { clearTimeout(moveTimer); customDates.value = mode === 'custom'; if (customDates.value) return; navigate({ ...concertDatePreset(mode, new Date()), datePreset: mode === 'any' ? undefined : mode }) }
 const resetFilters = () => navigate({ dateFrom: undefined, dateTo: undefined, datePreset: undefined, composers: undefined, works: undefined })
 const setPage = value => navigate({ page: value > 1 ? String(value) : undefined })

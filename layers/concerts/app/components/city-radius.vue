@@ -39,7 +39,7 @@ const help = computed(() => `${t('Straight-line distance from the city centre.')
 const draft = ref(String(props.radius || 0))
 const valid = computed(() => draft.value !== '' && Number.isInteger(Number(draft.value)) && Number(draft.value) >= 0 && Number(draft.value) <= 500)
 watch(() => props.radius, radius => { draft.value = String(radius || 0); custom.value = false })
-const changeCity = values => { custom.value = false; emit('change', { city: values.at(-1) || null, radius: values.length ? props.radius : 0 }) }
+const changeCity = values => { custom.value = false; emit('change', { city: values.at(-1) || null, radius: 0 }) }
 const choose = async value => {
   custom.value = value === 'custom'
   if (custom.value) { draft.value = String(props.radius || 0); await nextTick(); customInput.value?.focus(); customInput.value?.select() }

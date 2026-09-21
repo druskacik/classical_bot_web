@@ -67,5 +67,12 @@ test('zero radius means exact city; positive radius resolves canonical and legac
     assert.ok(sql.bindings.includes('SK'))
     assert.ok(sql.bindings.includes('25'))
   }
-  for (const query of [{ radius: '100' }, { city: '2', radius: '-1' }, { city: '2', radius: '501' }, { city: '2', radius: '1.5' }, { city: '2', radius: ['25','50'] }]) assert.throws(() => parseConcertFilters(query), { statusCode: 400 })
+  for (const query of [{ radius: '100' }, { city: '2', radius: '-1' }, { city: '2', radius: '501' }, { city: '2', radius: '1.5' }]) assert.throws(() => parseConcertFilters(query), { statusCode: 400 })
+})
+
+test('choosing a new city starts an exact-city search even when the previous city had a radius', () => {
+  const view = mount({ city: '2', radius: 100 })
+  view.state.changeCity(['25'])
+  assert.deepEqual(view.emitted.pop(), ['change', { city: '25', radius: 0 }])
+  view.unmount()
 })
