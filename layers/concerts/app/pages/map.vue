@@ -25,8 +25,8 @@
       <FilterAutocomplete type="composer" :label="t('Composer')" :placeholder="t('Search composers')" :show-count="false" :context="musicContext" :model-value="composers" @update:model-value="setFilter('composers', $event)" />
       <FilterAutocomplete type="work" :label="t('Work')" :placeholder="t('Search works or composers')" :show-count="false" :context="musicContext" :model-value="works" @update:model-value="setFilter('works', $event)" />
       <div v-if="dateMode === 'custom'" class="col-span-full flex flex-wrap gap-4 text-sm">
-        <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('From') }} <input type="date" :value="concertQuery.dateFrom || ''" :max="concertQuery.dateTo || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="setFilter('dateFrom', $event.target.value)"></label>
-        <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('To') }} <input type="date" :value="concertQuery.dateTo || ''" :min="concertQuery.dateFrom || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="setFilter('dateTo', $event.target.value)"></label>
+        <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('From') }} <input type="date" :value="concertQuery.dateFrom || ''" :max="concertQuery.dateTo || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="updateDate('dateFrom', $event.target.value)"></label>
+        <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('To') }} <input type="date" :value="concertQuery.dateTo || ''" :min="concertQuery.dateFrom || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="updateDate('dateTo', $event.target.value)"></label>
       </div>
       <button v-if="mobile && hasMusicDates" type="button" class="min-h-11 text-left text-primary" @click="resetFilters">{{ t('Clear filters') }}</button>
     </component>
@@ -85,23 +85,18 @@
 </template>
 <script setup>
 definePageMeta({ layout: 'map' })
-import { mapSelectionQuery, mapListLocation, concertDatePreset, resolveConcertDateMode } from '../utils/concert-discovery.js'
-import { firstQueryValue as first, querySelections as values, clearLocationQuery, musicQuery } from '../../shared/utils/concert-query.js'
+import { useConcertMapNavigation } from '../composables/useConcertMapNavigation.js'
+import { useConcertDateFilter } from '../composables/useConcertDateFilter.js'
+import { querySelections as values, musicQuery } from '../../shared/utils/concert-query.js'
 import { useConcertQuery } from '../composables/useConcertQuery.js'
-import { parseMapBounds } from '../../shared/utils/concert-map.js'
 const { t, locale } = useConcertText()
 const { concertSite } = useAppConfig()
 const route = useRoute()
 const router = useRouter()
-const { query: concertQuery, update: updateQuery } = useConcertQuery(route, router)
+const queryController = useConcertQuery(route, router)
+const { query: concertQuery } = queryController
 const composers = computed(() => values(concertQuery.value.composers))
 const works = computed(() => values(concertQuery.value.works))
-const selectionQuery = computed(() => mapSelectionQuery(concertQuery.value))
-const hasSelection = computed(() => Object.keys(selectionQuery.value).length > 0)
-const cityQuery = computed(() => selectionQuery.value.city || null)
-const jumpCity = ref(null)
-const focus = ref(null)
-const resolvedOrigin = ref(null)
 const filtersOpen = ref(false)
 const mobile = ref(false)
 const shortScreen = ref(false)
@@ -133,99 +128,32 @@ watch(filtersOpen, async open => {
   if (open) filterDialog.value?.showModal()
   else { filterDialog.value?.close(); filterTrigger.value?.focus() }
 })
-const resolvingOrigin = ref(Boolean(concertQuery.value.city))
-const bounds = computed(() => { try { return parseMapBounds(first(concertQuery.value.bounds)) ? first(concertQuery.value.bounds) : null } catch { return null } })
-const page = computed(() => Math.max(1, Number(first(concertQuery.value.page)) || 1))
 const programmePanel = ref(null)
-watch(page, () => { if (programmePanel.value) programmePanel.value.scrollTop = 0 }, { flush: 'post' })
 const musicContext = computed(() => musicQuery(concertQuery.value))
 const hasMusicDates = computed(() => Object.keys(musicContext.value).length > 0)
-const now = ref(null)
-const customDates = ref(false)
-onMounted(() => { now.value = new Date() })
-const dateMode = computed(() => customDates.value ? 'custom' : resolveConcertDateMode(first(concertQuery.value.datePreset), first(concertQuery.value.dateFrom), first(concertQuery.value.dateTo), now.value))
-const { data: mapData, status: mapStatus, refresh: refreshMap } = await useAsyncData(computed(() => `map:${JSON.stringify(musicContext.value)}`), () => $fetch('/api/get-concert-map', { params: musicContext.value }))
-const cityQueryValue = city => city?.cityQuery || String(city?.id || city?.value || '')
-const resolvedQuery = ref(null)
-const matchesCityQuery = (city, value) => city && value && (String(city.id) === value || (city === resolvedOrigin.value && resolvedQuery.value === value))
-const selectedCityDetails = computed(() => {
-  const value = cityQuery.value
-  if (matchesCityQuery(resolvedOrigin.value, value)) return resolvedOrigin.value
-  return mapData.value?.items.find(city => city.id === value) || null
-})
-const selectedCity = computed(() => selectedCityDetails.value?.id || (/^\d+$/.test(cityQuery.value || '') ? cityQuery.value : null))
-const selectedName = computed(() => selectedCityDetails.value?.name || null)
+const mapRequest = useAsyncData(computed(() => `map:${JSON.stringify(musicContext.value)}`), () => $fetch('/api/get-concert-map', { params: musicContext.value }))
+const { data: mapData, status: mapStatus, refresh: refreshMap } = mapRequest
+const navigation = useConcertMapNavigation(queryController, mapData, origin => $fetch('/api/get-area-cities', { params: { origin } }))
+const { selectionQuery, hasSelection, cityQuery, jumpCity, focus, selectedCity, selectedName, bounds, page, listParams, listLocation, moveMap, setFilter, setPage } = navigation
+const selectCity = city => { revealConcerts(); return navigation.selectCity(city) }
+const jump = city => { revealConcerts(); return navigation.jump(city) }
+const clearCity = () => { revealConcerts(); return navigation.clearCity() }
 const selectionTitle = computed(() => selectedName.value || cityQuery.value || (hasSelection.value
   ? t('Selected area ({radius} km radius)', { radius: selectionQuery.value.radius }) : null))
-const listParams = computed(() => {
-  const selection = selectionQuery.value
-  if (!Object.keys(selection).length && !bounds.value) return null
-  return { ...musicContext.value, ...(Object.keys(selection).length ? selection : { bounds: bounds.value }), page: page.value }
-})
+const { dateMode, selectDateMode: setDate, updateDate, resetEditor } = useConcertDateFilter(() => concertQuery.value, navigation.updateFilters, { locale, t, navigationKey: () => route.fullPath ?? route.query })
+const resetFilters = () => { resetEditor(); return navigation.resetFilters() }
 // A bare map has no viewport until Leaflet measures its container. Do not fetch
 // worldwide rows that would immediately be replaced by the visible area's rows.
-const { data: concerts, status: listStatus, refresh: refreshList } = await useAsyncData(computed(() => `map-list:${JSON.stringify(listParams.value)}`), () => listParams.value
+const listRequest = useAsyncData(computed(() => `map-list:${JSON.stringify(listParams.value)}`), () => listParams.value
   ? $fetch('/api/get-concerts', { params: listParams.value })
   : Promise.resolve({ items: [], total: 0, totalPages: 0 }))
+const { data: concerts, status: listStatus, refresh: refreshList } = listRequest
 const listLoading = computed(() => !listParams.value || listStatus.value === 'pending')
-const listLocation = computed(() => mapListLocation(concertQuery.value))
-const navigate = (changes, replace = false) => updateQuery({ bounds: latestBounds || bounds.value || undefined, ...changes }, {
-  path: '/map', replace, clearBounds: false, resetPage: !Object.hasOwn(changes, 'page'),
-})
-let moveTimer
-let latestBounds = bounds.value
-const moveMap = (value, { restoring = false } = {}) => {
-  clearTimeout(moveTimer)
-  // Keep the saved viewport as the URL's source of truth. fitBounds can expand
-  // it for a different screen or snapped zoom without changing the user's query.
-  if (restoring && bounds.value) return
-  latestBounds = value
-  if (value === bounds.value) return
-  moveTimer = setTimeout(() => { if (!resolvingOrigin.value) navigate({ bounds: value, page: restoring || Object.keys(selectionQuery.value).length ? concertQuery.value.page : undefined }, true) }, 300)
-}
-const clearSelection = clearLocationQuery()
-const selectCity = city => { revealConcerts(); clearTimeout(moveTimer); jumpCity.value = city.id; resolvedOrigin.value = city; resolvedQuery.value = cityQueryValue(city); navigate({ ...clearSelection, city: resolvedQuery.value }) }
-const jump = city => { const selected = { ...city, id: String(city.value), name: city.label }; selectCity(selected); focus.value = selected }
-const clearCity = () => { revealConcerts(); clearTimeout(moveTimer); jumpCity.value = null; navigate(clearSelection) }
-const setFilter = (key, value) => { clearTimeout(moveTimer); navigate({ [key]: value || undefined }) }
-const setDate = mode => { clearTimeout(moveTimer); customDates.value = mode === 'custom'; if (customDates.value) return; navigate({ ...concertDatePreset(mode, new Date()), datePreset: mode === 'any' ? undefined : mode }) }
-const resetFilters = () => navigate({ dateFrom: undefined, dateTo: undefined, datePreset: undefined, composers: undefined, works: undefined })
-const setPage = value => navigate({ page: value > 1 ? String(value) : undefined })
-watch(() => JSON.stringify(listParams.value), () => { if (programmePanel.value) programmePanel.value.scrollTop = 0 }, { flush: 'post' })
+watch([page, () => JSON.stringify(listParams.value)], () => { if (programmePanel.value) programmePanel.value.scrollTop = 0 }, { flush: 'post' })
 watch([cityQuery, hasSelection], () => { if (hasSelection.value) revealConcerts() })
 const concertDate = (date, part) => date ? new Intl.DateTimeFormat(locale, { [part]: part === 'month' ? 'short' : 'numeric', timeZone: 'UTC' }).format(new Date(date)) : ''
-watch(selectedCity, value => { jumpCity.value = value }, { immediate: true })
-watch(bounds, value => { clearTimeout(moveTimer); latestBounds = value }, { flush: 'sync' })
-const originQuery = cityQuery
-onMounted(() => watch(originQuery, async origin => {
-  if (!origin) { resolvingOrigin.value = false; return }
-  resolvingOrigin.value = true
-  // Names must resolve against the full catalogue: filtered map results can hide
-  // an equally named city and make an ambiguous origin appear unique.
-  let city = matchesCityQuery(resolvedOrigin.value, origin) ? resolvedOrigin.value : mapData.value?.items.find(city => city.id === origin)
-  if (!city) {
-    try {
-      const response = await $fetch('/api/get-area-cities', { params: { origin } })
-      const matches = response.items
-      if (matches.length === 1) city = { ...matches[0], id: String(matches[0].value), name: matches[0].label }
-    } catch { /* The programme and map remain usable without recentering. */ }
-  }
-  if (originQuery.value !== origin) return
-  resolvingOrigin.value = false
-  if (city) {
-    resolvedOrigin.value = city
-    resolvedQuery.value = origin
-    if (!bounds.value) {
-      // The map may have reported its default viewport during the lookup.
-      // Discard it and let the city focus publish the new viewport instead.
-      clearTimeout(moveTimer)
-      latestBounds = null
-      focus.value = { ...city, label: city.name }
-    }
-  }
-}, { immediate: true }))
-onBeforeUnmount(() => clearTimeout(moveTimer))
 useConcertListSeo({ title: () => `${t('Concert map')} — ${concertSite.name}`, description: () => t('Explore upcoming classical music concerts on an interactive world map.'), canonicalPath: '/map', indexable: false })
+await Promise.all([mapRequest, listRequest])
 </script>
 <style scoped>
 .map-page { overflow: hidden; isolation: isolate; display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-width: 0; min-height: 0; width: 100%; max-width: 120rem; margin-inline: auto; }

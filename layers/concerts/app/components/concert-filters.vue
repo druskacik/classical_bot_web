@@ -34,10 +34,10 @@
         <p v-if="dateSummary" class="mt-2 text-xs text-gray-600">{{ dateSummary }}</p>
         <div v-if="dateMode === 'custom'" class="mt-3 grid grid-cols-2 gap-4">
           <label class="min-w-0 text-xs text-gray-600">{{ t('From') }}
-            <input type="date" :max="dateTo || undefined" :value="dateFrom || ''" class="mt-1 h-11 w-full min-w-0 border-b border-gray-300 bg-transparent text-sm text-gray-900 focus-visible:outline-2 focus-visible:outline-primary" @change="update('dateFrom', $event.target.value || null)">
+            <input type="date" :max="dateTo || undefined" :value="dateFrom || ''" class="mt-1 h-11 w-full min-w-0 border-b border-gray-300 bg-transparent text-sm text-gray-900 focus-visible:outline-2 focus-visible:outline-primary" @change="updateDate('dateFrom', $event.target.value)">
           </label>
           <label class="min-w-0 text-xs text-gray-600">{{ t('To') }}
-            <input type="date" :min="dateFrom || undefined" :value="dateTo || ''" class="mt-1 h-11 w-full min-w-0 border-b border-gray-300 bg-transparent text-sm text-gray-900 focus-visible:outline-2 focus-visible:outline-primary" @change="update('dateTo', $event.target.value || null)">
+            <input type="date" :min="dateFrom || undefined" :value="dateTo || ''" class="mt-1 h-11 w-full min-w-0 border-b border-gray-300 bg-transparent text-sm text-gray-900 focus-visible:outline-2 focus-visible:outline-primary" @change="updateDate('dateTo', $event.target.value)">
           </label>
         </div>
       </div>
@@ -74,14 +74,14 @@
 
     <div v-if="activeFilterCount" class="mt-4 flex min-h-11 items-center justify-between" :class="fixedCity && 'md:col-span-3'">
       <p class="text-xs text-gray-500">{{ activeFilters(activeFilterCount) }}</p>
-      <button type="button" class="cursor-pointer text-sm text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="$emit('clear')">{{ t('Clear filters') }}</button>
+      <button type="button" class="cursor-pointer text-sm text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="clearFilters">{{ t('Clear filters') }}</button>
     </div>
   </section>
 </template>
 
 <script setup>
 const { t, locale, activeFilters } = useConcertText()
-import { concertDatePreset, formatConcertDateRange, resolveConcertDateMode } from '../utils/concert-discovery.js'
+import { useConcertDateFilter } from '../composables/useConcertDateFilter.js'
 import { clearAreaQuery } from '../../shared/utils/concert-area.js'
 
 import { hasCoordinateQuery } from '../../shared/utils/concert-query.js'
@@ -114,22 +114,12 @@ const musicExpanded = ref(Boolean(props.composers.length || props.works.length))
 watch(() => [props.composers.join(','), props.works.join(',')], () => {
   if (props.composers.length || props.works.length) musicExpanded.value = true
 })
-const chosenDateMode = ref(null)
-// Resolve local-calendar presets after hydration, never using the server's timezone.
-const localNow = ref(null)
-onMounted(() => { localNow.value = new Date() })
-const dateMode = computed(() => {
-  const chosen = chosenDateMode.value
-  if (chosen?.mode === 'custom' && !props.datePreset && chosen.dateFrom === props.dateFrom && chosen.dateTo === props.dateTo) return 'custom'
-  return resolveConcertDateMode(props.datePreset, props.dateFrom, props.dateTo, localNow.value)
-})
-const dateSummary = computed(() => formatConcertDateRange(props.dateFrom, props.dateTo, locale, { from: t('From'), until: t('Until') }))
-const selectDateMode = (mode) => {
-  localNow.value = new Date()
-  const range = mode === 'custom' ? { dateFrom: props.dateFrom, dateTo: props.dateTo } : concertDatePreset(mode, localNow.value)
-  chosenDateMode.value = { mode, ...range }
-  emit('update', { changes: { ...range, datePreset: ['today', 'week', 'weekend'].includes(mode) ? mode : null } })
-}
+const route = useRoute()
+const { dateMode, dateSummary, selectDateMode, updateDate, resetEditor } = useConcertDateFilter(
+  () => props, changes => emit('update', { changes }),
+  { locale, t, navigationKey: () => route.fullPath ?? route.query },
+)
+const clearFilters = () => { resetEditor(); emit('clear') }
 const optionContext = computed(() => ({
   bounds: props.bounds || undefined,
   ...(hasCoordinateQuery(props.areaQuery) ? props.areaQuery : {
