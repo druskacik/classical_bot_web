@@ -1,0 +1,802 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ClassicalBot Concert API",
+    "version": "1.0.0",
+    "description": "Unauthenticated organisation concert lookup. JSON and CSV use identical concert fields. CSV detail arrays are JSON text inside cells. Upcoming means today onward in UTC. State is currently unavailable."
+  },
+  "servers": [
+    {
+      "url": "https://classicalbot.com"
+    },
+    {
+      "url": "http://localhost:3000"
+    }
+  ],
+  "paths": {
+    "/api/v1/concerts": {
+      "get": {
+        "operationId": "listOrganisationConcerts",
+        "summary": "Upcoming concerts associated with an organisation website",
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "url",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "description": "Organisation HTTP(S) URL. Bare hostnames are accepted."
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "default": "json"
+            },
+            "description": "Response representation; does not change selected records."
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            },
+            "description": "Page number. Incompatible with all=true."
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "description": "Records per page. Incompatible with all=true."
+          },
+          {
+            "in": "query",
+            "name": "all",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Complete export, maximum 10000 concerts. Serialized responses are capped at 20 MiB."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Concerts or an empty collection. CSV is UTF-8 with BOM, quoted comma-separated fields and CRLF. Nulls are blank; arrays are JSON cells. Formula-like scalar text is prefixed with an apostrophe. CSV headers exactly follow Concert property order.",
+            "headers": {
+              "X-Total-Count": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Total matching primary concerts"
+              },
+              "Link": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Relative next-page URL, when available"
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "attachment; filename=\"concerts.csv\" for CSV"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConcertResponse"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"artists\",\"date\",\"time\",\"venue_name\",\"city\",\"state\",\"country\",\"venue_address\",\"buy_url\",\"id\",\"title\",\"event_url\",\"end_time\",\"event_status\",\"last_verified_at\",\"country_code\",\"venue_id\",\"venue_url\",\"parent_venue_name\",\"latitude\",\"longitude\",\"programme\",\"programme_items\",\"composers\",\"performers\",\"prices\",\"price_items\",\"admission_type\",\"booking_kind\",\"booking_status\",\"on_sale_at\",\"source_id\",\"source_name\",\"source_url\",\"source_event_urls\"\r\n"
+              }
+            }
+          },
+          "400": {
+            "description": "JSON error, including when format=csv.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "JSON error, including when format=csv.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "JSON error, including when format=csv.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "JSON error, including when format=csv.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds before retrying"
+              }
+            }
+          },
+          "500": {
+            "description": "JSON error, including when format=csv.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "summary": "Public CORS preflight",
+        "responses": {
+          "204": {
+            "description": "GET and OPTIONS permitted without credentials"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Concert": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artists",
+          "date",
+          "time",
+          "venue_name",
+          "city",
+          "state",
+          "country",
+          "venue_address",
+          "buy_url",
+          "id",
+          "title",
+          "event_url",
+          "end_time",
+          "event_status",
+          "last_verified_at",
+          "country_code",
+          "venue_id",
+          "venue_url",
+          "parent_venue_name",
+          "latitude",
+          "longitude",
+          "programme",
+          "programme_items",
+          "composers",
+          "performers",
+          "prices",
+          "price_items",
+          "admission_type",
+          "booking_kind",
+          "booking_status",
+          "on_sale_at",
+          "source_id",
+          "source_name",
+          "source_url",
+          "source_event_urls"
+        ],
+        "properties": {
+          "artists": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Semicolon-separated unique credited performer names."
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{2}:\\d{2}:\\d{2}$"
+          },
+          "venue_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Canonical hall name, falling back to the original concert venue."
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "type": "null",
+            "description": "State/region is not currently stored."
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "venue_address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Customer Venue column provisionally means address."
+          },
+          "buy_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Stored occurrence-specific booking URL; no homepage fallback."
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Primary concert event page, potentially on another source."
+          },
+          "end_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{2}:\\d{2}:\\d{2}$"
+          },
+          "event_status": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "cancelled",
+              "postponed",
+              "rescheduled"
+            ]
+          },
+          "last_verified_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "country_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z]{2}$"
+          },
+          "venue_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "venue_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent_venue_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latitude": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "longitude": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "programme": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Readable programme summary; ordering is not performance order."
+          },
+          "programme_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title",
+                "programme_label",
+                "catalogue_number",
+                "composer"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "programme_label": {
+                  "type": "string"
+                },
+                "catalogue_number": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "composer": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[0-9]+$"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "composers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "performers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "kind",
+                "roles",
+                "instruments",
+                "voice_type",
+                "character",
+                "ensemble",
+                "qualifier",
+                "identity_url"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "person",
+                    "ensemble"
+                  ]
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "instruments": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "voice_type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "character": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ensemble": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[0-9]+$"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "qualifier": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "identity_url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "prices": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Readable offers with currencies, categories and conditions."
+          },
+          "price_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "kind",
+                "price_type",
+                "amount",
+                "amount_max",
+                "currency",
+                "category",
+                "audience",
+                "conditions",
+                "basis"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "exact",
+                    "from",
+                    "range"
+                  ]
+                },
+                "price_type": {
+                  "type": "string",
+                  "enum": [
+                    "admission",
+                    "fee",
+                    "suggested_donation"
+                  ]
+                },
+                "amount": {
+                  "type": "string",
+                  "pattern": "^\\d+(\\.\\d+)?$"
+                },
+                "amount_max": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^\\d+(\\.\\d+)?$"
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "category": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "audience": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "conditions": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "basis": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "admission_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "booking_kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "purchase",
+              "reservation",
+              null
+            ]
+          },
+          "booking_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "unknown",
+              "on_sale",
+              "not_yet_on_sale",
+              "sold_out",
+              "box_office_only",
+              "not_required",
+              null
+            ]
+          },
+          "on_sale_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "source_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "source_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_event_urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Organisation event links retained through deduplication."
+          }
+        }
+      },
+      "ConcertResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "concerts",
+          "pagination",
+          "generated_at"
+        ],
+        "properties": {
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "url"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              "name": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            }
+          },
+          "concerts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Concert"
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "page",
+              "page_size",
+              "total",
+              "total_pages",
+              "all",
+              "next"
+            ],
+            "properties": {
+              "page": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "page_size": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "total": {
+                "type": "integer"
+              },
+              "total_pages": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "all": {
+                "type": "boolean"
+              },
+              "next": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
