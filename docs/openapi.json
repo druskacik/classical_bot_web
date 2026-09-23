@@ -81,7 +81,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Concerts or an empty collection. CSV is UTF-8 with BOM, quoted comma-separated fields and CRLF. Nulls are blank; arrays are JSON cells. Formula-like scalar text is prefixed with an apostrophe. CSV headers exactly follow Concert property order.",
+            "description": "Concerts or an empty collection. CSV is UTF-8 with BOM, quoted comma-separated fields and CRLF. Nulls are blank; arrays are JSON cells. Formula-like scalar text is prefixed with an apostrophe. CSV headers exactly follow Concert property order. Blocked, disabled or needs-attention sources with zero concerts return JSON with a message even when CSV is requested.",
             "headers": {
               "X-Total-Count": {
                 "schema": {
@@ -100,6 +100,12 @@
                   "type": "string"
                 },
                 "description": "attachment; filename=\"concerts.csv\" for CSV"
+              },
+              "X-Source-Status": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Current crawler registry status; active does not guarantee completed ingestion or enrichment."
               }
             },
             "content": {
@@ -127,7 +133,7 @@
             }
           },
           "404": {
-            "description": "JSON error, including when format=csv.",
+            "description": "Unknown source while registration is disabled. JSON even for format=csv.",
             "content": {
               "application/json": {
                 "schema": {
@@ -137,7 +143,7 @@
             }
           },
           "422": {
-            "description": "JSON error, including when format=csv.",
+            "description": "Invalid/non-public website, ambiguous source, or oversized export. JSON even for format=csv.",
             "content": {
               "application/json": {
                 "schema": {
@@ -173,8 +179,43 @@
                 }
               }
             }
+          },
+          "202": {
+            "description": "No concerts yet; source is pending, processing, pr_open or retry_wait. Always JSON, even for format=csv. Poll the same URL.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Suggested polling interval in seconds"
+              },
+              "X-Source-Status": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Current crawler registry status; active does not guarantee completed ingestion or enrichment."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConcertResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "DNS validation temporarily unavailable; no source registered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
-        }
+        },
+        "description": "When registration is enabled, unknown public websites are DNS-validated and queued at priority 100. This GET can create a source. Repeat the same request to poll registry status; active does not imply completed concert enrichment."
       },
       "options": {
         "summary": "Public CORS preflight",
@@ -699,7 +740,9 @@
             "required": [
               "id",
               "name",
-              "url"
+              "url",
+              "status",
+              "next_attempt_at"
             ],
             "properties": {
               "id": {
@@ -711,6 +754,27 @@
               },
               "url": {
                 "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "processing",
+                  "pr_open",
+                  "active",
+                  "blocked",
+                  "retry_wait",
+                  "duplicate",
+                  "needs_attention",
+                  "disabled"
+                ]
+              },
+              "next_attempt_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
               }
             }
           },
@@ -767,6 +831,9 @@
           "generated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "message": {
+            "type": "string"
           }
         }
       },

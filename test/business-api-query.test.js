@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import knex from 'knex'
+import { createSourceOnboarding, registerSource } from '../server/utils/business-api/onboarding.js'
 import { queryConcerts } from '../server/utils/business-api/query-concerts.js'
 
 // An isolated PostgreSQL cluster, never the application database or .env.
@@ -79,4 +80,38 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
   assert.equal((await queryConcerts(db,{...input,page:3})).concerts.length,0)
   await db.raw(`INSERT INTO classical_concert(id,title,url,source_url,date,inclusion_status) SELECT 100+n,'Export','https://example.com/'||n,'https://example.com/',CURRENT_DATE,'included' FROM generate_series(1,10001) n`)
   await assert.rejects(queryConcerts(db,{...input,all:true}),{code:'export_too_large'})
+  await db.raw(`
+    CREATE SEQUENCE api_source_id START 100;
+    ALTER TABLE crawler_source ALTER COLUMN id SET DEFAULT nextval('api_source_id');
+    ALTER TABLE crawler_source ADD COLUMN status text DEFAULT 'active', ADD COLUMN next_attempt_at timestamptz,
+      ADD COLUMN priority int DEFAULT 0, ADD COLUMN geographic_scope text DEFAULT 'unknown', ADD COLUMN created_at timestamptz DEFAULT now();
+    ALTER TABLE crawler_source_url ADD COLUMN normalized_url text UNIQUE, ADD COLUMN role text,
+      ADD COLUMN discovered_by text, ADD COLUMN metadata_json jsonb;
+  `)
+  let validations=0
+  const onboard=createSourceOnboarding(db,{env:{BUSINESS_API_REGISTRATION_ENABLED:'true',BUSINESS_API_SUBMISSIONS_PER_DAY:'2'},validate:async()=>{validations++}})
+  const request={url:'https://new.org/',submittedUrl:'http://www.new.org/'}
+  const registered=await Promise.all([onboard(request,'a'),onboard(request,'b')])
+  assert.equal(registered[0].id,registered[1].id)
+  assert.equal(registered[0].status,'pending')
+  const saved=await db('crawler_source').where('id',registered[0].id).first()
+  assert.equal(saved.priority,100);assert.equal(saved.canonical_url,'http://www.new.org/')
+  assert.equal((await db('crawler_source_url').where('discovered_by','business_api')).length,1)
+  await db('crawler_source').where('id',saved.id).update({status:'disabled',priority:12})
+  const before=validations
+  assert.equal((await onboard(request,'a')).status,'disabled')
+  assert.equal(validations,before)
+  assert.equal((await db('crawler_source').where('id',saved.id).first()).priority,12)
+  assert.equal((await onboard({url:'https://alias.example/'},'a')).id,'1')
+  const disabled=createSourceOnboarding(db,{env:{},validate:async()=>assert.fail('disabled registration validated')})
+  await assert.rejects(disabled({url:'https://disabled.org/'},'a'),{statusCode:404})
+  const rejects=createSourceOnboarding(db,{env:{BUSINESS_API_REGISTRATION_ENABLED:'true'},validate:async()=>{throw Object.assign(new Error(),{statusCode:422})}})
+  await assert.rejects(rejects({url:'https://invalid.org/'},'a'),{statusCode:422})
+  assert.equal((await db('crawler_source').where('canonical_url','https://invalid.org/')).length,0)
+  await registerSource(db,{url:'https://second.org/'},2)
+  await assert.rejects(registerSource(db,{url:'https://third.org/'},2),{code:'submission_limit'})
+  // Historical registrations do not consume today's persistent allowance.
+  await db('crawler_source').where('id',saved.id).update({created_at:db.raw("now() - interval '2 days'")})
+  await registerSource(db,{url:'https://third.org/'},2)
+
 })

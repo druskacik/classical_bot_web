@@ -38,7 +38,7 @@ export function parseInput(query) {
     if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) > max) throw fail(400, 'invalid_parameter', 'Invalid pagination value.')
     return Number(value)
   }
-  return { url, format, all, page: positive(query.page, 1, 1000000), pageSize: positive(query.page_size, 50, 100) }
+  return { url, submittedUrl: query.url, format, all, page: positive(query.page, 1, 1000000), pageSize: positive(query.page_size, 50, 100) }
 }
 const csvCell = value => {
   let text = value == null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value)

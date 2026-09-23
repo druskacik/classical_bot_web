@@ -4,13 +4,13 @@ import { contactClientIP } from '../contact.js'
 import { parseInput, serializeCsv, assertExportSize } from './contract.js'
 import { createLimiter } from './limiter.js'
 
-export function createConcertApiHandler({ load, cache = createDataCache(), limiter = createLimiter(), env = process.env, log = console.info }) {
+export function createConcertApiHandler({ load, prepare, cache = createDataCache(), limiter = createLimiter(), env = process.env, log = console.info }) {
   return defineEventHandler(async event => {
     const started = performance.now()
     let status = 200, count = 0, format = 'unknown'
     setHeader(event, 'Access-Control-Allow-Origin', '*')
     setHeader(event, 'Access-Control-Allow-Methods', 'GET, OPTIONS')
-    setHeader(event, 'Access-Control-Expose-Headers', 'X-Total-Count, Link, Content-Disposition, Retry-After')
+    setHeader(event, 'Access-Control-Expose-Headers', 'X-Total-Count, Link, Content-Disposition, Retry-After, X-Source-Status')
     setHeader(event, 'Cache-Control', 'no-store')
     if (event.method === 'OPTIONS') { setResponseStatus(event, 204); return null }
     try {
@@ -18,13 +18,30 @@ export function createConcertApiHandler({ load, cache = createDataCache(), limit
       format = input.format
       const ip = contactClientIP(event.node.req.socket.remoteAddress, getHeader(event, 'x-forwarded-for'), env.BUSINESS_API_TRUST_PROXY_HOPS)
       limiter.attempt(ip, input.all)
-      const key = JSON.stringify([input.url, input.all, input.page, input.pageSize, new Date().toISOString().slice(0, 10)])
-      const result = await cache.get('business-api-concerts', key, 120000, async () => {
+      const sourceState = prepare ? await prepare(input, ip) : null
+      const key = JSON.stringify([input.url, sourceState?.id ?? null, input.all, input.page, input.pageSize, new Date().toISOString().slice(0, 10)])
+      const cached = await cache.get('business-api-concerts', key, 120000, async () => {
         if (input.all) limiter.reserve()
         try { return await load(input) }
         finally { if (input.all) limiter.release() }
       })
+      const result = { ...cached, pagination: { ...cached.pagination, next: null }, source: { ...cached.source } }
+      if (sourceState) {
+        result.source.status = sourceState.status
+        result.source.next_attempt_at = sourceState.next_attempt_at
+        setHeader(event, 'X-Source-Status', sourceState.status)
+      }
       count = result.concerts.length
+      const pending = ['pending', 'processing', 'pr_open', 'retry_wait'].includes(sourceState?.status)
+      const stopped = ['blocked', 'disabled', 'needs_attention'].includes(sourceState?.status)
+      if (result.pagination.total === 0 && (pending || stopped)) {
+        status = pending ? 202 : 200
+        setResponseStatus(event, status)
+        setHeader(event, 'Content-Type', 'application/json; charset=utf-8')
+        setHeader(event, 'X-Total-Count', '0')
+        if (pending) setHeader(event, 'Retry-After', '60')
+        return { ...result, message: pending ? 'Source onboarding is in progress. Repeat this request to check for concerts.' : `Source status is ${sourceState.status}. No upcoming concerts are available.` }
+      }
       const { pagination } = result
       let next = null
       if (!input.all && input.page < pagination.total_pages) {
