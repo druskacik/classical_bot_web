@@ -32,7 +32,7 @@
         autocomplete="off"
         :placeholder="selectedOptions.length ? (['city', 'area-city'].includes(type) ? t('Change city…') : t('Add another…')) : placeholder"
         :class="compact ? 'min-w-0 w-full' : 'min-w-32'"
-        class="flex-1 bg-transparent py-1 text-sm text-gray-900 outline-none placeholder:text-gray-400"
+        class="flex-1 bg-transparent py-1 text-sm text-gray-900 outline-none placeholder:text-gray-500"
         role="combobox"
         aria-autocomplete="list"
         :aria-expanded="open"
@@ -88,7 +88,7 @@
             {{ option.secondaryLabel }}
           </span>
         </span>
-        <span v-if="showCount" class="shrink-0 pt-0.5 text-xs tabular-nums text-gray-400">{{ option.count }}</span>
+        <span v-if="showCount" class="shrink-0 pt-0.5 text-xs tabular-nums text-gray-500">{{ option.count }}</span>
       </button>
       <p v-if="loading" class="px-3 py-3 text-sm text-gray-500">{{ t('Searching…') }}</p>
       <p v-else-if="!availableOptions.length" class="px-3 py-3 text-sm text-gray-500">
