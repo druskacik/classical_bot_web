@@ -131,10 +131,10 @@ The default interaction accent follows Nuxt UI’s light-mode primary color. Com
 - **Gallery White:** The page, navigation, list, and overlay surface.
 - **Gallery Mist:** The restrained hover fill for rows and listbox options.
 - **Soft Slate:** Neutral source-badge fill and subdued loading surfaces.
-- **Faint Slate:** Placeholders and autocomplete result counts.
+- **Faint Slate:** Decorative or non-text details that do not need to meet text contrast requirements.
 - **Slate Divider:** Fine borders, section rules, and list separators.
 - **Slate Field:** The resting underline for form controls.
-- **Muted Slate:** Labels and quiet metadata.
+- **Muted Slate:** Placeholders, autocomplete result counts, labels, and quiet metadata that need readable text contrast.
 - **Secondary Slate:** Supporting copy, composer links, and result summaries.
 - **Body Slate:** Long-form reading copy.
 - **Ink Slate:** Primary text and concert titles.

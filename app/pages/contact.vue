@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-auto w-full max-w-xl px-4 py-10 sm:py-14">
+  <main class="mx-auto w-full max-w-xl px-4 py-10 sm:py-14">
     <h1 class="font-serif text-3xl text-gray-900">Contact</h1>
     <p class="mt-4 text-gray-600">Don't hesitate to contact us, we are friendly.</p>
 
@@ -31,7 +31,7 @@
       <p role="status" aria-live="polite" class="text-gray-700">{{ success ? 'Thank you. Your message has been sent.' : '' }}</p>
       <noscript class="text-sm text-gray-600">Please enable JavaScript to send a message.</noscript>
     </form>
-  </div>
+  </main>
 </template>
 
 <script setup>
