@@ -271,8 +271,6 @@ const goToPage = async (page) => {
 .concert-list-page :deep(a) { text-underline-offset: 0.2em; }
 .concert-list-page :deep(a:focus-visible),
 .concert-list-page :deep(button:focus-visible) { outline: 2px solid var(--ui-primary); outline-offset: 3px; }
-.concert-list-page :deep(::selection) { background: var(--color-blue-100); color: var(--color-gray-950); }
-
 @media (max-width: 639px) {
   .concert-list-page { padding-top: 1rem; }
   .concert-list-page > h1 { font-size: 1.875rem; line-height: 1.2; }

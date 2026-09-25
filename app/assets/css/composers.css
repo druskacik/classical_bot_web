@@ -1,8 +1,8 @@
+::selection { background: var(--color-blue-100); color: var(--color-gray-950); }
+
 .composer-surface {
-  --composer-selection: #dbeafe;
   --ui-primary: var(--color-blue-600);
 }
-.composer-surface ::selection { background: var(--composer-selection); color: #111827; }
 .composer-surface a, .composer-surface button { text-underline-offset: 0.2em; }
 .composer-surface a:focus-visible, .composer-surface button:focus-visible {
   outline: 2px solid var(--ui-primary); outline-offset: 4px; border-radius: 2px;

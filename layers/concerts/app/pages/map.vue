@@ -245,7 +245,6 @@ useConcertListSeo({ title: () => `${t('Concert map')} — ${concertSite.name}`, 
 /* Autocomplete inputs already show focus on their surrounding field. */
 .map-page :is(button, a, input:not([role="combobox"]), select):focus-visible { outline: 2px solid var(--ui-primary); outline-offset: 3px; }
 .map-toolbar :is(select, input[type="date"]):focus-visible { outline: none; border-bottom: 2px solid var(--ui-primary); }
-.map-page ::selection { background: var(--color-blue-100); color: var(--color-gray-950); }
 @media (max-width: 64rem) { .map-workspace { grid-template-columns: minmax(0, 1fr) minmax(0, 21rem); } }
 /* Mobile keeps one stable map viewport behind the programme panel. */
 .map-mobile { grid-template-rows: auto minmax(0, 1fr); }
