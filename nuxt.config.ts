@@ -3,7 +3,28 @@ import { fileURLToPath } from 'node:url'
 export default defineNuxtConfig({
   extends: ['./layers/concerts'],
   nitro: {
-    externals: { inline: [fileURLToPath(new URL('./site.config.js', import.meta.url))] },
+    externals: { inline: [
+      fileURLToPath(new URL('./site.config.js', import.meta.url)),
+      'nitropack/presets/node/runtime/node-server',
+    ] },
+  },
+  $production: {
+    nitro: {
+      entry: fileURLToPath(new URL('./server/startup.mjs', import.meta.url)),
+      hooks: {
+        'prerender:config': (config) => { delete config.entry },
+        'rollup:before': (_nitro, config) => {
+          const output = config.output
+          if (!output || Array.isArray(output)) return
+          const manualChunks = output.manualChunks
+          // Nitro normally groups its runtime into one eagerly loaded chunk.
+          // The listener must remain a genuinely deferred import.
+          output.manualChunks = (id, meta) => id.endsWith('/presets/node/runtime/node-server.mjs')
+            ? 'nitro/listener'
+            : typeof manualChunks === 'function' ? manualChunks(id, meta) : undefined
+        },
+      },
+    },
   },
   css: ['~/assets/css/composers.css'],
   devtools: { enabled: true },

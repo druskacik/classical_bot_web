@@ -145,6 +145,40 @@ switch disabled to confirm bypasses. After deployment, compare load counts,
 database activity, and response times under comparable traffic before claiming
 a production improvement. These changes do not deploy either site.
 
+## Composer recommendations
+
+“Keep exploring” ranks composers by the fraction of each candidate's sources
+that list at least one upcoming concert containing both composers. Repeated
+performances on one source count once. Registered URL aliases and merged sources
+share an identity; unmatched URLs use their trimmed, trailing-slash-free value.
+The calculation uses included, non-duplicate concerts and public published
+composer playlists. Scores break ties by shared-source count, name and ID.
+Missing recommendation slots use the existing popularity-ranked directory.
+
+One Nitro cached function stores rankings for all composers for 24 hours, with
+stale-while-revalidate enabled. The first composer request after expiry serves
+the previous result and triggers a background refresh; idle servers do not
+refresh on a schedule. Refresh failures retain the last successful rankings.
+Names, images and concert counts still come from the five-minute directory
+cache. `SERVER_DATA_CACHE_ENABLED` does not control this separate cache.
+
+Every production ClassicalBot process warms this cache **before opening its
+HTTP listener**, including after deployment. The query has a 15-second statement
+timeout and transaction-local JIT disabled, inside a read-only transaction.
+Startup has a 30-second overall deadline, including connection establishment.
+A failure exits nonzero without listening; deployment health/startup allowances
+must accommodate this delay. There is no disk persistence, shared replica cache,
+scheduled task, database migration or build-time database requirement. Development
+loads recommendations on demand; the separate classical.sk server has no warm-up.
+
+`[composer-recommendations]` logs calculation duration, the number of composers
+with rankings, and failures. Validate query fixtures with
+`node --test test/composer-recommendations.test.js` (requires local PostgreSQL).
+After `npm run build`, also run
+`TEST_COMPOSER_STARTUP=1 node --test test/composer-recommendations.test.js` to test
+the real production listener against an isolated database, including failed and
+timed-out warm-ups. This test never connects to the application database.
+
 ## Run both websites locally
 
 Install dependencies once at the repository root with Node.js 24 and `npm ci`.
