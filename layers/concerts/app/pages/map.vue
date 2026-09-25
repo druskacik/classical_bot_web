@@ -254,7 +254,6 @@ useConcertListSeo({ title: () => `${t('Concert map')} — ${concertSite.name}`, 
 .mobile-search :deep(label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .mobile-search :deep(input) { font-size: 16px; }
 .map-mobile .map-filter-toggle { display: inline-flex; gap: .4rem; align-items: center; min-height: 44px; color: var(--ui-primary); font-size: var(--text-sm); cursor: pointer; }
-.map-mobile :deep(.text-primary), .map-mobile :deep(.panel-back), .map-mobile .map-filter-toggle { color: var(--color-blue-600); }
 .map-mobile :deep(input::placeholder) { color: var(--color-gray-500); }
 .map-mobile .map-toolbar { position: fixed; inset: 0; width: 100%; height: 100dvh; max-width: none; max-height: 100dvh; margin: 0; border: 0; padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom)); overflow-y: auto; background: white; }
 .map-mobile .map-toolbar:not([open]) { display: none; }

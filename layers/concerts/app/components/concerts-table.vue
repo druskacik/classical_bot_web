@@ -81,7 +81,7 @@ import { concertCityLocation, concertCountryLocation, concertComposerLocation } 
 
 const BADGE_BASE_CLASSES = 'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium'
 const BADGE_OUTLINE_CLASSES = {
-  primary: 'text-blue-700 border border-primary/50',
+  primary: 'text-primary-700 border border-primary/50',
   error: 'text-red-700 border border-error/50',
   red: 'text-red-700 border border-red/50',
   orange: 'text-orange-700 border border-orange/50',

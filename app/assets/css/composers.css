@@ -1,7 +1,7 @@
-::selection { background: var(--color-blue-100); color: var(--color-gray-950); }
+::selection { background: var(--color-primary-100); color: var(--color-gray-950); }
 
 .composer-surface {
-  --ui-primary: var(--color-blue-600);
+  --ui-primary: var(--color-primary-600);
 }
 .composer-surface a, .composer-surface button { text-underline-offset: 0.2em; }
 .composer-surface a:focus-visible, .composer-surface button:focus-visible {

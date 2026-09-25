@@ -12,6 +12,12 @@
         ],
         "createdAt": "2026-09-04T20:11:11.009Z",
         "reason": "Existing pagination size is intentional; user approved narrowing this exception to its component."
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "2px",
+        "createdAt": "2026-09-25T14:03:11.088Z",
+        "reason": "DESIGN.md explicitly specifies a 2px focus corner for composer links."
       }
     ]
   }

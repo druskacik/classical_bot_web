@@ -246,7 +246,7 @@ const goToPage = async (page) => {
 
 <style scoped>
 .concert-list-page {
-  --ui-primary: var(--color-blue-600);
+  --ui-primary: var(--color-primary-600);
   max-width: 80rem;
   padding-top: 2.5rem;
   padding-bottom: 4rem;
