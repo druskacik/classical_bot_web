@@ -223,8 +223,37 @@ test('multiple alerts and combined delivery against disposable PostgreSQL', {ski
     const first=await activate({country:'CZ'})
     await saveAlert(db,first.token,{city:'1'})
     await add()
-    assert.equal((await run({send:async()=>{throw {code:'EENVELOPE',responseCode:550}}})).failed,1)
+    assert.equal((await run({send:async()=>{throw {code:'EENVELOPE',command:'RCPT TO',responseCode:550}}})).failed,1)
     assert.ok((await listAlerts(db,first.token)).alerts.every(a=>a.status==='suspended'))
+  })
+  await reset()
+  await t.test('permanent sender rejection holds the digest without suspending searches',async()=>{
+    const first=await activate({country:'CZ'})
+    await saveAlert(db,first.token,{city:'1'})
+    await add()
+    assert.equal((await run({send:async()=>{throw {code:'EENVELOPE',command:'MAIL FROM',responseCode:550}}})).failed,1)
+    assert.ok((await listAlerts(db,first.token)).alerts.every(a=>a.status==='active'))
+    assert.equal((await db('concert_alert_digest').first()).status,'held')
+  })
+  await reset()
+  await t.test('cleanup preserves renewed confirmations and removes stale pending searches',async()=>{
+    const email='renewed@example.org'
+    await requestAlert(db,{email,criteria:{country:'CZ'}},send,origin)
+    const original=await db('concert_alert').where({email}).first()
+    await requestAlert(db,{email,criteria:{country:'SK'}},send,origin)
+    const expired=(await db('concert_alert').where({email}).whereNot('id',original.id).first()).id
+    await requestAlert(db,{email,criteria:{country:'DE'}},send,origin)
+    const missing=(await db('concert_alert').where({email}).whereNotIn('id',[original.id,expired]).first()).id
+    await db('concert_alert').where({email}).update({created_at:db.raw("now() - interval '8 days'"),confirmation_expires_at:db.raw("now() - interval '1 day'")})
+    await db('concert_alert').where('id',missing).update({confirmation_hash:null,confirmation_expires_at:null})
+    await db('concert_alert_rate').delete()
+    await requestAlert(db,{email,criteria:{country:'CZ'}},send,origin)
+    const link=messages.at(-1).text.match(/confirm#([\w-]+)/)[1]
+    assert.equal((await db('concert_alert').where('confirmation_hash',hash(link)).first()).id,original.id)
+    await run()
+    assert.equal(await db('concert_alert').where('id',expired).first(),undefined)
+    assert.equal(await db('concert_alert').where('id',missing).first(),undefined)
+    assert.equal((await confirmAlert(db,link)).alertId,original.id)
   })
   await reset()
   await t.test('rolling hourly budget queues excess digests and counts failed attempts',async()=>{

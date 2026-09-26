@@ -21,7 +21,10 @@ test('SMTP ambiguous outcomes are held rather than resent', () => {
   assert.equal(failureKind({ code: 'ETIMEDOUT', command: 'DATA' }), 'held')
   assert.equal(failureKind({ code: 'ESOCKET', command: 'CONN' }), 'retry')
   assert.equal(failureKind({ responseCode: 450 }), 'retry')
-  assert.equal(failureKind({ code: 'EENVELOPE', responseCode: 550 }), 'rejected')
+  assert.equal(failureKind({ code: 'EENVELOPE', command: 'RCPT TO', responseCode: 550 }), 'rejected')
+  assert.equal(failureKind({ code: 'EENVELOPE', command: 'MAIL FROM', responseCode: 550 }), 'held')
+  assert.equal(failureKind({ code: 'EENVELOPE', command: 'DATA', responseCode: 550 }), 'held')
+  assert.equal(failureKind({ code: 'EENVELOPE', responseCode: 550 }), 'held')
 })
 test('digest escapes programme data and excludes unsafe links', () => {
   const mail = digestMail({ email: 'one@example.org', summary: '<Bach>' }, [{ title: '<script>x</script>', id: 1, date: '2026-12-01', url: 'javascript:alert(1)', programme: 'A & B' }], 'https://classicalbot.com', 'secret', 1)

@@ -15,7 +15,7 @@ export function alertDay(now = new Date()) {
   return { day: `${parts.year}-${parts.month}-${parts.day}`, due: Number(parts.hour) >= 8 }
 }
 export function failureKind(error) {
-  if (error.code === 'EENVELOPE' && error.responseCode >= 500) return 'rejected'
+  if (error.code === 'EENVELOPE' && error.command === 'RCPT TO' && error.responseCode >= 500) return 'rejected'
   if (error.responseCode >= 400 && error.responseCode < 500) return 'retry'
   if (['ECONNECTION', 'EDNS', 'EAUTH', 'ESOCKET'].includes(error.code) && !['DATA', 'CONN'].includes(error.command)) return 'retry'
   if (error.command === 'CONN') return 'retry'

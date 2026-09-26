@@ -59,7 +59,8 @@ export async function runAlerts(db, { send, origin, now = new Date(), hourlyLimi
         const delivery = await db.transaction(async trx => {
           const subscriber = await trx('concert_alert_subscriber').where('id',id).forUpdate().first()
           await trx('concert_alert').where({ subscriber_id:id, status:'active' }).whereRaw("criteria->>'dateTo' < to_char(CURRENT_DATE, 'YYYY-MM-DD')").update({ status:'expired' })
-          await trx('concert_alert').where({ subscriber_id:id, status:'pending' }).where('created_at','<',new Date(now.valueOf()-7*86400_000)).whereNull('management_hash').delete()
+          await trx('concert_alert').where({ subscriber_id:id, status:'pending' }).where('created_at','<',new Date(now.valueOf()-7*86400_000)).whereNull('management_hash')
+            .where(q=>q.whereNull('confirmation_expires_at').orWhere('confirmation_expires_at','<=',trx.fn.now())).delete()
           if (await trx('concert_alert_digest').where({ subscriber_id:id, status:'held' }).first()) return null
           const existing = await trx('concert_alert_digest').where({ subscriber_id:id, status:'pending' }).orderBy('id').first()
           if (existing) {
