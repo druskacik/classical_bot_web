@@ -1,11 +1,11 @@
 <template>
-  <main class="container mx-auto max-w-xl px-4 py-12">
+  <main class="alerts-confirm container mx-auto max-w-xl px-4 py-12">
     <h1 class="font-serif text-3xl text-gray-950">Your concert alert</h1>
     <p v-if="busy" role="status" class="mt-4 text-gray-700">Confirming your alert…</p>
     <p class="mt-4 text-gray-700">Receive one daily email when new concerts match your search. Concerts already listed will not be emailed.</p>
     <p v-if="error" role="alert" class="mt-4 text-red-700">{{ error }}</p>
     <button v-if="error && secret" type="button" :disabled="busy" class="mt-6 min-h-11 cursor-pointer bg-gray-900 px-4 text-white hover:bg-gray-700 disabled:opacity-60" @click="confirm">Try again</button>
-    <NuxtLink to="/" class="mt-6 block text-primary hover:underline">Browse concerts</NuxtLink>
+    <NuxtLink to="/" class="mt-6 inline-flex min-h-11 items-center text-primary hover:underline">Browse concerts</NuxtLink>
   </main>
 </template>
 <script setup>
@@ -29,3 +29,9 @@ async function confirm() {
   finally { busy.value = false }
 }
 </script>
+
+<style scoped>
+.alerts-confirm { --ui-primary: var(--color-primary-600); }
+.alerts-confirm :is(button, a):focus-visible { outline: 2px solid var(--ui-primary); outline-offset: 3px; }
+.alerts-confirm a { text-underline-offset: 4px; }
+</style>

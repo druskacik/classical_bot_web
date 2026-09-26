@@ -1,9 +1,9 @@
 <template>
-  <dialog ref="dialog" class="alert-dialog m-auto w-[calc(100%-2rem)] max-w-3xl max-h-[calc(100dvh-2rem)] overflow-y-auto bg-white p-0 text-gray-900" :aria-labelledby="`${id}-title`" @cancel.prevent="close" @close="restoreScroll">
+  <dialog ref="dialog" class="alert-dialog m-auto w-[calc(100%-2rem)] max-w-3xl max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-white p-0 text-gray-900" :aria-labelledby="`${id}-title`" @cancel.prevent="close" @close="restoreScroll">
     <div class="p-5 sm:p-8">
       <header class="mb-6 flex items-start justify-between gap-4">
         <h2 :id="`${id}-title`" ref="heading" tabindex="-1" class="font-serif text-2xl sm:text-3xl">{{ editing ? 'Editing your alert' : managed ? 'Creating a new alert' : 'New concert alert' }}</h2>
-        <button type="button" :disabled="busy" aria-label="Close alert dialog" class="-mr-2 -mt-2 flex size-11 shrink-0 items-center justify-center hover:bg-gray-50 disabled:opacity-50" @click="close"><UIcon name="i-lucide-x" class="size-5" /></button>
+        <button type="button" :disabled="busy" aria-label="Close alert dialog" class="-mr-2 -mt-2 flex size-11 shrink-0 items-center justify-center hover:bg-gray-50 disabled:opacity-50" @click="close"><UIcon name="i-lucide-x" class="size-5" aria-hidden="true" /></button>
       </header>
       <template v-if="!success">
         <p v-if="filterError" ref="filterErrorElement" role="alert" tabindex="-1" class="mb-4 text-sm text-red-700">Choose at least one filter before saving an alert.</p>
@@ -16,7 +16,7 @@
             :countries="countries" :countries-loading="countriesLoading" :countries-error="countriesError"
             @update="update" @city-radius="changeCityRadius" @clear="draft = {}" @retry-countries="loadCountries" />
         </fieldset>
-        <div class="mt-6">
+        <div class="mt-6 min-h-10" :aria-busy="previewPending">
           <p class="break-words text-sm text-gray-700" aria-live="polite">{{ summary || (previewError ? 'Your search could not be loaded.' : 'Loading your search…') }}</p>
           <p v-if="previewError" role="alert" class="mt-2 text-sm text-red-700">{{ previewError }}</p>
           <button v-if="previewError" type="button" class="min-h-11 text-primary hover:underline" @click="preview">Try again</button>
@@ -26,7 +26,7 @@
           <p v-if="managed" class="break-all text-sm text-gray-700">Saving for {{ subscriberEmail }}</p>
           <div v-else>
             <label :for="`${id}-email`" class="block text-sm text-gray-800">Email address</label>
-            <input :id="`${id}-email`" v-model="email" :disabled="busy" type="email" autocomplete="email" required maxlength="254" class="mt-1 min-h-11 w-full border-0 border-b border-gray-400 bg-white text-base text-gray-950 outline-none focus:border-b-2 focus:border-primary focus:ring-0" />
+            <input :id="`${id}-email`" v-model="email" :disabled="busy" type="email" autocomplete="email" autocapitalize="none" :spellcheck="false" required maxlength="254" class="mt-1 min-h-11 w-full border-0 border-b border-gray-400 bg-white text-base text-gray-950 outline-none focus:border-b-2 focus:border-primary focus:ring-0" />
             <div class="hidden" aria-hidden="true"><label :for="`${id}-website`">Website</label><input :id="`${id}-website`" v-model="website" tabindex="-1" autocomplete="off" /></div>
           </div>
           <p v-if="error" role="alert" class="mt-3 text-sm text-red-700">{{ error }}</p>
@@ -151,6 +151,8 @@ async function submit() {
 .alert-dialog::backdrop { background: rgb(17 24 39 / 0.4); }
 .alert-dialog :deep(button:not(:disabled)), .alert-dialog :deep(select:not(:disabled)) { cursor: pointer; }
 .alert-dialog :deep(button:focus-visible), .alert-dialog :deep(a:focus-visible) { outline: 2px solid var(--ui-primary); outline-offset: 3px; }
+.alert-dialog :deep(button) { min-width: 2.75rem; }
+.alert-dialog :deep(.concert-filters > div:last-child > button) { min-height: 2.75rem; }
 .alert-dialog :deep(.music-fields) { display: grid; }
 .alert-dialog :deep(button[aria-controls][aria-expanded]) { display: none; }
 .alert-dialog :deep([role='listbox']) { max-height: 12rem; }
