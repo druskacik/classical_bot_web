@@ -64,3 +64,16 @@ test('saved radius alerts retain their location through shared query parsing', a
     assert.match(restored.summary, /Prague.*50 km/)
   }
 })
+
+test('saving alerts rejects semantically empty filters while previews and existing alerts remain readable', async () => {
+  const { criteria } = await import('../server/utils/alerts/criteria.js')
+  const db = () => { throw new Error('Empty criteria must not query the database') }
+  for (const input of [{}, { page: '2' }, { city: ' ', composers: ' , ', works: ',' }, { radius: '0' }, { datePreset: 'week' }]) {
+    await assert.rejects(criteria(db, input, { requireFilter: true }), error => error.statusCode === 400 && error.statusMessage === 'Choose at least one filter before saving an alert.')
+  }
+  assert.equal((await criteria(db, {})).summary, 'Worldwide · Any upcoming date')
+  assert.equal((await criteria(db, {}, { allowExpired: true })).summary, 'Worldwide · Any upcoming date')
+  for (const input of [{ country: 'AT' }, { city: 'Vienna' }, { composers: 'Bach' }, { dateFrom: '2099-10-01' }]) {
+    assert.ok((await criteria(db, input, { requireFilter: true })).summary)
+  }
+})

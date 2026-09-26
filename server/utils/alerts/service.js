@@ -64,7 +64,7 @@ async function activate(trx, alert, selected) {
 export async function requestAlert(db, body, send, origin) {
   const email = normalizeEmail(body.email)
   await rateLimit(db, `email:${email}`, 3, 3600)
-  const selected = await criteria(db, body.criteria)
+  const selected = await criteria(db, body.criteria, { requireFilter: true })
   const confirmation = token()
   const result = await db.transaction(async trx => {
     await trx('concert_alert_subscriber').insert({ email }).onConflict('email').ignore()
@@ -110,7 +110,7 @@ export async function saveAlert(db, secret, input, id) {
   return db.transaction(async trx => {
     const subscriber = await getSubscriber(trx, secret, true)
     const alert = id == null ? null : await ownedAlert(trx, subscriber, id)
-    const selected = await criteria(trx, input)
+    const selected = await criteria(trx, input, { requireFilter: true })
     const existing = await duplicate(trx, subscriber, selected, alert?.id)
     if (existing) return { ok: true, duplicate: true, alertId: existing.id }
     const created = alert || (await trx('concert_alert').insert({ email: subscriber.email, subscriber_id: subscriber.id }).returning('*'))[0]

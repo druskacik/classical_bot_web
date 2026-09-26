@@ -1,6 +1,16 @@
 import { criteria, matching, concertDetails } from './criteria.js'
-import { alertDay, digestMail, failureKind } from './core.js'
-import { rateLimit, ensureManagement } from './service.js'
+import { createError } from 'h3'
+import { alertDay, digestMail, failureKind, token } from './core.js'
+import { ensureManagement } from './service.js'
+
+// The worker holds advisory lock 78239001 across replicas before reserving slots.
+// Store each attempt separately so retries and bursts share an exact rolling hour.
+async function reserveDigestAttempt(db, maximum) {
+  const { count } = await db('concert_alert_rate').whereLike('key', 'digest-attempt:%')
+    .where('expires_at', '>', db.fn.now()).count('* as count').first()
+  if (Number(count) >= maximum) throw createError({ statusCode: 429, statusMessage: 'Hourly alert sending limit reached.' })
+  await db('concert_alert_rate').insert({ key: `digest-attempt:${token()}`, count: 1, expires_at: db.raw("now() + interval '1 hour'") })
+}
 
 async function newMatches(trx, subscriber) {
   const alerts = await trx('concert_alert').where({ subscriber_id: subscriber.id, status: 'active' }).whereNull('removed_at').orderBy('id')
@@ -33,7 +43,8 @@ async function renderMatches(trx, subscriber, matches) {
   }
   return [...concerts.values()].sort((a,b)=>a.date.localeCompare(b.date) || a.id-b.id)
 }
-export async function runAlerts(db, { send, origin, now = new Date(), dailyLimit = 100 } = {}) {
+export async function runAlerts(db, { send, origin, now = new Date(), hourlyLimit = 200 } = {}) {
+  if (!Number.isSafeInteger(hourlyLimit) || hourlyLimit < 1) throw new Error('Invalid alert budget')
   const connection = await db.client.acquireConnection()
   const stats = { accepted: 0, failed: 0, held: 0, skipped: 0 }
   try {
@@ -71,7 +82,7 @@ export async function runAlerts(db, { send, origin, now = new Date(), dailyLimit
           return (await trx('concert_alert_digest').insert({subscriber_id:id,day,matches:JSON.stringify(matches)}).returning('*'))[0]
         })
         if (!delivery) { stats.skipped++; continue }
-        await rateLimit(db, `digest-budget:${day}`, dailyLimit, 48*3600)
+        await reserveDigestAttempt(db, hourlyLimit)
         await db('concert_alert_digest').where('id',delivery.id).update({status:'sending',attempts:delivery.attempts+1,attempted_at:now})
         await db.transaction(async trx => {
           const subscriber = await trx('concert_alert_subscriber').where('id',id).forUpdate().first()

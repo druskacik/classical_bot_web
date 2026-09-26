@@ -1,51 +1,59 @@
 <template>
-  <main class="container mx-auto max-w-2xl px-4 py-12">
-    <h1 class="font-serif text-3xl text-gray-950">Your alerts</h1>
-    <p v-if="email" class="mt-3 break-all text-gray-700">{{ email }}</p>
-    <p class="mt-3 text-gray-700">One daily email with new matches across all your alerts.</p>
+  <main class="alerts-manage container mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+    <header class="border-b border-gray-200 pb-6">
+      <h1 class="font-serif text-3xl text-gray-950">Your alerts</h1>
+      <p v-if="email" class="mt-3 break-all text-gray-700">{{ email }}</p>
+      <p class="mt-3 text-gray-700">One daily email with new matches across all your alerts.</p>
+    </header>
     <p v-if="notice" role="status" class="mt-4 text-gray-900">{{ notice }}</p>
     <p v-if="loading && !loaded" role="status" class="mt-6">Loading your alerts…</p>
     <template v-if="loaded">
-      <button v-if="signupEnabled" type="button" class="mt-6 min-h-11 cursor-pointer bg-gray-900 px-4 text-white hover:bg-gray-700" @click="edit()">Add another alert</button>
+      <button v-if="alertsEnabled" type="button" class="mt-6 min-h-11 cursor-pointer bg-gray-900 px-5 text-sm text-white hover:bg-gray-700" aria-haspopup="dialog" @click="edit()">Add another alert</button>
       <p v-if="!alerts.length" class="mt-8 text-gray-700">You have no saved alerts. Choose a search to hear about new concerts.</p>
       <ul class="mt-6 divide-y divide-gray-200">
-        <li v-for="alert in alerts" :key="alert.id" class="py-5" :aria-label="alert.summary">
-          <h2 :id="`alert-${alert.id}`" :ref="el => { if (String(alert.id) === highlighted) highlightElement = el }" tabindex="-1" class="break-words font-serif text-xl text-gray-950">{{ alert.summary }}</h2>
-          <p class="mt-2 text-sm text-gray-600">{{ statusLabel(alert.status) }}</p>
-          <div v-if="removing === alert.id" class="mt-3">
-            <p class="text-gray-800">Remove this alert? Your other searches will stay active.</p>
-            <div class="mt-2 flex flex-wrap gap-5">
-              <button type="button" :disabled="busy" class="min-h-11 cursor-pointer text-red-700 disabled:opacity-60" @click="remove(alert)">Remove alert</button>
-              <button type="button" :disabled="busy" class="min-h-11 cursor-pointer text-gray-700" @click="removing = null">Keep alert</button>
+        <li v-for="alert in alerts" :key="alert.id" class="py-6 sm:py-7" :aria-label="alert.summary">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+            <div class="min-w-0 flex-1">
+              <h2 :id="`alert-${alert.id}`" :ref="el => { if (String(alert.id) === highlighted) highlightElement = el }" tabindex="-1" class="break-words font-serif text-xl text-gray-950">{{ alert.summary }}</h2>
+              <p class="mt-2 text-sm text-gray-600">{{ statusLabel(alert.status) }}</p>
             </div>
-          </div>
-          <div v-else class="mt-2 flex flex-wrap gap-5">
-            <button v-if="signupEnabled" type="button" class="min-h-11 cursor-pointer text-primary hover:underline" @click="edit(alert)">{{ alert.status === 'active' ? 'Edit' : 'Review and save' }}</button>
-            <button type="button" class="min-h-11 cursor-pointer text-gray-700 hover:underline" @click="removing = alert.id">Remove</button>
+            <div v-if="removing === alert.id" class="max-w-xs text-sm">
+              <p class="text-gray-800">Remove this alert? Your other searches will stay active.</p>
+              <div class="mt-2 flex flex-wrap gap-5">
+                <button type="button" :disabled="busy" class="min-h-11 cursor-pointer text-red-700 disabled:opacity-60" @click="remove(alert)">Remove alert</button>
+                <button type="button" :disabled="busy" class="min-h-11 cursor-pointer text-gray-700" @click="removing = null">Keep alert</button>
+              </div>
+            </div>
+            <div v-else class="flex shrink-0 flex-wrap gap-5 text-sm">
+              <button v-if="alertsEnabled" type="button" class="min-h-11 cursor-pointer text-primary hover:underline" aria-haspopup="dialog" @click="edit(alert)">{{ alert.status === 'active' ? 'Edit' : 'Review and save' }}</button>
+              <button type="button" class="min-h-11 cursor-pointer text-gray-700 hover:underline" @click="removing = alert.id">Remove</button>
+            </div>
           </div>
         </li>
       </ul>
       <button v-if="nextOffset !== null" type="button" :disabled="loading" class="min-h-11 cursor-pointer text-primary disabled:opacity-60" @click="load(true)">{{ loading ? 'Loading…' : 'Show more' }}</button>
-      <div v-if="alerts.some(a => ['active', 'pending', 'suspended'].includes(a.status)) || stopAll" class="mt-8 border-t border-gray-200 pt-5">
+      <div v-if="alerts.some(a => ['active', 'pending', 'suspended'].includes(a.status)) || stopAll" class="mt-10 border-t border-gray-200 pt-5 text-sm">
         <template v-if="stopAll">
           <p class="text-gray-800">Stop all concert emails? This will unsubscribe all your alerts, including those awaiting confirmation.</p>
           <div class="mt-3 flex flex-wrap gap-5">
-            <button type="button" :disabled="busy" class="min-h-11 cursor-pointer text-red-700 disabled:opacity-60" @click="stop">Unsubscribe from all</button>
+            <button type="button" :disabled="busy" class="min-h-11 cursor-pointer text-base text-red-700 disabled:opacity-60" @click="stop">Unsubscribe from all</button>
             <button type="button" :disabled="busy" class="min-h-11 cursor-pointer text-gray-700" @click="stopAll = false">Keep my alerts</button>
           </div>
         </template>
-        <button v-else type="button" class="min-h-11 cursor-pointer text-gray-700 hover:underline" @click="stopAll = true">Unsubscribe from all</button>
+        <button v-else type="button" class="min-h-11 cursor-pointer text-base text-gray-700 hover:underline" @click="stopAll = true">Unsubscribe from all</button>
       </div>
     </template>
     <p v-if="error" role="alert" class="mt-4 text-red-700">{{ error }}</p>
     <button v-if="error && secret && !loaded" type="button" class="mt-3 min-h-11 cursor-pointer text-primary" @click="load()">Try again</button>
+    <AlertDialog v-if="editor" :initial-criteria="editor.criteria" :alert-id="editor.id" :token="secret" :subscriber-email="email" @close="editor = null" @saved="saved" />
     <NuxtLink to="/" class="mt-6 inline-flex min-h-11 items-center text-primary hover:underline">Browse concerts</NuxtLink>
   </main>
 </template>
 <script setup>
 useHead({ title: 'Your alerts — ClassicalBot', meta: [{ name: 'robots', content: 'noindex, nofollow' }, { name: 'referrer', content: 'no-referrer' }] })
 const config = useRuntimeConfig()
-const signupEnabled = computed(() => String(config.public.alertsSignupEnabled) === 'true')
+const alertsEnabled = computed(() => String(config.public.alertsEnabled) === 'true')
+const editor = ref(null)
 const secret = ref(''), email = ref(''), alerts = ref([]), loading = ref(true), loaded = ref(false), busy = ref(false), error = ref(''), notice = ref(''), nextOffset = ref(null), removing = ref(null), stopAll = ref(false), highlighted = ref(''), highlightElement = ref(null)
 const statusLabel = status => ({ active: 'Active', pending: 'Awaiting email confirmation', expired: 'Ended — the selected dates have passed', suspended: 'Delivery stopped — your email could not receive messages', unsubscribed: 'Unsubscribed' })[status] || status
 onMounted(async () => {
@@ -71,8 +79,12 @@ async function load(more = false) {
   finally { loading.value = false }
 }
 function edit(alert) {
-  sessionStorage.setItem('concert-alert-context', JSON.stringify({ alertId: alert?.id || null, email: email.value }))
-  navigateTo({ path: '/', query: alert?.criteria || {} })
+  editor.value = { id: alert?.id ?? null, criteria: alert?.criteria || {} }
+}
+async function saved(result) {
+  notice.value = result.message
+  highlighted.value = String(result.alertId || '')
+  await load()
 }
 async function remove(alert) {
   busy.value = true; error.value = ''
@@ -87,3 +99,9 @@ async function stop() {
   finally { busy.value = false }
 }
 </script>
+
+<style scoped>
+.alerts-manage { --ui-primary: var(--color-primary-600); }
+.alerts-manage :deep(button:focus-visible), .alerts-manage :deep(a:focus-visible) { outline: 2px solid var(--ui-primary); outline-offset: 3px; }
+.alerts-manage :deep(a), .alerts-manage :deep(button) { text-underline-offset: 4px; }
+</style>

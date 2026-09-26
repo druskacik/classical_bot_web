@@ -27,7 +27,7 @@ test('multiple alerts and combined delivery against disposable PostgreSQL', {ski
   const run=options=>runAlerts(db,{send,origin,now,...options})
   const add=async (patch={})=>(await db('classical_concert').insert({city_id:1,country_code_resolved:'CZ',...patch}).returning('id'))[0].id
   let seq=0
-  const activate=async (query={},email=`user${++seq}@example.org`)=>{
+  const activate=async (query={country:'CZ'},email=`user${++seq}@example.org`)=>{
     await requestAlert(db,{email,criteria:query},send,origin)
     return confirmAlert(db,messages.at(-1).text.match(/confirm#([\w-]+)/)[1])
   }
@@ -48,7 +48,7 @@ test('multiple alerts and combined delivery against disposable PostgreSQL', {ski
     assert.equal(dup.duplicate,true); assert.equal(dup.alertId,second.alertId)
     const concurrent=await Promise.all([saveAlert(db,first.token,{country:'SK'}),saveAlert(db,first.token,{country:'SK'})])
     assert.equal(concurrent.filter(r=>r.duplicate).length,1)
-    const other=await activate({},'other@example.org')
+    const other=await activate({country:'CZ'},'other@example.org')
     await assert.rejects(()=>saveAlert(db,other.token,{},first.alertId),e=>e.statusCode===404)
     await assert.rejects(()=>removeAlert(db,other.token,first.alertId),e=>e.statusCode===404)
     await removeAlert(db,first.token,third.alertId)
@@ -107,7 +107,7 @@ test('multiple alerts and combined delivery against disposable PostgreSQL', {ski
   })
   await reset()
   await t.test('held delivery blocks subscriber; unsubscribe invalidates pending confirmation',async()=>{
-    const first=await activate({},'held@example.org')
+    const first=await activate({country:'CZ'},'held@example.org')
     await add()
     assert.equal((await run({send:async()=>{throw {code:'ETIMEDOUT',command:'DATA'}}})).failed,1)
     await saveAlert(db,first.token,{country:'CZ'})
@@ -151,8 +151,31 @@ test('multiple alerts and combined delivery against disposable PostgreSQL', {ski
     assert.ok((await listAlerts(db,first.token)).alerts.every(a=>a.status==='suspended'))
   })
   await reset()
+  await t.test('rolling hourly budget queues excess digests and counts failed attempts',async()=>{
+    await activate({country:'CZ'})
+    await activate({country:'CZ'})
+    await activate({country:'CZ'})
+    await add()
+    messages.length=0
+    assert.equal((await run({hourlyLimit:2})).accepted,2)
+    assert.equal(messages.length,2)
+    assert.equal(Number((await db('concert_alert_digest').where('status','pending').count('* as count').first()).count),1)
+    assert.equal((await run({hourlyLimit:2})).accepted,0)
+    // A new Prague day does not reset the rolling-hour budget.
+    assert.equal((await run({hourlyLimit:2,now:new Date(now.valueOf()+86400_000)})).accepted,0)
+    const slots=await db('concert_alert_rate').whereLike('key','digest-attempt:%').orderBy('key')
+    assert.equal(slots.length,2)
+    await db('concert_alert_rate').where('key',slots[0].key).update({expires_at:db.raw("now() - interval '1 second'")})
+    assert.equal((await run({hourlyLimit:2,send:async()=>{throw {responseCode:450}}})).failed,1)
+    assert.equal((await run({hourlyLimit:2,now:new Date(now.valueOf()+3600_000)})).accepted,0)
+    await db('concert_alert_rate').whereLike('key','digest-attempt:%').update({expires_at:db.raw("now() - interval '1 second'")})
+    assert.equal((await run({hourlyLimit:2,now:new Date(now.valueOf()+3600_000)})).accepted,1)
+    assert.equal(messages.length,3)
+    assert.equal((await run({hourlyLimit:2,now:new Date(now.valueOf()+3600_000)})).accepted,0)
+  })
+  await reset()
   await t.test('legacy management aliases, pagination and worker exclusion',async()=>{
-    const first=await activate({})
+    const first=await activate({country:'CZ'})
     const legacy=managementToken({id:first.alertId,generation:1})
     await db('concert_alert').where('id',first.alertId).update({management_hash:hash(legacy)})
     assert.equal((await getSubscriber(db,legacy)).id,(await getSubscriber(db,first.token)).id)

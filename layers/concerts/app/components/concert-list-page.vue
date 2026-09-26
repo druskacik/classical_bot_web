@@ -28,14 +28,15 @@
       />
 
       <p v-if="concertQuery.bounds" class="mt-3 flex items-center gap-4 text-sm text-gray-600">{{ t('Map area') }} <button type="button" class="min-h-11 text-primary hover:underline" @click="updateFilter({ key: 'bounds', value: null })">{{ t('Remove map area') }}</button></p>
-      <div ref="resultsHeading" class="results-heading mt-1 flex min-h-8 items-center justify-between gap-4 sm:mt-3" tabindex="-1">
+      <div ref="resultsHeading" class="results-heading mt-1 flex min-h-8 flex-col items-start gap-1 sm:mt-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4" tabindex="-1">
         <p v-if="concertPage" class="text-sm text-gray-600" aria-live="polite">
           {{ resultSummary }}
         </p>
-        <NuxtLink :to="concertMapLocation(concertQuery, filters.city)" class="ml-auto inline-flex min-h-11 items-center gap-2 text-sm text-primary hover:underline"><UIcon name="i-lucide-map" class="size-4" />{{ t('Map') }}</NuxtLink>
+        <div class="flex w-full flex-wrap items-center gap-x-6 gap-y-1 sm:ml-auto sm:w-auto sm:justify-end">
+          <slot name="alerts" :criteria="requestParams" />
+          <NuxtLink :to="concertMapLocation(concertQuery, filters.city)" class="inline-flex min-h-11 shrink-0 items-center gap-2 text-sm text-primary hover:underline"><UIcon name="i-lucide-map" class="size-4" />{{ t('Map') }}</NuxtLink>
+        </div>
       </div>
-
-      <slot name="alerts" :criteria="requestParams" />
 
       <div v-if="concertStatus === 'pending' && !concertPage" class="py-10">
         <UProgress animation="swing" />

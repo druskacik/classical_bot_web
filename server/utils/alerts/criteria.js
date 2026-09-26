@@ -2,7 +2,7 @@ import { createError } from 'h3'
 import { parseConcertFilters, applyFilters } from '../../../layers/concerts/server/utils/concert-filters.js'
 import { resolveArea } from '../../../layers/concerts/server/utils/concert-area.js'
 const keys = ['country', 'city', 'radius', 'nearCity', 'nearLat', 'nearLng', 'radiusKm', 'dateFrom', 'dateTo', 'composers', 'works']
-export async function criteria(db, input, { allowExpired = false } = {}) {
+export async function criteria(db, input, { allowExpired = false, requireFilter = false } = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input) || input.bounds) throw createError({ statusCode: 400, statusMessage: 'Remove the map area before creating an alert.' })
   const query = {}
   for (const key of keys) {
@@ -15,6 +15,9 @@ export async function criteria(db, input, { allowExpired = false } = {}) {
   if (query.radiusKm !== undefined && query.radius === undefined) query.radius = query.radiusKm
   delete query.nearCity; delete query.radiusKm
   const filters = parseConcertFilters(query)
+  if (requireFilter && ![filters.country, filters.city, filters.area, filters.dateFrom, filters.dateTo, filters.composers.length, filters.works.length].some(Boolean)) {
+    throw createError({ statusCode: 400, statusMessage: 'Choose at least one filter before saving an alert.' })
+  }
   if (!allowExpired && filters.dateTo) {
     const { rows } = await db.raw("SELECT to_char(CURRENT_DATE, 'YYYY-MM-DD') AS today")
     if (filters.dateTo < rows[0].today) throw createError({ statusCode: 400, statusMessage: 'Choose an upcoming date range.' })

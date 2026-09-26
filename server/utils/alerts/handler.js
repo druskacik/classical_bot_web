@@ -12,7 +12,7 @@ export default defineEventHandler(async event => {
   setHeader(event, 'Referrer-Policy', 'no-referrer')
   const action = getRouterParam(event, 'action')
   if (!actions.has(action)) throw createError({ statusCode: 404 })
-  if (['preview', 'request', 'confirm', 'update', 'create'].includes(action) && process.env.NUXT_PUBLIC_ALERTS_SIGNUP_ENABLED !== 'true') throw createError({ statusCode: 503, statusMessage: 'New concert alerts are currently unavailable.' })
+  if (['preview', 'request', 'confirm', 'update', 'create'].includes(action) && process.env.NUXT_PUBLIC_ALERTS_ENABLED !== 'true') throw createError({ statusCode: 503, statusMessage: 'New concert alerts are currently unavailable.' })
   const origin = getHeader(event, 'origin')
   const local = process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin || '')
   if ((!local && origin !== classicalBotSite.origin) || getHeader(event, 'sec-fetch-site') === 'cross-site') throw createError({ statusCode: 403 })
