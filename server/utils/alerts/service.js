@@ -43,12 +43,19 @@ export function criteriaIdentity(selected) {
     from: f.dateFrom || null, to: f.dateTo || null,
     composers: [...f.composers].sort(), works: [...new Set(f.works)].sort((a,b) => a-b) })
 }
-async function duplicate(trx, subscriber, selected, except) {
+const isLive = alert => alert && !alert.removed_at && ['pending', 'active'].includes(alert.status)
+async function duplicate(trx, subscriber, selected, except, includeInactive = false) {
   const identity = criteriaIdentity(selected)
-  const rows = await trx('concert_alert').where('subscriber_id', subscriber.id).whereNull('removed_at').whereIn('status', ['pending', 'active'])
+  const query = trx('concert_alert').where('subscriber_id', subscriber.id)
+  if (includeInactive) query.where(builder => builder.whereIn('status', ['pending', 'active', 'unsubscribed']).orWhereNotNull('removed_at'))
+  else query.whereNull('removed_at').whereIn('status', ['pending', 'active'])
+  // Prefer an existing live search over historical matches, deterministically.
+  const rows = await query.orderByRaw("CASE WHEN removed_at IS NULL AND status IN ('active', 'pending') THEN 0 ELSE 1 END").orderBy('id')
   for (const row of rows) {
     if (String(row.id) === String(except)) continue
-    const existing = await criteria(trx, row.status === 'pending' ? row.pending_criteria : row.criteria, { allowExpired: true })
+    const input = row.pending_criteria || row.criteria
+    if (!input) continue
+    const existing = await criteria(trx, input, { allowExpired: true })
     if (criteriaIdentity(existing) === identity) return row
   }
 }
@@ -58,7 +65,7 @@ async function baseline(trx, alertId, selected) {
 }
 async function activate(trx, alert, selected) {
   await baseline(trx, alert.id, selected)
-  await trx('concert_alert').where('id', alert.id).update({ criteria: selected.query, summary: selected.summary, status: 'active', generation: alert.generation + 1,
+  await trx('concert_alert').where('id', alert.id).update({ criteria: selected.query, summary: selected.summary, status: 'active', removed_at: null, generation: alert.generation + 1,
     pending_criteria: null, pending_summary: null, confirmation_hash: null, confirmation_expires_at: null, activated_at: trx.fn.now() })
 }
 export async function requestAlert(db, body, send, origin) {
@@ -70,8 +77,8 @@ export async function requestAlert(db, body, send, origin) {
     await trx('concert_alert_subscriber').insert({ email }).onConflict('email').ignore()
     const subscriber = await trx('concert_alert_subscriber').where({ email }).forUpdate().first()
     const management = await ensureManagement(trx, subscriber)
-    let alert = await duplicate(trx, subscriber, selected)
-    if (alert?.status === 'active') return { management, existing: true }
+    let alert = await duplicate(trx, subscriber, selected, undefined, true)
+    if (isLive(alert) && alert.status === 'active') return { management, existing: true }
     if (!alert) [alert] = await trx('concert_alert').insert({ email, subscriber_id: subscriber.id }).returning('*')
     await trx('concert_alert').where('id', alert.id).update({ pending_criteria: selected.query, pending_summary: selected.summary, confirmation_hash: hash(confirmation), confirmation_expires_at: new Date(Date.now() + 24 * 3600_000) })
     return { management, existing: false }
@@ -85,7 +92,8 @@ export async function confirmAlert(db, secret) {
     const candidate = await trx('concert_alert').where('confirmation_hash', hashed).first()
     if (!candidate) throw invalidLink()
     const subscriber = await trx('concert_alert_subscriber').where('id', candidate.subscriber_id).forUpdate().first()
-    const alert = await trx('concert_alert').where({ id: candidate.id, confirmation_hash: hashed }).whereNull('removed_at').where('confirmation_expires_at', '>', trx.fn.now()).first()
+    // A fresh signup can confirm a removed row; removal/unsubscribe revoke older tokens.
+    const alert = await trx('concert_alert').where({ id: candidate.id, confirmation_hash: hashed }).where('confirmation_expires_at', '>', trx.fn.now()).first()
     if (!alert?.pending_criteria) throw invalidLink()
     const selected = await criteria(trx, alert.pending_criteria)
     const existing = await duplicate(trx, subscriber, selected, alert.id)
@@ -111,25 +119,33 @@ export async function saveAlert(db, secret, input, id) {
     const subscriber = await getSubscriber(trx, secret, true)
     const alert = id == null ? null : await ownedAlert(trx, subscriber, id)
     const selected = await criteria(trx, input, { requireFilter: true })
-    const existing = await duplicate(trx, subscriber, selected, alert?.id)
-    if (existing) return { ok: true, duplicate: true, alertId: existing.id }
-    const created = alert || (await trx('concert_alert').insert({ email: subscriber.email, subscriber_id: subscriber.id }).returning('*'))[0]
+    const existing = await duplicate(trx, subscriber, selected, alert?.id, true)
+    if (isLive(existing)) return { ok: true, duplicate: true, alertId: existing.id }
+    if (existing && alert) await retire(trx, alert)
+    const created = existing || alert || (await trx('concert_alert').insert({ email: subscriber.email, subscriber_id: subscriber.id }).returning('*'))[0]
     await activate(trx, created, selected)
     return { ok: true, alertId: created.id }
+  })
+}
+async function retire(trx, alert) {
+  await trx('concert_alert').where('id', alert.id).update({
+    criteria: alert.criteria || alert.pending_criteria, summary: alert.summary || alert.pending_summary,
+    removed_at: trx.fn.now(), status: 'unsubscribed', generation: alert.generation + 1,
+    confirmation_hash: null, confirmation_expires_at: null, pending_criteria: null, pending_summary: null,
   })
 }
 export async function removeAlert(db, secret, id) {
   return db.transaction(async trx => {
     const subscriber = await getSubscriber(trx, secret, true)
     const alert = await ownedAlert(trx, subscriber, id)
-    await trx('concert_alert').where('id', alert.id).update({ removed_at: trx.fn.now(), status: 'unsubscribed', generation: alert.generation + 1, confirmation_hash: null, confirmation_expires_at: null, pending_criteria: null, pending_summary: null })
+    await retire(trx, alert)
     return { ok: true }
   })
 }
 export async function unsubscribe(db, secret) {
   return db.transaction(async trx => {
     const subscriber = await getSubscriber(trx, secret, true)
-    await trx('concert_alert').where('subscriber_id', subscriber.id).update({ status: 'unsubscribed', pending_criteria: null, pending_summary: null, confirmation_hash: null, confirmation_expires_at: null })
+    await trx('concert_alert').where('subscriber_id', subscriber.id).update({ criteria: trx.raw('COALESCE(criteria, pending_criteria)'), summary: trx.raw('COALESCE(summary, pending_summary)'), status: 'unsubscribed', pending_criteria: null, pending_summary: null, confirmation_hash: null, confirmation_expires_at: null })
     await trx('concert_alert_digest').where('subscriber_id', subscriber.id).where('status', 'pending').update({ status: 'cancelled' })
     return { ok: true }
   })

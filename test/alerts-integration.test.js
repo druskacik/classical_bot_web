@@ -61,6 +61,82 @@ test('multiple alerts and combined delivery against disposable PostgreSQL', {ski
     assert.ok((await listAlerts(db,first.token)).alerts.every(a=>a.status==='unsubscribed'))
   })
   await reset()
+  await t.test('managed saves reactivate unsubscribed and removed searches without duplicate rows',async()=>{
+    const first=await activate({country:'CZ'})
+    const subscriber=await getSubscriber(db,first.token)
+    for (const removed of [false,true]) {
+      if (removed) await removeAlert(db,first.token,first.alertId)
+      else await unsubscribe(db,first.token)
+      const fresh=await add()
+      const before=await db('concert_alert').where('id',first.alertId).first()
+      const results=await Promise.all([saveAlert(db,first.token,{country:'cz'}),saveAlert(db,first.token,{country:'CZ'})])
+      assert.ok(results.every(result=>result.alertId===first.alertId))
+      assert.equal(results.filter(result=>result.duplicate).length,1)
+      const after=await db('concert_alert').where('id',first.alertId).first()
+      assert.equal(after.status,'active'); assert.equal(after.removed_at,null)
+      assert.equal(after.generation,before.generation+1)
+      assert.ok(await db('concert_alert_seen').where({alert_id:first.alertId,concert_id:fresh}).first())
+      assert.equal((await listAlerts(db,first.token)).alerts.length,1)
+      assert.equal(Number((await db('concert_alert').where('subscriber_id',subscriber.id).count('* as count').first()).count),1)
+      assert.equal((await run()).accepted,0)
+    }
+  })
+  await reset()
+  await t.test('public reactivation reuses the row but waits for a fresh confirmation',async()=>{
+    const email='reactivation@example.org'
+    const first=await activate({country:'CZ'},email)
+    for (const removed of [false,true]) {
+      if (removed) await removeAlert(db,first.token,first.alertId)
+      else await unsubscribe(db,first.token)
+      await requestAlert(db,{email,criteria:{country:'cz'}},send,origin)
+      const link=messages.at(-1).text.match(/confirm#([\w-]+)/)[1]
+      const waiting=await db('concert_alert').where('id',first.alertId).first()
+      assert.equal(waiting.status,'unsubscribed')
+      assert.equal(Boolean(waiting.removed_at),removed)
+      assert.equal(Number((await db('concert_alert').count('* as count').first()).count),1)
+      const fresh=await add()
+      assert.equal((await run()).accepted,0)
+      const confirmed=await confirmAlert(db,link)
+      assert.equal(confirmed.alertId,first.alertId); assert.equal(confirmed.token,first.token)
+      assert.equal((await listAlerts(db,first.token)).alerts[0].status,'active')
+      assert.ok(await db('concert_alert_seen').where({alert_id:first.alertId,concert_id:fresh}).first())
+      await assert.rejects(()=>confirmAlert(db,link))
+    }
+  })
+  await reset()
+  await t.test('removed and unsubscribed pending searches keep criteria for later reactivation',async()=>{
+    for (const removed of [false,true]) {
+      const email=`pending-${removed}@example.org`
+      await requestAlert(db,{email,criteria:{country:'CZ'}},send,origin)
+      const oldLink=messages.at(-1).text.match(/confirm#([\w-]+)/)[1]
+      const access=messages.at(-1).text.match(/manage#([\w-]+)/)[1]
+      const pending=(await listAlerts(db,access)).alerts[0]
+      const duplicate=await saveAlert(db,access,{country:'CZ'})
+      assert.equal(duplicate.duplicate,true); assert.equal(duplicate.alertId,pending.id)
+      if (removed) await removeAlert(db,access,pending.id)
+      else await unsubscribe(db,access)
+      await assert.rejects(()=>confirmAlert(db,oldLink))
+      const restored=await saveAlert(db,access,{country:'CZ'})
+      assert.equal(restored.alertId,pending.id)
+      assert.equal((await listAlerts(db,access)).alerts[0].status,'active')
+    }
+  })
+  await reset()
+  await t.test('editing into an inactive search restores it and retires the replaced search',async()=>{
+    const first=await activate({country:'CZ'})
+    await removeAlert(db,first.token,first.alertId)
+    const second=await saveAlert(db,first.token,{country:'SK'})
+    const result=await saveAlert(db,first.token,{country:'CZ'},second.alertId)
+    assert.equal(result.alertId,first.alertId); assert.ok(!result.duplicate)
+    const list=await listAlerts(db,first.token)
+    assert.equal(list.alerts.length,1); assert.equal(list.alerts[0].id,first.alertId)
+    assert.ok((await db('concert_alert').where('id',second.alertId).first()).removed_at)
+    // Even if older historical duplicates exist, a live match always wins.
+    await db('concert_alert').insert({email:list.email,subscriber_id:(await getSubscriber(db,first.token)).id,status:'unsubscribed',criteria:{country:'CZ'},summary:'Czechia'})
+    const duplicate=await saveAlert(db,first.token,{country:'CZ'})
+    assert.equal(duplicate.duplicate,true); assert.equal(duplicate.alertId,first.alertId)
+  })
+  await reset()
   await t.test('one digest, overlapping matches, baseline suppression and recipient delivery history',async()=>{
     const baseline=await add()
     const first=await activate({city:'1'})
