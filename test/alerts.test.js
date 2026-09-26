@@ -1,5 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { Duplex } from 'node:stream'
+import nodemailer from 'nodemailer'
 import { alertDay, failureKind, digestMail, normalizeEmail, token, tokenHash, managementToken } from '../server/utils/alerts/core.js'
 
 test('email and management tokens reject injection and malformed input', () => {
@@ -19,12 +21,63 @@ test('daily delivery follows Prague daylight saving time', () => {
 })
 test('SMTP ambiguous outcomes are held rather than resent', () => {
   assert.equal(failureKind({ code: 'ETIMEDOUT', command: 'DATA' }), 'held')
-  assert.equal(failureKind({ code: 'ESOCKET', command: 'CONN' }), 'retry')
+  for (const code of ['ESOCKET', 'ETIMEDOUT', 'ECONNECTION']) {
+    assert.equal(failureKind({ code, command: 'CONN' }), 'held')
+    assert.equal(failureKind({ code }), 'held')
+  }
+  assert.equal(failureKind({ code: 'EDNS', command: 'CONN' }), 'retry')
+  assert.equal(failureKind({ code: 'EAUTH', command: 'AUTH PLAIN' }), 'retry')
   assert.equal(failureKind({ responseCode: 450 }), 'retry')
   assert.equal(failureKind({ code: 'EENVELOPE', command: 'RCPT TO', responseCode: 550 }), 'rejected')
   assert.equal(failureKind({ code: 'EENVELOPE', command: 'MAIL FROM', responseCode: 550 }), 'held')
   assert.equal(failureKind({ code: 'EENVELOPE', command: 'DATA', responseCode: 550 }), 'held')
   assert.equal(failureKind({ code: 'EENVELOPE', responseCode: 550 }), 'held')
+})
+test('Nodemailer failures after the complete message body are held', async t => {
+  for (const code of ['ESOCKET', 'ETIMEDOUT', 'ECONNECTION']) {
+    await t.test(code, async () => {
+      let greeted = false, receivingBody = false, bodyReceived = false, buffer = ''
+      // A scripted SMTP peer lets the real transport fail after DATA without networking.
+      const connection = new Duplex({
+        read() {
+          if (!greeted) { greeted = true; this.push('220 test SMTP ready\r\n') }
+        },
+        write(chunk, encoding, callback) {
+          buffer += chunk.toString()
+          if (receivingBody) {
+            if (buffer.endsWith('\r\n.\r\n')) {
+              bodyReceived = true
+              setImmediate(() => {
+                if (code === 'ETIMEDOUT') this.emit('timeout')
+                else if (code === 'ESOCKET') this.destroy(new Error('Connection reset after DATA'))
+                else this.destroy()
+              })
+            }
+          } else {
+            let end
+            while ((end = buffer.indexOf('\r\n')) !== -1) {
+              const command = buffer.slice(0, end)
+              buffer = buffer.slice(end + 2)
+              if (command === 'DATA') { receivingBody = true; this.push('354 Send message\r\n') }
+              else this.push('250 OK\r\n')
+            }
+          }
+          callback()
+        },
+      })
+      connection.setTimeout = () => connection
+      const transport = nodemailer.createTransport({ connection, secure: false, ignoreTLS: true })
+      try {
+        await assert.rejects(transport.sendMail({ from: 'sender@example.org', to: 'recipient@example.org', text: 'Digest content' }), error => {
+          assert.equal(bodyReceived, true)
+          assert.equal(error.code, code)
+          assert.equal(error.command, 'CONN')
+          assert.equal(failureKind(error), 'held')
+          return true
+        })
+      } finally { transport.close(); connection.destroy() }
+    })
+  }
 })
 test('digest escapes programme data and excludes unsafe links', () => {
   const mail = digestMail({ email: 'one@example.org', summary: '<Bach>' }, [{ title: '<script>x</script>', id: 1, date: '2026-12-01', url: 'javascript:alert(1)', programme: 'A & B' }], 'https://classicalbot.com', 'secret', 1)

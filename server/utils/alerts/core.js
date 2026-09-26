@@ -17,8 +17,9 @@ export function alertDay(now = new Date()) {
 export function failureKind(error) {
   if (error.code === 'EENVELOPE' && error.command === 'RCPT TO' && error.responseCode >= 500) return 'rejected'
   if (error.responseCode >= 400 && error.responseCode < 500) return 'retry'
-  if (['ECONNECTION', 'EDNS', 'EAUTH', 'ESOCKET'].includes(error.code) && !['DATA', 'CONN'].includes(error.command)) return 'retry'
-  if (error.command === 'CONN') return 'retry'
+  if (['EDNS', 'EAUTH'].includes(error.code)) return 'retry'
+  // Nodemailer also labels post-submission disconnects and timeouts as CONN.
+  // Without a definite rejection, the server may already have accepted the mail.
   return 'held'
 }
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])

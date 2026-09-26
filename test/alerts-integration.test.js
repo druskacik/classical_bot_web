@@ -185,10 +185,14 @@ test('multiple alerts and combined delivery against disposable PostgreSQL', {ski
   await t.test('held delivery blocks subscriber; unsubscribe invalidates pending confirmation',async()=>{
     const first=await activate({country:'CZ'},'held@example.org')
     await add()
-    assert.equal((await run({send:async()=>{throw {code:'ETIMEDOUT',command:'DATA'}}})).failed,1)
+    assert.equal((await run({send:async()=>{throw {code:'ETIMEDOUT',command:'CONN'}}})).failed,1)
     await saveAlert(db,first.token,{country:'CZ'})
     await add()
-    assert.equal((await run()).accepted,0)
+    let retried=false
+    const later=new Date(now.valueOf()+86400_000)
+    assert.equal((await run({now:later,send:async()=>{retried=true}})).accepted,0)
+    assert.equal(retried,false)
+    assert.equal((await db('concert_alert_digest').first()).status,'held')
     await requestAlert(db,{email:'held@example.org',criteria:{country:'SK'}},send,origin)
     const pending=messages.at(-1).text.match(/confirm#([\w-]+)/)[1]
     await unsubscribe(db,first.token)
