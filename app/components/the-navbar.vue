@@ -19,6 +19,7 @@ const items = computed(() => [
     { label: 'Sources', href: '/sources' },
     { label: 'Blog', href: '/blog' },
     { label: 'About', href: '/about' },
+    { label: 'API', href: '/api' },
     { label: 'Contact', href: '/contact' },
 ]);
 </script>
