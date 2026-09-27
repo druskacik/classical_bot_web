@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { createApp, toNodeListener } from 'h3'
-import { validateWebsite, submittedUrl, createSubmissionLimiter } from '../server/utils/business-api/onboarding.js'
+import { validateWebsite, submittedUrl, createSubmissionLimiter, createSourceOnboarding } from '../server/utils/business-api/onboarding.js'
 import { createConcertApiHandler } from '../server/utils/business-api/handler.js'
 import { createDataCache } from '../layers/concerts/server/utils/data-cache.js'
 
@@ -28,6 +28,28 @@ test('submission limits count attempts, isolate clients and expire', () => {
   attempt('a');attempt('a');attempt('b')
   assert.throws(()=>attempt('a'),{statusCode:429})
   now=3600000;attempt('a')
+})
+
+test('failed website validation does not consume the submission quota', async () => {
+  let registrations = 0
+  const db = () => ({ select: async () => [] })
+  db.transaction = async () => { registrations++; return { id: String(registrations) } }
+  let validationError
+  const onboard = createSourceOnboarding(db, {
+    env: { BUSINESS_API_REGISTRATION_ENABLED: 'true', BUSINESS_API_SUBMISSIONS_PER_IP_HOUR: '1' },
+    validate: async () => { if (validationError) throw validationError },
+  })
+  const input = { url: 'https://example.com' }
+  for (const statusCode of [422, 503]) {
+    validationError = Object.assign(new Error('Validation failed'), { statusCode })
+    await assert.rejects(onboard(input, 'a'), { statusCode })
+  }
+  assert.equal(registrations, 0)
+  validationError = undefined
+  await onboard(input, 'a')
+  assert.equal(registrations, 1)
+  await assert.rejects(onboard(input, 'a'), { statusCode: 429, code: 'rate_limited' })
+  assert.equal(registrations, 1)
 })
 
 test('HTTP polling reads live registry state while sharing cached concerts', async t => {

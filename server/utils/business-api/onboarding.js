@@ -51,7 +51,7 @@ export function positiveSetting(env, name, fallback) {
   return Number(value)
 }
 
-export function createSubmissionLimiter({ limit = 5, now = Date.now } = {}) {
+export function createSubmissionLimiter({ limit = 10, now = Date.now } = {}) {
   const clients = new Map()
   return ip => {
     const time = now()
@@ -100,14 +100,14 @@ export async function registerSource(db, input, dailyLimit = 50) {
   }
 }
 
-export function createSourceOnboarding(db, { env = process.env, validate = validateWebsite, limiter = createSubmissionLimiter({ limit: positiveSetting(env, 'BUSINESS_API_SUBMISSIONS_PER_IP_HOUR', 5) }) } = {}) {
+export function createSourceOnboarding(db, { env = process.env, validate = validateWebsite, limiter = createSubmissionLimiter({ limit: positiveSetting(env, 'BUSINESS_API_SUBMISSIONS_PER_IP_HOUR', 10) }) } = {}) {
   const dailyLimit = positiveSetting(env, 'BUSINESS_API_SUBMISSIONS_PER_DAY', 50)
   return async (input, ip) => {
     try { return await lookupSource(db, input.url) }
     catch (error) { if (error.code !== 'source_not_found') throw error }
     if (env.BUSINESS_API_REGISTRATION_ENABLED !== 'true') throw fail(404, 'source_not_found', 'This organisation is not registered.')
-    limiter(ip)
     await validate(input.submittedUrl || input.url)
+    limiter(ip)
     return registerSource(db, input, dailyLimit)
   }
 }

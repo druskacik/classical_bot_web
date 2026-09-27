@@ -114,7 +114,7 @@ Registry status bypasses the concert cache; concert results can still be 120 sec
 
 Submission defaults, configurable with positive integer environment variables:
 
-- `BUSINESS_API_SUBMISSIONS_PER_IP_HOUR=5`: unknown-source validation attempts, per process;
+- `BUSINESS_API_SUBMISSIONS_PER_IP_HOUR=10`: unknown-source submissions that pass website validation, per process;
   resets on restart. Configure trusted proxy hops before enabling behind a proxy.
 - `BUSINESS_API_SUBMISSIONS_PER_DAY=50`: successful new registrations per UTC day, persisted
   through source timestamps and `business_api` alias provenance. Shared across replicas,
