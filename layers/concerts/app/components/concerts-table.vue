@@ -33,10 +33,12 @@
           </a>
 
           <div class="entry-metadata flex flex-wrap items-start gap-2">
-            <span v-if="props.currentCityId && String(concert.city_id) === props.currentCityId" :class="badgeClasses(concert.city, 'outline')">{{ concert.city }}</span>
-            <NuxtLink v-else :to="cityPath(concert)" :prefetch="false" :rel="concert.city_path ? undefined : 'nofollow'">
-              <span :class="badgeClasses(concert.city, 'outline')">{{ concert.city }}</span>
-            </NuxtLink>
+            <template v-if="typeof concert.city === 'string' && concert.city.trim()">
+              <span v-if="props.currentCityId && String(concert.city_id) === props.currentCityId" :class="badgeClasses(concert.city, 'outline')">{{ concert.city }}</span>
+              <NuxtLink v-else :to="cityPath(concert)" :prefetch="false" :rel="concert.city_path ? undefined : 'nofollow'">
+                <span :class="badgeClasses(concert.city, 'outline')">{{ concert.city }}</span>
+              </NuxtLink>
+            </template>
             <NuxtLink v-if="props.showCountry" :to="countryPath(concert.country_code)" :prefetch="false">
               <span :class="badgeClasses(getCountryName(concert.country_code), 'outline')">
                 {{ getCountryName(concert.country_code) }}
@@ -147,6 +149,7 @@ const props = defineProps({
 const route = useRoute()
 
 const badgeColor = (label) => {
+  if (typeof label !== 'string' || !label.trim()) return 'rose'
   if (SPECIAL_BADGE_COLORS[label]) return SPECIAL_BADGE_COLORS[label]
 
   let hash = 0
