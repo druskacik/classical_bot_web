@@ -1,7 +1,7 @@
 <template>
   <ol class="concert-list list-none divide-y divide-gray-200 bg-white">
     <li
-      v-for="concert in props.concerts"
+      v-for="concert in displayConcerts"
       :key="concert.id"
       class="concert-entry"
     >
@@ -39,13 +39,14 @@
                 <span :class="badgeClasses(concert.city, 'outline')">{{ concert.city }}</span>
               </NuxtLink>
             </template>
-            <NuxtLink v-if="props.showCountry" :to="countryPath(concert.country_code)" :prefetch="false">
+            <NuxtLink v-if="props.showCountry && getCountryPath(concert.country_code)" :to="countryPath(concert.country_code)" :prefetch="false">
               <span :class="badgeClasses(getCountryName(concert.country_code), 'outline')">
                 {{ getCountryName(concert.country_code) }}
               </span>
             </NuxtLink>
+            <span v-else-if="props.showCountry" :class="badgeClasses(getCountryName(concert.country_code), 'outline')">{{ getCountryName(concert.country_code) }}</span>
             <a
-              v-if="concert.source_url"
+              v-if="hasText(concert.source) && hasText(concert.source_url)"
               :href="concert.source_url"
               target="_blank"
               rel="noopener noreferrer"
@@ -53,7 +54,7 @@
             >
               <span :class="badgeClasses(concert.source)">{{ concert.source }}</span>
             </a>
-            <span v-else :class="badgeClasses(concert.source)">{{ concert.source }}</span>
+            <span v-else-if="hasText(concert.source)" :class="badgeClasses(concert.source)">{{ concert.source }}</span>
           </div>
 
           <div v-if="!concert.works?.length && concert.composers?.length" class="flex flex-wrap items-baseline">
@@ -77,7 +78,8 @@
 
 <script setup>
 const { t, locale } = useConcertText()
-import { getCountryName } from '../utils/countries.js'
+import { getCountryName, getCountryPath } from '../utils/countries.js'
+import { normalizeProgrammeItems } from '../utils/concert-programme.js'
 import { concertCalendarDate, createConcertDateFormatting, formatConcertTime as formatTime, formatConcertDateTime as formatDateTime } from '../utils/concert-dates.js'
 import { concertCityLocation, concertCountryLocation, concertComposerLocation } from '../utils/concert-discovery.js'
 
@@ -147,6 +149,12 @@ const props = defineProps({
 })
 
 const route = useRoute()
+const hasText = value => typeof value === 'string' && Boolean(value.trim())
+const displayConcerts = computed(() => props.concerts.map(concert => ({
+  ...concert,
+  composers: normalizeProgrammeItems(concert.composers),
+  works: normalizeProgrammeItems(concert.works),
+})))
 
 const badgeColor = (label) => {
   if (typeof label !== 'string' || !label.trim()) return 'rose'

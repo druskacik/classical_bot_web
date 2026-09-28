@@ -1,5 +1,9 @@
+import { normalizeProgrammeItems } from './concert-programme.js'
+
 // Map results are a preview; keep full programmes on the concert source page.
 export function mapProgramme(composers = [], works = []) {
+  composers = normalizeProgrammeItems(composers)
+  works = normalizeProgrammeItems(works)
   const key = composer => composer?.id == null ? composer?.name || 'unknown' : String(composer.id)
   const groups = new Map()
   for (const composer of [...composers, ...works.map(work => work.composer)].filter(Boolean)) {

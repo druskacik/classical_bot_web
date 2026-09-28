@@ -1,5 +1,5 @@
 <template>
-  <ul v-if="works.length" class="concert-programme list-none space-y-3 text-sm [overflow-wrap:anywhere] sm:space-y-0">
+  <ul v-if="safeWorks.length" class="concert-programme list-none space-y-3 text-sm [overflow-wrap:anywhere] sm:space-y-0">
     <li v-for="group in groups" :key="group.key" class="grid min-w-0 gap-x-4 gap-y-1 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-y-0 sm:py-1.5">
       <NuxtLink
         v-if="group.composer"
@@ -31,6 +31,7 @@
 
 <script setup>
 import { querySelections } from '../../shared/utils/concert-query.js'
+import { normalizeProgrammeItems } from '../utils/concert-programme.js'
 import { concertWorkLocation, concertComposerLocation } from '../utils/concert-discovery.js'
 
 const props = defineProps({
@@ -39,16 +40,18 @@ const props = defineProps({
 })
 const { t } = useConcertText()
 const route = useRoute()
+const safeWorks = computed(() => normalizeProgrammeItems(props.works))
+const safeComposers = computed(() => normalizeProgrammeItems(props.composers))
 const selectedWorks = computed(() => new Set(querySelections(route.query.works).map(Number)))
 const matches = work => selectedWorks.value.has(Number(work.id))
 const groups = computed(() => {
   const grouped = new Map()
-  for (const work of props.works) {
+  for (const work of safeWorks.value) {
     const key = work.composer?.id == null ? 'unknown' : String(work.composer.id)
     if (!grouped.has(key)) grouped.set(key, { key, composer: work.composer, works: [] })
     grouped.get(key).works.push(work)
   }
-  for (const composer of props.composers) {
+  for (const composer of safeComposers.value) {
     const key = String(composer.id)
     if (!grouped.has(key)) grouped.set(key, { key, composer, works: [] })
   }

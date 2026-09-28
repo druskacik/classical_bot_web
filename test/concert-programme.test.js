@@ -1,3 +1,4 @@
+import { normalizeProgrammeItems } from '../layers/concerts/app/utils/concert-programme.js'
 import { compileComponent, renderer } from '../test-support/vue.js'
 import { querySelections } from '../layers/concerts/shared/utils/concert-query.js'
 import assert from 'node:assert/strict'
@@ -38,7 +39,7 @@ for (const locale of ['en-GB', 'sk-SK']) {
     const route = Vue.reactive({ path: '/', fullPath: '/', query: {} })
     const component = compileComponent('../layers/concerts/app/components/concert-programme.vue', {
       useRoute: () => route, useConcertText: () => createConcertText(locale),
-      concertWorkLocation, concertComposerLocation, querySelections,
+      concertWorkLocation, concertComposerLocation, querySelections, normalizeProgrammeItems,
     }, { inlineTemplate: true })
     const props = Vue.reactive({ works, composers: [{ id: 1, name: 'Bach' }, { id: 8, name: 'Mozart' }] })
     const root = { children: [] }
@@ -72,6 +73,18 @@ for (const locale of ['en-GB', 'sk-SK']) {
     props.works = []
     await Vue.nextTick()
     assert.equal(all(root, 'button').length, 0)
+    props.works = [null, { id: 90, title: 'Anonymous work', composer: null }]
+    props.composers = [null]
+    await Vue.nextTick()
+    assert.ok(text(root).includes('Anonymous work'))
+    props.works = null
+    props.composers = null
+    await Vue.nextTick()
+    assert.equal(all(root, 'a').length, 0)
+    props.works = works
+    props.composers = [{ id: 1, name: 'Bach' }]
+    await Vue.nextTick()
+    assert.ok(text(root).includes('Concerto'))
     app.unmount()
   })
 }

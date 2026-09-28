@@ -4,6 +4,14 @@ import { mapProgramme } from '../layers/concerts/app/utils/map-programme.js'
 const bach = { id: 1, name: 'Bach' }
 const mozart = { id: 2, name: 'Mozart' }
 const work = (id, composer) => ({ id, title: `Work ${id}`, composer })
+test('missing arrays and null entries preserve valid map programme data', () => {
+  for (const value of [null, undefined, '', {}, [null, undefined]]) {
+    assert.deepEqual(mapProgramme(value, value), { names: [], rows: [], omitted: 0 })
+  }
+  const composers = [bach, mozart]
+  const works = [work(1, bach), work(2, null), work(3, mozart), work(4, bach)]
+  assert.deepEqual(mapProgramme([null, ...composers, undefined], [null, ...works, undefined]), mapProgramme(composers, works))
+})
 test('short map previews retain composer/work associations and represent each composer before extra works', () => {
   const preview = mapProgramme([bach, mozart], [work(1, bach), work(2, bach), work(3, bach), work(4, mozart)])
   assert.deepEqual(preview.rows, [{ composer: 'Bach', work: 'Work 1' }, { composer: 'Mozart', work: 'Work 4' }, { composer: 'Bach', work: 'Work 2' }])

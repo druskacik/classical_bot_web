@@ -5,7 +5,9 @@ import { renderToString } from '@vue/server-renderer'
 import { compileComponent } from '../test-support/vue.js'
 import * as dates from '../layers/concerts/app/utils/concert-dates.js'
 import * as discovery from '../layers/concerts/app/utils/concert-discovery.js'
-import { getCountryName } from '../layers/concerts/app/utils/countries.js'
+import { normalizeProgrammeItems } from '../layers/concerts/app/utils/concert-programme.js'
+import { querySelections } from '../layers/concerts/shared/utils/concert-query.js'
+import { getCountryName, getCountryPath } from '../layers/concerts/app/utils/countries.js'
 import { createConcertText } from '../layers/concerts/app/utils/concert-text.js'
 
 const concert = {
@@ -17,7 +19,7 @@ const concert = {
 async function render(row, { locale = 'en-GB', currentCityId = null, countryName = getCountryName } = {}) {
   const cityCalls = []
   const component = compileComponent('../layers/concerts/app/components/concerts-table.vue', {
-    ...dates, ...discovery, getCountryName: countryName,
+    ...dates, ...discovery, getCountryName: countryName, getCountryPath, normalizeProgrammeItems,
     useConcertText: () => createConcertText(locale),
     useRoute: () => ({ query: {} }),
     concertCityLocation: (...args) => {
@@ -30,7 +32,10 @@ async function render(row, { locale = 'en-GB', currentCityId = null, countryName
     props: ['to', 'prefetch'],
     setup: (props, { slots }) => () => h('a', { href: props.to.path }, slots.default()),
   })
-  app.component('ConcertProgramme', { render: () => h('div', 'Programme') })
+  app.component('ConcertProgramme', compileComponent('../layers/concerts/app/components/concert-programme.vue', {
+    ...discovery, normalizeProgrammeItems, querySelections, useRoute: () => ({ path: '/', query: {} }),
+    useConcertText: () => createConcertText(locale),
+  }, { inlineTemplate: true }))
   return { html: await renderToString(app), cityCalls }
 }
 
@@ -44,7 +49,6 @@ for (const locale of ['en-GB', 'sk-SK']) {
         assert.match(html, /SVATOVÁCLAVSKÝ HUDEBNÍ FESTIVAL/)
         assert.match(html, /18:00/)
         assert.match(html, /Festival/)
-        assert.match(html, /Programme/)
         assert.equal((html.match(/location-badge/g) || []).length, 1, 'country badge remains')
         assert.equal(cityCalls.length, 0)
       }
@@ -70,3 +74,42 @@ test('outline badge helper tolerates missing and blank labels', async () => {
     assert.match(html, /text-rose-700/)
   }
 })
+
+test('source metadata requires a name and only links nonblank URLs', async () => {
+  for (const source of [null, undefined, '', '  ', 'Festival']) {
+    for (const source_url of [null, undefined, '', '  ', 'https://example.com/source']) {
+      const { html } = await render({ ...concert, source, source_url })
+      assert.equal(html.includes('concert-source'), source === 'Festival')
+      assert.equal(html.includes('href="https://example.com/source"'), source === 'Festival' && source_url === 'https://example.com/source')
+    }
+  }
+})
+
+test('unknown countries have a noninteractive badge and valid countries retain links', async () => {
+  for (const country_code of [null, undefined, '', '  ', 'invalid']) {
+    const { html } = await render({ ...concert, country_code })
+    assert.match(html, />Unknown country<\/span>/)
+    assert.doesNotMatch(html, /href="\/"/)
+  }
+  assert.match((await render(concert)).html, /href="\/czechia"/)
+})
+
+for (const locale of ['en-GB', 'sk-SK']) {
+  test(`real programme renders missing arrays and preserves mixed valid entries (${locale})`, async () => {
+    for (const value of [null, undefined, '', {}, [null, undefined]]) {
+      const { html } = await render({ ...concert, composers: value, works: value }, { locale })
+      assert.match(html, /SVATOVÁCLAVSKÝ/)
+      assert.doesNotMatch(html, /class="concert-programme/)
+    }
+    const composer = { id: 1, name: 'Bach' }
+    const { html } = await render({ ...concert,
+      composers: [null, composer, undefined],
+      works: [null, { id: 1, title: 'Suite', composer }, undefined, { id: 2, title: 'Anonymous work', composer: null }],
+    }, { locale })
+    assert.match(html, />Bach<\/a>/)
+    assert.match(html, />Suite<\/a>/)
+    assert.match(html, />Anonymous work<\/a>/)
+    const composerOnly = await render({ ...concert, composers: [null, composer], works: [null] }, { locale })
+    assert.match(composerOnly.html, /Bach/)
+  })
+}

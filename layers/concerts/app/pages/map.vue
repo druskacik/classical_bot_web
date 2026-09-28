@@ -64,8 +64,9 @@
         </div>
         <ol v-else class="divide-y divide-gray-200" :class="listLoading && 'opacity-50'">
           <li v-for="concert in concerts?.items || []" :key="concert.id" class="map-concert">
-            <time :datetime="concert.date?.slice(0, 10)" class="text-center text-gray-600"><span class="block text-xs uppercase">{{ concertDate(concert.date, 'month') }}</span><span class="block font-serif text-2xl text-gray-950">{{ concertDate(concert.date, 'day') }}</span><span class="block text-xs">{{ concert.date?.slice(0, 4) }}</span></time>
-            <div class="min-w-0">
+            <time v-if="concertCalendarDate(concert.date)" :datetime="concertCalendarDate(concert.date)" class="text-center text-gray-600"><span class="block text-xs uppercase">{{ concertDate(concert.date, 'month') }}</span><span class="block font-serif text-2xl text-gray-950">{{ concertDate(concert.date, 'day') }}</span><span class="block text-xs">{{ concertCalendarDate(concert.date).slice(0, 4) }}</span></time>
+            <span v-else class="col-span-2 text-xs text-gray-600">{{ t('Date unavailable') }}</span>
+            <div class="min-w-0" :class="{ 'col-span-2': !concertCalendarDate(concert.date) }">
               <p class="text-xs text-gray-600">{{ concert.city }}<template v-if="concert.time_from"> · {{ concert.time_from.slice(0, 5) }}</template></p>
               <a :href="concert.url" target="_blank" rel="noopener noreferrer" class="mt-1 block font-serif text-lg leading-snug text-gray-950 hover:text-primary hover:underline">{{ concert.title }}<span class="sr-only"> ({{ t('Opens in a new tab') }})</span></a>
               <p v-if="concert.venue" class="mt-1 text-xs text-gray-600">{{ concert.venue }}</p>
@@ -89,6 +90,7 @@ import { useConcertMapNavigation } from '../composables/useConcertMapNavigation.
 import { useConcertDateFilter } from '../composables/useConcertDateFilter.js'
 import { querySelections as values, musicQuery } from '../../shared/utils/concert-query.js'
 import { useConcertQuery } from '../composables/useConcertQuery.js'
+import { concertCalendarDate } from '../utils/concert-dates.js'
 const { t, locale } = useConcertText()
 const { concertSite } = useAppConfig()
 const route = useRoute()
@@ -151,7 +153,10 @@ const { data: concerts, status: listStatus, refresh: refreshList } = listRequest
 const listLoading = computed(() => !listParams.value || listStatus.value === 'pending')
 watch([page, () => JSON.stringify(listParams.value)], () => { if (programmePanel.value) programmePanel.value.scrollTop = 0 }, { flush: 'post' })
 watch([cityQuery, hasSelection], () => { if (hasSelection.value) revealConcerts() })
-const concertDate = (date, part) => date ? new Intl.DateTimeFormat(locale, { [part]: part === 'month' ? 'short' : 'numeric', timeZone: 'UTC' }).format(new Date(date)) : ''
+const concertDate = (date, part) => {
+  const calendarDate = concertCalendarDate(date)
+  return calendarDate ? new Intl.DateTimeFormat(locale, { [part]: part === 'month' ? 'short' : 'numeric', timeZone: 'UTC' }).format(new Date(`${calendarDate}T00:00:00Z`)) : ''
+}
 useConcertListSeo({ title: () => `${t('Concert map')} — ${concertSite.name}`, description: () => t('Explore upcoming classical music concerts on an interactive world map.'), canonicalPath: '/map', indexable: false })
 await Promise.all([mapRequest, listRequest])
 </script>
