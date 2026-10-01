@@ -52,6 +52,12 @@ export default defineNuxtConfig({
           'data-website-id': '80e40b8a-37ec-46e1-ae9d-3749dc235c46',
           async: true,
           defer: true,
+        },
+        // Temporary session replay and heatmap collection; keep the standard tracker above.
+        {
+          src: 'https://umami.cr.bswatcher.com/recorder.js',
+          'data-website-id': '80e40b8a-37ec-46e1-ae9d-3749dc235c46',
+          defer: true,
         }
       ]
     }
