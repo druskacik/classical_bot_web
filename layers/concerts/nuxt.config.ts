@@ -11,6 +11,11 @@ export default defineNuxtConfig({
     externals: { inline: [fileURLToPath(new URL('./', import.meta.url))] },
   },
   modules: ['@nuxt/ui'],
+  icon: {
+    clientBundle: {
+      icons: ['lucide:map', 'lucide:list', 'lucide:sliders-horizontal', 'lucide:circle-play'],
+    },
+  },
   css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],
   ui: {
     colorMode: false,
