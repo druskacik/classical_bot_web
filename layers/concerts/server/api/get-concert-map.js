@@ -5,6 +5,7 @@ import { getAreaCities } from '../utils/area-cities.js'
 import { resolveArea } from '../utils/concert-area.js'
 import { cachedConcertData } from '../utils/concert-data-cache.js'
 import { concertFilterCacheInput } from '../utils/data-cache-keys.js'
+import { cityDisplayName } from '../../shared/utils/city-query.js'
 
 export default defineEventHandler(async event => {
   const filters = parseConcertFilters(getQuery(event), concertSite.country)
@@ -16,7 +17,7 @@ export default defineEventHandler(async event => {
       .select('cc.city_id').count('* as count').groupBy('cc.city_id')
     const counts = new Map(rows.map(row => [String(row.city_id), Number(row.count)]))
     const items = cities.filter(city => counts.has(String(city.id))).map(city => ({
-      id: String(city.id), cityQuery: city.cityQuery, name: concertSite.locale === 'sk-SK' ? city.local_name || city.english_name : city.english_name,
+      id: String(city.id), cityQuery: city.cityQuery, name: cityDisplayName(city, concertSite.locale),
       englishName: city.english_name, localName: city.local_name,
       country: city.country_code, latitude: city.latitude, longitude: city.longitude, count: counts.get(String(city.id)),
     }))

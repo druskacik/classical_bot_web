@@ -1,18 +1,18 @@
-import { cityQueryValues } from '../../shared/utils/city-query.js'
+import { cityDisplayName, cityQueryValues } from '../../shared/utils/city-query.js'
 import knex from './connection.js'
 import { cachedConcertData } from './concert-data-cache.js'
 import { validCoordinates } from '../../shared/utils/concert-area.js'
 import { containsNormalizedText, normalizeSearchText } from './search-text.js'
 
 export const getAreaCities = () => cachedConcertData('area-cities', {}, async () => {
-  const cities = await knex('city').select('id', 'english_name', 'local_name', 'country_code', 'latitude', 'longitude')
+  const cities = await knex('city').select('id', 'english_name', 'local_name', 'display_name', 'country_code', 'latitude', 'longitude')
   const values = cityQueryValues(cities)
   return cities.filter(validCoordinates).map(city => ({ ...city, cityQuery: values.get(String(city.id)) }))
 })
 export function areaCityOptions(cities, query, selected, locale, countryName) {
   const search = normalizeSearchText(query)
-  const label = city => locale === 'sk-SK' ? city.local_name || city.english_name : city.english_name
-  const matches = cities.filter(city => !search || containsNormalizedText(city.english_name, search) || containsNormalizedText(city.local_name, search))
+  const label = city => cityDisplayName(city, locale)
+  const matches = cities.filter(city => !search || [city.english_name, city.local_name, city.display_name].some(name => containsNormalizedText(name, search)))
     .sort((a, b) => label(a).localeCompare(label(b), locale) || a.country_code.localeCompare(b.country_code) || Number(a.id) - Number(b.id)).slice(0, 20)
   const chosen = cities.find(city => String(city.id) === selected)
   if (chosen && !matches.includes(chosen)) matches.push(chosen)

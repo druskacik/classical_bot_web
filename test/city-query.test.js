@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cityQueryValues } from '../layers/concerts/shared/utils/city-query.js'
+import { cityDisplayName, cityQueryValues } from '../layers/concerts/shared/utils/city-query.js'
 import { concertMapLocation, mapListLocation } from '../layers/concerts/app/utils/concert-discovery.js'
 
 test('readable identities account for same-country English and local aliases across the full catalogue', () => {
@@ -25,4 +25,18 @@ test('list/map round trip retains readable city, radius and complete date/music 
   assert.deepEqual(map, { path: '/map', query })
   assert.deepEqual(mapListLocation({ ...map.query, bounds: '4,52,6,53', page: '2' }), { path: '/', query })
   assert.deepEqual(mapListLocation({ bounds: '4,52,6,53', datePreset: 'week' }), { path: '/', query: { bounds: '4,52,6,53', datePreset: 'week' } })
+})
+
+test('display labels preserve canonical identity and local fallback names', () => {
+  const city = { id: 1, english_name: 'Athens', local_name: 'Atény', country_code: 'US', display_name: 'Athens (Georgia)' }
+  assert.equal(cityDisplayName(city), 'Athens (Georgia)')
+  assert.equal(cityDisplayName(city, 'sk-SK'), 'Athens (Georgia)')
+  assert.equal(cityDisplayName({ ...city, display_name: null }, 'sk-SK'), 'Atény')
+  assert.equal(cityDisplayName({ ...city, display_name: null }), 'Athens')
+  assert.equal(cityQueryValues([city]).get('1'), 'Athens,US', 'presentation labels never become URL identities')
+  const values = cityQueryValues([city, { ...city, id: 2, display_name: 'Athens (Ohio)' }])
+  assert.equal(values.get('1'), '1')
+  assert.equal(values.get('2'), '2')
+  const query = { city: '1', radius: '25' }
+  assert.deepEqual(mapListLocation(concertMapLocation(query, '1').query), { path: '/', query })
 })

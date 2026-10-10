@@ -1,6 +1,7 @@
 import { createError } from 'h3'
 import { normalizeConcertQuery, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
 import { citiesWithinArea } from '../../shared/utils/concert-area.js'
+import { cityDisplayName } from '../../shared/utils/city-query.js'
 
 const invalid = message => { throw createError({ statusCode: 400, statusMessage: message }) }
 const number = (value, label) => {
@@ -44,7 +45,7 @@ export function resolveArea(area, cities, locale = 'en-GB') {
   }
   if (area.cityId && !city) invalid('City coordinates are unavailable; choose another city or point')
   const resolved = city ? { ...area, cityId: String(city.id), latitude: city.latitude, longitude: city.longitude,
-    label: locale === 'sk-SK' ? city.local_name || city.english_name : city.english_name,
+    label: cityDisplayName(city, locale),
     countryCode: city.country_code,
     unresolvedCity: {
       names: [...new Set([city.english_name, city.local_name].filter(Boolean).map(name => name.toLowerCase()))].sort(),

@@ -9,6 +9,7 @@ import { getCountryName } from '../utils/countries.js'
 import { containsNormalizedText, normalizedLikePattern, normalizeSearchText } from '../utils/search-text.js'
 import { applyFilters, facetFilters, parseCity, parseConcertFilters } from '../utils/concert-filters.js'
 import { getCityCatalogue } from '../utils/city-catalogue.js'
+import { cityDisplayName, cityQueryValues } from '../../shared/utils/city-query.js'
 
 const OPTION_LIMIT = 20
 
@@ -52,14 +53,19 @@ export default defineEventHandler(async (event) => {
         suggestions = rows.map(row => ({ ...row, label: getCountryName(row.value) }))
         labels = selected.filter(value => !concertSite.country || value === concertSite.country).map(value => ({ value, label: getCountryName(value) }))
       } else if (type === 'city') {
-        const cities = await knex('city').select('id', 'english_name', 'local_name', 'country_code')
+        const cities = await knex('city').select('id', 'english_name', 'local_name', 'display_name', 'country_code')
           .modify(query => { if (concertSite.country) query.where('country_code', concertSite.country) })
+        const values = cityQueryValues(cities)
+        const byId = new Map(cities.map(city => [String(city.id), city]))
+        const label = city => cityDisplayName(city, concertSite.locale)
         const candidates = cities.filter(city => (!context.country || city.country_code === context.country)
-          && (!search || containsNormalizedText(city.english_name, search) || containsNormalizedText(city.local_name, search)))
-        suggestions = await base().whereIn('canonical_city.id', candidates.map(city => city.id))
-          .select(knex.raw("canonical_city.english_name || ',' || canonical_city.country_code as value"), knex.raw(`${concertSite.cityRoutes === 'local' ? 'COALESCE(canonical_city.local_name, canonical_city.english_name)' : 'canonical_city.english_name'} as label`), 'canonical_city.country_code')
-          .countDistinct('cc.id as count').groupBy('canonical_city.english_name', ...(concertSite.cityRoutes === 'local' ? ['canonical_city.local_name'] : []), 'canonical_city.country_code')
-          .orderBy('count', 'desc').orderBy('label').limit(OPTION_LIMIT)
+          && (!search || [city.english_name, city.local_name, city.display_name].some(name => containsNormalizedText(name, search))))
+        const counts = await base().whereIn('canonical_city.id', candidates.map(city => city.id))
+          .select('canonical_city.id').countDistinct('cc.id as count').groupBy('canonical_city.id')
+        suggestions = counts.map(row => {
+          const city = byId.get(String(row.id))
+          return { value: values.get(String(city.id)), label: label(city), country_code: city.country_code, count: Number(row.count) }
+        }).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, concertSite.locale) || a.value.localeCompare(b.value)).slice(0, OPTION_LIMIT)
         if (concertSite.cityRoutes === 'local') {
           const unresolved = await base().whereNull('cc.city_id').whereNotNull('cc.city_raw')
             .select(knex.raw("cc.city_raw || ',' || cc.country_code_resolved as value"), 'cc.city_raw as label', 'cc.country_code_resolved as country_code')
@@ -69,13 +75,17 @@ export default defineEventHandler(async (event) => {
         }
         for (const value of selected) {
           const parsed = parseCity(value)
-          const city = cities.find(city => parsed?.id ? Number(city.id) === parsed.id :
+          const matches = cities.filter(city => parsed?.id ? Number(city.id) === parsed.id :
             (!parsed?.country || city.country_code === parsed.country) &&
             [city.english_name, city.local_name].some(name => name?.toLowerCase() === parsed?.name?.toLowerCase()))
+          const city = matches.length === 1 ? matches[0] : null
           if (city) {
             const row = await applyFilters(knex('classical_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), { ...context, city: parsed }).countDistinct('cc.id as count').first()
-            labels.push({ value, label: concertSite.cityRoutes === 'local' ? city.local_name || city.english_name : city.english_name, country_code: city.country_code, count: Number(row.count) })
-          } else if (!concertSite.country) labels.push({ value, label: parsed?.name || value })
+            labels.push({ value, label: label(city), country_code: city.country_code, count: Number(row.count) })
+          } else if (matches.length > 1) {
+            const row = await applyFilters(knex('classical_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), { ...context, city: parsed }).countDistinct('cc.id as count').first()
+            labels.push({ value, label: parsed.name, country_code: parsed.country || (new Set(matches.map(city => city.country_code)).size === 1 ? matches[0].country_code : undefined), count: Number(row.count) })
+          } else if (!concertSite.country) labels.push({ value, label: parsed?.name || value, country_code: parsed?.country })
           else if (parsed?.name && (!parsed.country || parsed.country === concertSite.country)) {
             const legacy = (await getCityCatalogue()).byPath.get(`/${parsed.name}`)
             if (legacy?.filterValue) {

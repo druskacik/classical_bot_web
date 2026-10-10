@@ -1,5 +1,8 @@
 // Check every English/local alias before exposing a readable city identity.
 // This catalogue must include cities without concerts or coordinates too.
+export const cityDisplayName = (city, locale = 'en-GB') => city.display_name
+  || (locale === 'sk-SK' ? city.local_name || city.english_name : city.english_name)
+
 export function cityQueryValues(cities) {
   const aliases = new Map()
   const key = (name, country) => `${name.toLowerCase()},${country}`
