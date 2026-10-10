@@ -44,9 +44,18 @@ test('filter updates are atomic, reset pagination and clear city only for countr
 test('city and country navigation preserve dates/music and remove redundant location queries', () => {
   const preserved = { dateFrom: query.dateFrom, dateTo: query.dateTo, composers: 'Mozart', works: '42' }
   assert.deepEqual(concertCityLocation(query, { city_path: '/czechia/prague' }), { path: '/czechia/prague', query: preserved })
-  assert.deepEqual(concertCityLocation(query, { city: 'Vienna', country_code: 'AT' }), { path: '/', query: { ...preserved, country: 'AT', city: 'Vienna,AT' } })
+  assert.deepEqual(concertCityLocation(query, { city: 'Vienna', country_code: 'AT' }), { path: '/', query: { ...preserved, city: 'Vienna,AT' } })
   assert.deepEqual(concertCountryLocation(query, 'AT'), { path: '/austria', query: preserved })
   assert.deepEqual(concertCityLocation(query, { city: 'Unknown' }), { path: '/', query: { ...preserved, city: 'Unknown' } })
+})
+
+test('unresolved city links retain country-qualified names without a resolved-country filter', () => {
+  const concert = { id: 561268, city_id: null, city_path: null, city: 'Nové Město nad Metují', country_code: 'CZ' }
+  assert.deepEqual(concertCityLocation({}, concert), { path: '/', query: { city: 'Nové Město nad Metují,CZ' } })
+  assert.deepEqual(concertCityLocation({ ...query, country: 'AT', nearLat: '48', nearLng: '16', radius: '50', bounds: '15,47,17,49' }, concert), {
+    path: '/',
+    query: { city: 'Nové Město nad Metují,CZ', dateFrom: query.dateFrom, dateTo: query.dateTo, composers: 'Mozart', works: '42' },
+  })
 })
 
 test('composer refinements preserve route and selections, deduplicate and reset page', () => {

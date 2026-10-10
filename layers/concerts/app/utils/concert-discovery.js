@@ -8,7 +8,8 @@ export const concertCityLocation = (query, concert) => ({
   // Fallback cities must leave fixed-location routes so their query takes effect.
   path: concert.city_path || '/',
   query: updateConcertQuery(query, {
-    country: concert.city_path ? undefined : concert.country_code,
+    // City values include their country; a separate country filter excludes unresolved events.
+    country: undefined,
     city: concert.city_path ? undefined : (concert.country_code ? `${concert.city},${concert.country_code}` : concert.city),
   }),
 })
