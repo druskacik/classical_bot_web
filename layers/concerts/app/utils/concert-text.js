@@ -10,6 +10,7 @@ const slovak = {
   "Full programme": "Celý program",
   "Done": "Hotovo",
   "Radius": "Okolie",
+  "Radius unavailable": "Okolie nie je dostupné",
   "Custom…": "Vlastné…",
   "Radius in km": "Okolie v km",
   "Set": "Nastaviť",

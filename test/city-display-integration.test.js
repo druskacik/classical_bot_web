@@ -155,9 +155,69 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
     assert.equal((await concerts({ query: { city: 'Athens,US' } })).total, 4)
   })
 
+  await t.test('unresolved suggestions use exact filter counts, country fallback and radius metadata', async () => {
+    await db('classical_concert').insert([
+      { city_raw: 'Nové Město nad Metují', country_code_raw: 'CZ' },
+      { city_raw: 'Nové Město nad Metují', country_code_resolved: 'CZ', country_code_raw: 'AT' },
+      { city_raw: 'NOVÉ MĚSTO NAD METUJÍ', country_code_raw: 'AT' },
+      { city_raw: 'Vienna', country_code_raw: 'AT' },
+      { city_raw: 'VIENNA', country_code_raw: 'AT' },
+      { city_raw: 'Athens', country_code_raw: 'US' },
+      { city_raw: 'Unlinked Slovak City', country_code_resolved: 'SK' },
+      { city_raw: 'No country' }, { city_raw: '   ', country_code_raw: 'CZ' },
+      { city_raw: 'Invalid country', country_code_raw: 'INVALID' },
+      { city_raw: 'Hidden rejected', country_code_raw: 'CZ', inclusion_status: 'rejected' },
+      { city_raw: 'Hidden duplicate', country_code_raw: 'CZ', duplicate_of_id: 1 },
+      { city_raw: 'Hidden past', country_code_raw: 'CZ', date: '2000-01-01' },
+    ])
+    const found = await options({ q: 'nove mesto nad metuji' })
+    assert.equal(found.length, 2)
+    const czech = found.find(item => item.country_code === 'CZ')
+    assert.equal(czech.value, 'Nové Město nad Metují,CZ')
+    assert.equal(czech.secondaryLabel, 'Czechia')
+    assert.equal(czech.count, 2)
+    assert.equal(czech.radiusAvailable, false)
+    assert.equal((await concerts({ query: { city: czech.value } })).total, czech.count)
+    assert.equal((await options({ q: 'nove', country: 'CZ' }))[0].count, 1, 'existing resolved-country scope remains unchanged')
+    for (const query of [{ q: 'hidden' }, { q: 'no country' }, { q: 'invalid country' }, { q: 'nove', composers: 'Austria Composer' }, { q: 'nove', works: '1' }, { q: 'nove', dateFrom: '2099-01-01' }]) assert.deepEqual(await options(query), [])
+    const selected = (await options({ q: 'Vienna', selected: czech.value, dateFrom: '2099-01-01' })).find(item => item.value === czech.value)
+    assert.equal(selected.count, 0)
+    assert.equal(selected.radiusAvailable, false)
+    const vienna = await options({ q: 'vienna' })
+    assert.equal(vienna.length, 1)
+    assert.equal(vienna[0].label, 'Vienna')
+    assert.equal(vienna[0].radiusAvailable, true)
+    const restored = await options({ q: 'vienna', selected: 'VIENNA,AT' })
+    assert.equal(restored.length, 1)
+    assert.equal(restored[0].value, 'VIENNA,AT')
+    const athens = await options({ q: 'athens' })
+    assert.equal(athens.find(item => item.value === 'Athens,US').radiusAvailable, false)
+    assert.equal(athens.find(item => item.value === '861').radiusAvailable, true)
+    assert.equal((await options({ selected: '6' })).find(item => item.value === '6').radiusAvailable, false)
+    for (const item of [...vienna, ...athens, ...found]) {
+      assert.equal(item.count, (await concerts({ query: { city: item.value } })).total, item.value)
+    }
+    assert.deepEqual((await origins({ query: { q: 'nove mesto' } })).items, [])
+    await assert.rejects(concerts({ query: { city: czech.value, radius: '25' } }), { statusCode: 400 })
+    const raw = Array.from({ length: 22 }, (_, i) => ({ city_raw: `Limit city ${String(i).padStart(2, '0')}`, country_code_raw: 'CZ' }))
+    await db('classical_concert').insert([...raw, ...Array.from({ length: 4 }, () => raw[21])])
+    const limited = await options({ q: 'Limit city' })
+    assert.equal(limited.length, 20)
+    assert.equal(limited[0].count, 5)
+    assert.equal(limited[0].value, 'Limit city 21,CZ')
+  })
+
   await t.test('Slovak site retains localization and country scope', async () => {
     Object.assign(site, { country: 'SK', locale: 'sk-SK', cityRoutes: 'local' })
     assert.deepEqual(await options({ q: 'Athens' }), [])
+    const unresolved = await options({ q: 'Unlinked Slovak' })
+    assert.equal(unresolved[0].value, 'Unlinked Slovak City,SK')
+    assert.equal(unresolved[0].radiusAvailable, false)
+    assert.deepEqual(await options({ q: 'nove' }), [])
+    assert.deepEqual(await options({ selected: 'Nové Město nad Metují,CZ' }), (await options({})))
+    const restored = await options({ selected: 'Unlinked Slovak City,SK', dateFrom: '2099-01-01' })
+    assert.equal(restored[0].count, 0)
+    assert.equal(restored[0].radiusAvailable, false)
     assert.equal((await options({ q: 'Bratislava' }))[0].label, 'Bratislava')
     assert.deepEqual((await origins({ query: { q: 'Athens', selected: '861' } })).items, [])
     assert.equal((await concerts({ query: { city: '861' } })).total, 0)

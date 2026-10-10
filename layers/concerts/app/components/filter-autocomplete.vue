@@ -46,7 +46,7 @@
       >
       </div>
       <div v-if="$slots.trailing" class="shrink-0" @focusin="closeOptions">
-        <slot name="trailing" />
+        <slot name="trailing" :selected-options="selectedOptions" :loading="loading" :error="loadError" />
       </div>
     </div>
 

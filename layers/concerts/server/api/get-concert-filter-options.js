@@ -1,6 +1,6 @@
 import { firstQueryValue as first, querySelections } from '../../shared/utils/concert-query.js'
 import { getAreaCities } from '../utils/area-cities.js'
-import { resolveArea } from '../utils/concert-area.js'
+import { resolveArea, matchingAreaCities } from '../utils/concert-area.js'
 import { concertFilterCacheInput } from '../utils/data-cache-keys.js'
 import { cachedConcertData } from '../utils/concert-data-cache.js'
 import { concertSite } from '#concert-site'
@@ -56,43 +56,73 @@ export default defineEventHandler(async (event) => {
         const cities = await knex('city').select('id', 'english_name', 'local_name', 'display_name', 'country_code')
           .modify(query => { if (concertSite.country) query.where('country_code', concertSite.country) })
         const values = cityQueryValues(cities)
-        const byId = new Map(cities.map(city => [String(city.id), city]))
-        const label = city => cityDisplayName(city, concertSite.locale)
-        const candidates = cities.filter(city => (!context.country || city.country_code === context.country)
-          && (!search || [city.english_name, city.local_name, city.display_name].some(name => containsNormalizedText(name, search))))
-        const counts = await base().whereIn('canonical_city.id', candidates.map(city => city.id))
-          .select('canonical_city.id').countDistinct('cc.id as count').groupBy('canonical_city.id')
-        suggestions = counts.map(row => {
-          const city = byId.get(String(row.id))
-          return { value: values.get(String(city.id)), label: label(city), country_code: city.country_code, count: Number(row.count) }
-        }).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, concertSite.locale) || a.value.localeCompare(b.value)).slice(0, OPTION_LIMIT)
-        if (concertSite.cityRoutes === 'local') {
-          const unresolved = await base().whereNull('cc.city_id').whereNotNull('cc.city_raw')
-            .select(knex.raw("cc.city_raw || ',' || cc.country_code_resolved as value"), 'cc.city_raw as label', 'cc.country_code_resolved as country_code')
-            .countDistinct('cc.id as count').groupBy('cc.city_raw', 'cc.country_code_resolved')
-          suggestions = [...suggestions, ...unresolved.filter(city => !search || containsNormalizedText(city.label, search))]
-            .sort((a, b) => Number(b.count) - Number(a.count) || a.label.localeCompare(b.label, 'sk')).slice(0, OPTION_LIMIT)
+        const [counts, rawCounts, coordinateCities] = await Promise.all([
+          base().whereNotNull('canonical_city.id').select('canonical_city.id')
+            .countDistinct('cc.id as count').groupBy('canonical_city.id'),
+          base().whereNull('cc.city_id').whereNotNull('cc.city_raw')
+            .select(knex.raw('LOWER(cc.city_raw) as name'), knex.raw('MIN(cc.city_raw) as label'),
+              knex.raw('COALESCE(cc.country_code_resolved, cc.country_code_raw) as country_code'))
+            .countDistinct('cc.id as count')
+            .groupByRaw('LOWER(cc.city_raw), COALESCE(cc.country_code_resolved, cc.country_code_raw)'),
+          getAreaCities(),
+        ])
+        const located = coordinateCities.filter(city => !concertSite.country || city.country_code === concertSite.country)
+        const radiusAvailable = value => matchingAreaCities(located, value).length === 1
+        const key = (name, country) => `${name},${country}`.toLowerCase()
+        const byId = new Map(counts.map(row => [String(row.id), Number(row.count)]))
+        const byName = new Map()
+        // A readable filter includes every canonical English/local alias, but
+        // an unlinked concert matches only its literal raw name and country.
+        for (const city of cities) {
+          for (const name of new Set([city.english_name, city.local_name].filter(Boolean).map(name => name.toLowerCase()))) {
+            const identity = key(name, city.country_code)
+            byName.set(identity, (byName.get(identity) || 0) + (byId.get(String(city.id)) || 0))
+          }
         }
+        for (const row of rawCounts) {
+          const identity = key(row.name, row.country_code)
+          byName.set(identity, (byName.get(identity) || 0) + Number(row.count))
+        }
+        const options = new Map()
+        const add = option => {
+          if (option.count > 0 && option.value.length <= 160) options.set(option.value.toLowerCase(), option)
+        }
+        for (const row of rawCounts) {
+          // Only offer values that parse into the same exact name/country.
+          if (!row.label.trim() || row.label !== row.label.trim() || !/^[A-Z]{2}$/.test(row.country_code || '')) continue
+          if (search && !containsNormalizedText(row.label, search)) continue
+          const value = `${row.label},${row.country_code}`
+          add({ value, label: row.label, country_code: row.country_code, count: byName.get(key(row.name, row.country_code)) })
+        }
+        for (const city of cities) {
+          if (context.country && city.country_code !== context.country) continue
+          const value = values.get(String(city.id))
+          const identity = value.toLowerCase()
+          // Prefer the reviewed label even when the raw name supplied the search match.
+          if (!options.has(identity) && search && ![city.english_name, city.local_name, city.display_name].some(name => containsNormalizedText(name, search))) continue
+          add({ value, label: cityDisplayName(city, concertSite.locale), country_code: city.country_code,
+            count: /^\d+$/.test(value) ? byId.get(String(city.id)) || 0 : byName.get(identity) || 0 })
+        }
+        suggestions = [...options.values()]
+          .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, concertSite.locale) || a.value.localeCompare(b.value))
+          .slice(0, OPTION_LIMIT).map(option => ({ ...option, radiusAvailable: radiusAvailable(option.value) }))
         for (const value of selected) {
           const parsed = parseCity(value)
+          if (concertSite.country && parsed?.country && parsed.country !== concertSite.country) continue
           const matches = cities.filter(city => parsed?.id ? Number(city.id) === parsed.id :
             (!parsed?.country || city.country_code === parsed.country) &&
             [city.english_name, city.local_name].some(name => name?.toLowerCase() === parsed?.name?.toLowerCase()))
+          if (concertSite.country && parsed?.id && !matches.length) continue
           const city = matches.length === 1 ? matches[0] : null
-          if (city) {
-            const row = await applyFilters(knex('classical_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), { ...context, city: parsed }).countDistinct('cc.id as count').first()
-            labels.push({ value, label: label(city), country_code: city.country_code, count: Number(row.count) })
-          } else if (matches.length > 1) {
-            const row = await applyFilters(knex('classical_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), { ...context, city: parsed }).countDistinct('cc.id as count').first()
-            labels.push({ value, label: parsed.name, country_code: parsed.country || (new Set(matches.map(city => city.country_code)).size === 1 ? matches[0].country_code : undefined), count: Number(row.count) })
-          } else if (!concertSite.country) labels.push({ value, label: parsed?.name || value, country_code: parsed?.country })
-          else if (parsed?.name && (!parsed.country || parsed.country === concertSite.country)) {
-            const legacy = (await getCityCatalogue()).byPath.get(`/${parsed.name}`)
-            if (legacy?.filterValue) {
-              const row = await applyFilters(knex('classical_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), { ...context, city: parsed }).countDistinct('cc.id as count').first()
-              labels.push({ value, label: legacy.name, country_code: concertSite.country, count: Number(row.count) })
-            }
-          }
+          const row = await applyFilters(knex('classical_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), { ...context, city: parsed }).countDistinct('cc.id as count').first()
+          const option = { value, label: city ? cityDisplayName(city, concertSite.locale) : parsed?.name || value,
+            country_code: city?.country_code || parsed?.country || concertSite.country
+              || (new Set(matches.map(city => city.country_code)).size === 1 ? matches[0].country_code : undefined),
+            count: Number(row.count), radiusAvailable: radiusAvailable(value) }
+          // Keep the selected spelling so the control can restore its exact value,
+          // without showing a second suggestion for a case-only variant.
+          suggestions = suggestions.filter(item => item.value.toLowerCase() !== value.toLowerCase())
+          labels.push(option)
         }
       } else {
         const music = builder => type === 'composer'

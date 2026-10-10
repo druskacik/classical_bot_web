@@ -18,22 +18,22 @@ function mount(props) {
 test('inline radius defaults to city only; custom edits require an explicit valid submission', async () => {
   const view = mount({ city: '2', radius: 0 })
   assert.equal(view.state.custom.value, false)
-  await view.state.choose('100')
+  await view.state.choose('100', true)
   assert.deepEqual(view.emitted.pop(), ['change', { city: '2', radius: 100 }])
-  await view.state.choose('custom')
+  await view.state.choose('custom', true)
   assert.equal(view.emitted.length, 0)
-  for (const value of ['', '-1', '501', '1.5', 'bad']) { view.state.draft.value = value; view.state.apply() }
+  for (const value of ['', '-1', '501', '1.5', 'bad']) { view.state.draft.value = value; view.state.apply(true) }
   assert.equal(view.emitted.length, 0)
   view.state.draft.value = '75'
-  view.state.apply()
+  view.state.apply(true)
   assert.deepEqual(view.emitted.pop(), ['change', { city: '2', radius: 75 }])
   assert.equal(view.state.custom.value, false, 'saved values return to the radius pill')
-  await view.state.choose('custom')
+  await view.state.choose('custom', true)
   view.state.draft.value = '42'
   view.state.cancel()
   assert.equal(view.state.custom.value, false)
   assert.equal(view.emitted.length, 0, 'Escape discards the unsubmitted value')
-  await view.state.choose('0')
+  await view.state.choose('0', true)
   assert.deepEqual(view.emitted.pop(), ['change', { city: '2', radius: 0 }])
   view.state.changeCity([])
   assert.deepEqual(view.emitted.pop(), ['change', { city: null, radius: 0 }])
@@ -71,4 +71,64 @@ test('choosing a new city starts an exact-city search even when the previous cit
   view.state.changeCity(['25'])
   assert.deepEqual(view.emitted.pop(), ['change', { city: '25', radius: 0 }])
   view.unmount()
+})
+
+
+test('radius expansion requires current matching metadata and never reuses another city', async () => {
+  const props = Vue.reactive({ city: '2', radius: 0 })
+  const view = mount(props)
+  try {
+    const options = [{ value: '2', radiusAvailable: true }, { value: 'Unknown,SK', radiusAvailable: false }]
+    assert.equal(view.state.available(options, false, false), true)
+    for (const [loading, error] of [[true, false], [false, true]]) assert.equal(view.state.available(options, loading, error), false)
+    props.city = 'Unknown,SK'
+    assert.equal(view.state.available(options, false, false), false)
+    assert.equal(view.state.available([], false, false), false)
+    await view.state.choose('25', false)
+    await view.state.choose('custom', false)
+    view.state.draft.value = '25'
+    view.state.apply(false)
+    assert.deepEqual(view.emitted, [])
+    view.state.changeCity(['Unknown,SK'])
+    assert.deepEqual(view.emitted.pop(), ['change', { city: 'Unknown,SK', radius: 0 }])
+  } finally { view.unmount() }
+})
+
+test('rendered radius follows autocomplete metadata across reload, failure and selection changes', async () => {
+  const requests = []
+  const autocomplete = compileComponent('../layers/concerts/app/components/filter-autocomplete.vue', {
+    $fetch: (_url, { params }) => new Promise((resolve, reject) => requests.push({ params, resolve, reject })),
+    document: { addEventListener() {}, removeEventListener() {}, getElementById() {} },
+  }, { inlineTemplate: true })
+  const radius = compileComponent('../layers/concerts/app/components/city-radius.vue', {}, { inlineTemplate: true })
+  const props = Vue.reactive({ city: 'Nové Město nad Metují,CZ', radius: 0 })
+  const root = { children: [] }
+  const app = renderer.createApp({ render: () => Vue.h(radius, props) })
+  app.component('FilterAutocomplete', autocomplete)
+  app.component('UIcon', { render: () => null })
+  const find = (node, tag) => node.tag === tag ? node : node.children?.map(child => find(child, tag)).find(Boolean)
+  const flush = async () => { await Promise.resolve(); await Vue.nextTick(); await Vue.nextTick() }
+  app.mount(root)
+  try {
+    assert.equal(find(root, 'select').props.disabled, true)
+    requests.at(-1).resolve({ items: [{ value: props.city, label: 'Nové Město nad Metují', radiusAvailable: false }] })
+    await flush()
+    assert.equal(find(root, 'select').props.disabled, true)
+    assert.ok(find(root, 'select').props['aria-describedby'])
+    props.city = 'Prague,CZ'
+    await flush()
+    assert.equal(find(root, 'select').props.disabled, true)
+    requests.at(-1).resolve({ items: [{ value: props.city, label: 'Prague', radiusAvailable: true }] })
+    await flush()
+    assert.equal(find(root, 'select').props.disabled, false)
+    assert.equal(find(root, 'select').props['aria-describedby'], undefined)
+    props.city = 'Unknown,CZ'
+    await flush()
+    requests.at(-1).reject(new Error('Unavailable'))
+    await flush()
+    assert.equal(find(root, 'select').props.disabled, true)
+    props.city = null
+    await flush()
+    assert.equal(find(root, 'select').props.disabled, true)
+  } finally { app.unmount() }
 })

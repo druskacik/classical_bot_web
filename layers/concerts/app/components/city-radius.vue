@@ -1,8 +1,8 @@
 <template>
   <FilterAutocomplete compact type="city" :context="context" :country="country" :label="t('City')" :placeholder="t('Any city')" :model-value="city ? [city] : []" @update:model-value="changeCity">
-    <template #trailing>
-      <div class="shrink-0" :title="help">
-        <form v-if="custom && city" class="flex h-8 items-center gap-1 rounded-full bg-primary/10 pl-2.5 pr-1 text-xs text-primary" @submit.prevent="apply" @keydown.esc.stop.prevent="cancel">
+    <template #trailing="{ selectedOptions, loading, error }">
+      <div class="shrink-0" :title="available(selectedOptions, loading, error) ? help : city ? t('Radius unavailable') : help">
+        <form v-if="custom && available(selectedOptions, loading, error)" class="flex h-8 items-center gap-1 rounded-full bg-primary/10 pl-2.5 pr-1 text-xs text-primary" @submit.prevent="apply(available(selectedOptions, loading, error))" @keydown.esc.stop.prevent="cancel">
           <input :id="`${id}-custom`" ref="customInput" v-model="draft" :aria-label="t('Radius in km')" type="number" min="0" max="500" step="1" required class="radius-number w-12 min-w-0 bg-transparent text-right tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-primary" @keydown.enter.stop>
           <span aria-hidden="true">km</span>
           <button type="submit" :disabled="!valid" :aria-label="t('Set')" class="flex size-7 items-center justify-center rounded-full hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40"><UIcon name="i-lucide-check" class="size-4" /></button>
@@ -12,7 +12,7 @@
             + {{ radius || 0 }} km
             <span class="size-3" />
           </span>
-          <select :id="id" ref="control" :aria-label="t('Radius')" :value="String(radius || 0)" :disabled="!city" class="absolute inset-0 size-full appearance-none cursor-pointer rounded-full border-0 bg-primary/10 pl-2.5 pr-6 text-xs text-primary outline-none hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default disabled:bg-gray-100 disabled:text-gray-500" @change="choose($event.target.value)">
+          <select :id="id" ref="control" :aria-label="t('Radius')" :aria-describedby="city && !available(selectedOptions, loading, error) ? `${id}-unavailable` : undefined" :value="String(radius || 0)" :disabled="!available(selectedOptions, loading, error)" class="absolute inset-0 size-full appearance-none cursor-pointer rounded-full border-0 bg-primary/10 pl-2.5 pr-6 text-xs text-primary outline-none hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default disabled:bg-gray-100 disabled:text-gray-500" @change="choose($event.target.value, available(selectedOptions, loading, error))">
             <option value="0">+ 0 km</option>
             <option v-for="km in presets" :key="km" :value="String(km)">+ {{ km }} km</option>
             <option v-if="radius > 0 && !presets.includes(radius)" :value="String(radius)">+ {{ radius }} km</option>
@@ -20,6 +20,7 @@
           </select>
           <UIcon name="i-lucide-chevron-down" class="pointer-events-none absolute right-2.5 size-3" :class="city ? 'text-primary' : 'text-gray-500'" />
         </div>
+        <span v-if="city && !available(selectedOptions, loading, error)" :id="`${id}-unavailable`" class="sr-only">{{ t('Radius unavailable') }}</span>
       </div>
     </template>
   </FilterAutocomplete>
@@ -40,14 +41,16 @@ const draft = ref(String(props.radius || 0))
 const valid = computed(() => draft.value !== '' && Number.isInteger(Number(draft.value)) && Number(draft.value) >= 0 && Number(draft.value) <= 500)
 watch(() => props.radius, radius => { draft.value = String(radius || 0); custom.value = false })
 const changeCity = values => { custom.value = false; emit('change', { city: values.at(-1) || null, radius: 0 }) }
-const choose = async value => {
+const available = (options, loading, error) => !loading && !error && options.some(option => String(option.value) === props.city && option.radiusAvailable === true)
+const choose = async (value, canExpand) => {
+  if (!canExpand) return
   custom.value = value === 'custom'
   if (custom.value) { draft.value = String(props.radius || 0); await nextTick(); customInput.value?.focus(); customInput.value?.select() }
   else emit('change', { city: props.city, radius: Number(value) })
 }
 const restoreFocus = () => nextTick(() => control.value?.focus())
 const cancel = () => { custom.value = false; draft.value = String(props.radius || 0); restoreFocus() }
-const apply = () => { if (props.city && valid.value) { custom.value = false; emit('change', { city: props.city, radius: Number(draft.value) }); restoreFocus() } }
+const apply = canExpand => { if (canExpand && props.city && valid.value) { custom.value = false; emit('change', { city: props.city, radius: Number(draft.value) }); restoreFocus() } }
 defineExpose({ focusRadius: () => control.value?.focus() })
 </script>
 
