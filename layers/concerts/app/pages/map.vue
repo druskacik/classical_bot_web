@@ -22,8 +22,8 @@
           <option value="any">{{ t('Any upcoming date') }}</option><option value="today">{{ t('Today') }}</option><option value="week">{{ t('This week') }}</option><option value="weekend">{{ t('This weekend') }}</option><option value="custom">{{ t('Custom dates') }}</option>
         </select>
       </label>
-      <FilterAutocomplete type="composer" :label="t('Composer')" :placeholder="t('Search composers')" :show-count="false" :context="musicContext" :model-value="composers" @update:model-value="setFilter('composers', $event)" />
-      <FilterAutocomplete type="work" :label="t('Work')" :placeholder="t('Search works or composers')" :show-count="false" :context="musicContext" :model-value="works" @update:model-value="setFilter('works', $event)" />
+      <FilterAutocomplete type="composer" :label="t('Composer')" :placeholder="t('Search composers')" :show-count="false" :context="filterContext" :model-value="composers" @update:model-value="setFilter('composers', $event)" />
+      <FilterAutocomplete type="work" :label="t('Work')" :placeholder="t('Search works or composers')" :show-count="false" :context="filterContext" :model-value="works" @update:model-value="setFilter('works', $event)" />
       <div v-if="dateMode === 'custom'" class="col-span-full flex flex-wrap gap-4 text-sm">
         <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('From') }} <input type="date" :value="concertQuery.dateFrom || ''" :max="concertQuery.dateTo || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="updateDate('dateFrom', $event.target.value)"></label>
         <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('To') }} <input type="date" :value="concertQuery.dateTo || ''" :min="concertQuery.dateFrom || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="updateDate('dateTo', $event.target.value)"></label>
@@ -88,7 +88,7 @@
 definePageMeta({ layout: 'map' })
 import { useConcertMapNavigation } from '../composables/useConcertMapNavigation.js'
 import { useConcertDateFilter } from '../composables/useConcertDateFilter.js'
-import { querySelections as values, musicQuery } from '../../shared/utils/concert-query.js'
+import { querySelections as values, musicQuery, mapFilterQuery } from '../../shared/utils/concert-query.js'
 import { useConcertQuery } from '../composables/useConcertQuery.js'
 import { concertCalendarDate } from '../utils/concert-dates.js'
 const { t, locale } = useConcertText()
@@ -132,8 +132,9 @@ watch(filtersOpen, async open => {
 })
 const programmePanel = ref(null)
 const musicContext = computed(() => musicQuery(concertQuery.value))
+const filterContext = computed(() => mapFilterQuery(concertQuery.value))
 const hasMusicDates = computed(() => Object.keys(musicContext.value).length > 0)
-const mapRequest = useAsyncData(computed(() => `map:${JSON.stringify(musicContext.value)}`), () => $fetch('/api/get-concert-map', { params: musicContext.value }))
+const mapRequest = useAsyncData(computed(() => `map:${JSON.stringify(filterContext.value)}`), () => $fetch('/api/get-concert-map', { params: filterContext.value }))
 const { data: mapData, status: mapStatus, refresh: refreshMap } = mapRequest
 const navigation = useConcertMapNavigation(queryController, mapData, origin => $fetch('/api/get-area-cities', { params: { origin } }))
 const { selectionQuery, hasSelection, cityQuery, jumpCity, focus, selectedCity, selectedName, bounds, page, listParams, listLocation, moveMap, setFilter, setPage } = navigation

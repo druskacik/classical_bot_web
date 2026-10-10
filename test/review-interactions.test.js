@@ -240,3 +240,49 @@ test('fixed-city radius requests use the page origin and omit the exact-country 
     } finally { view.unmount() }
   }
 })
+
+test('map page sends country to markers and programme and exposes it to music facets', async () => {
+  const requests = []
+  const route = Vue.reactive({ query: { country: 'CZ', bounds: '10,40,20,55', composers: 'Bach' } })
+  const view = await mount('../layers/concerts/app/pages/map.vue', {}, route, async (url, { params }) => {
+    requests.push({ url, params })
+    return { items: [], total: 0 }
+  })
+  try {
+    for (const request of view.dataRequests) await request.handler()
+    assert.deepEqual(requests, [
+      { url: '/api/get-concert-map', params: { country: 'CZ', composers: 'Bach' } },
+      { url: '/api/get-concerts', params: { country: 'CZ', composers: 'Bach', bounds: '10,40,20,55', page: 1 } },
+    ])
+    assert.deepEqual(view.state.filterContext.value, { country: 'CZ', composers: 'Bach' })
+    const key = Vue.unref(view.dataRequests[0].key)
+    route.query = { ...route.query, country: 'AT' }
+    assert.notEqual(Vue.unref(view.dataRequests[0].key), key)
+    assert.equal(view.state.filterContext.value.country, 'AT')
+    route.query = { country: 'CZ' }
+    assert.equal(view.state.hasMusicDates.value, false, 'country alone does not enable the music/date reset button')
+  } finally { view.unmount() }
+})
+
+test('cross-country city jump updates marker and programme requests together', async () => {
+  for (const cityQuery of ['Vienna,AT', '25']) {
+    const route = Vue.reactive({ query: { country: 'CZ', bounds: '10,40,20,55', composers: 'Bach' } })
+    const requests = []
+    const view = await mount('../layers/concerts/app/pages/map.vue', {}, route, async (url, { params }) => {
+      requests.push({ url, params })
+      return { items: [], total: 0 }
+    })
+    try {
+      const oldKey = Vue.unref(view.dataRequests[0].key)
+      view.state.jump({ value: '25', label: 'Vienna', country_code: 'AT', cityQuery })
+      await Vue.nextTick()
+      for (const request of view.dataRequests) await request.handler()
+      assert.deepEqual(requests, [
+        { url: '/api/get-concert-map', params: { composers: 'Bach' } },
+        { url: '/api/get-concerts', params: { composers: 'Bach', city: cityQuery, page: 1 } },
+      ])
+      assert.notEqual(Vue.unref(view.dataRequests[0].key), oldKey)
+      assert.deepEqual(view.state.filterContext.value, { composers: 'Bach' })
+    } finally { view.unmount() }
+  }
+})

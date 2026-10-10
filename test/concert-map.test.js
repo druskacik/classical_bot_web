@@ -39,3 +39,12 @@ test('world-copy positions and cluster centres stay near the date line', () => {
   assert.equal(Math.abs(group.longitude), 180)
   assert.equal(group.count, 5)
 })
+
+test('map request context includes country and music but leaves selection to the programme', async () => {
+  const { mapFilterQuery } = await import('../layers/concerts/shared/utils/concert-query.js')
+  const query = { country: 'CZ', city: 'Prague,CZ', bounds: '10,40,20,55', page: '3', datePreset: 'custom', dateFrom: '2026-10-01', composers: 'Bach', works: '12' }
+  assert.deepEqual(mapFilterQuery(query), { country: 'CZ', dateFrom: '2026-10-01', composers: 'Bach', works: '12' })
+  const cz = parseConcertFilters(mapFilterQuery(query))
+  const at = parseConcertFilters(mapFilterQuery({ ...query, country: 'AT' }))
+  assert.notDeepEqual(concertFilterCacheInput(cz), concertFilterCacheInput(at))
+})

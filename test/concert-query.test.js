@@ -72,3 +72,10 @@ test('radius-only fixed-city links retain their route origin, pagination, filter
     assert.equal(middleware(location), undefined)
   }
 })
+
+test('map middleware preserves country scope on direct links and reloads', () => {
+  const location = { path: '/map', query: { country: 'CZ', bounds: '10,40,20,55' }, hash: '' }
+  assert.equal(middleware(location), undefined)
+  const normalized = middleware({ ...location, query: { ...location.query, page: '1' } })
+  assert.deepEqual(normalized.location, location)
+})

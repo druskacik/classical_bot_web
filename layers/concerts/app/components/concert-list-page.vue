@@ -34,7 +34,7 @@
         </p>
         <div class="flex w-full flex-wrap items-center gap-x-6 gap-y-1 sm:ml-auto sm:w-auto sm:justify-end">
           <slot name="alerts" :criteria="requestParams" />
-          <NuxtLink :to="concertMapLocation(concertQuery, filters.city)" class="inline-flex min-h-11 shrink-0 items-center gap-2 text-sm text-primary hover:underline"><UIcon name="i-lucide-map" class="size-4" />{{ t('Map') }}</NuxtLink>
+          <NuxtLink :to="concertMapLocation(concertQuery, filters.city, filters.country)" class="inline-flex min-h-11 shrink-0 items-center gap-2 text-sm text-primary hover:underline"><UIcon name="i-lucide-map" class="size-4" />{{ t('Map') }}</NuxtLink>
         </div>
       </div>
 

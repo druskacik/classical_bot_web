@@ -104,14 +104,14 @@ export const applyFilters = (builder, filters) => {
     }
     builder.where((cityFilter) => {
       cityFilter
-        .whereILike('canonical_city.english_name', filters.city.name)
-        .orWhereILike('canonical_city.local_name', filters.city.name)
+        .whereRaw('LOWER(??) = LOWER(?)', ['canonical_city.english_name', filters.city.name])
+        .orWhereRaw('LOWER(??) = LOWER(?)', ['canonical_city.local_name', filters.city.name])
       if (filters.city.country) {
         cityFilter.orWhere(unresolvedCity => unresolvedCity
           .whereNull('cc.city_id')
-          .whereILike('cc.city_raw', filters.city.name))
+          .whereRaw('LOWER(??) = LOWER(?)', ['cc.city_raw', filters.city.name]))
       } else {
-        cityFilter.orWhereILike('cc.city_raw', filters.city.name)
+        cityFilter.orWhereRaw('LOWER(??) = LOWER(?)', ['cc.city_raw', filters.city.name])
       }
     })
   }

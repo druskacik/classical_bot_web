@@ -35,3 +35,6 @@ export function updateConcertQuery(input, changes, { resetPage = true, clearBoun
     ...(resetPage ? { page: undefined } : {}),
   })
 }
+
+// Filters shared by map markers, programme results, and music facets.
+export const mapFilterQuery = query => cleanConcertQuery({ country: query.country, ...musicQuery(query) })

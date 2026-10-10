@@ -1,6 +1,6 @@
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { mapSelectionQuery, mapListLocation } from '../utils/concert-discovery.js'
-import { firstQueryValue as first, clearLocationQuery, musicQuery } from '../../shared/utils/concert-query.js'
+import { firstQueryValue as first, clearLocationQuery, mapFilterQuery } from '../../shared/utils/concert-query.js'
 import { parseMapBounds } from '../../shared/utils/concert-map.js'
 
 // Public filters stay in the route; resolved IDs are only marker identity.
@@ -15,7 +15,7 @@ export function useConcertMapNavigation({ query: concertQuery, update }, mapData
   const resolvingOrigin = ref(Boolean(concertQuery.value.city))
   const bounds = computed(() => { try { return parseMapBounds(first(concertQuery.value.bounds)) ? first(concertQuery.value.bounds) : null } catch { return null } })
   const page = computed(() => Math.max(1, Number(first(concertQuery.value.page)) || 1))
-  const musicContext = computed(() => musicQuery(concertQuery.value))
+  const filterContext = computed(() => mapFilterQuery(concertQuery.value))
   const cityQueryValue = city => city?.cityQuery || String(city?.id || city?.value || '')
   const resolvedQuery = ref(null)
   const matchesCityQuery = (city, value) => city && value && (String(city.id) === value || (city === resolvedOrigin.value && resolvedQuery.value === value))
@@ -29,7 +29,7 @@ export function useConcertMapNavigation({ query: concertQuery, update }, mapData
   const listParams = computed(() => {
     const selection = selectionQuery.value
     if (!Object.keys(selection).length && !bounds.value) return null
-    return { ...musicContext.value, ...(Object.keys(selection).length ? selection : { bounds: bounds.value }), page: page.value }
+    return { ...filterContext.value, ...(Object.keys(selection).length ? selection : { bounds: bounds.value }), page: page.value }
   })
   const listLocation = computed(() => mapListLocation(concertQuery.value))
   const navigate = (changes, replace = false) => {
@@ -54,7 +54,12 @@ export function useConcertMapNavigation({ query: concertQuery, update }, mapData
     jumpCity.value = city.id
     resolvedOrigin.value = city
     resolvedQuery.value = cityQueryValue(city)
-    return navigate({ ...clearSelection, city: resolvedQuery.value })
+    // Autocomplete uses country_code; map markers use country. Use metadata
+    // rather than the public city value, which may be a numeric ID.
+    const country = city.country_code || city.country
+    const outsideCountry = country && concertQuery.value.country
+      && country.toUpperCase() !== concertQuery.value.country.toUpperCase()
+    return navigate({ ...clearSelection, ...(outsideCountry ? { country: undefined } : {}), city: resolvedQuery.value })
   }
   const jump = city => {
     const selected = { ...city, id: String(city.value), name: city.label }

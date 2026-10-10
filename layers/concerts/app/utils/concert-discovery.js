@@ -90,15 +90,15 @@ export const cityRadiusLocation = (query, city, radius = 0) => ({
 
 // Marker identity stays separate from the public city filter.
 export const mapSelectionQuery = input => selectionQuery(normalizeConcertQuery(input))
-export const normalizeMapQuery = input => serializeConcertQuery({ ...normalizeConcertQuery(input), country: undefined })
-export const concertMapLocation = (query, city) => ({
-  path: '/map', query: normalizeMapQuery({ ...query, city: city || undefined, page: undefined }),
+export const normalizeMapQuery = input => serializeConcertQuery(normalizeConcertQuery(input))
+export const concertMapLocation = (query, city, country = query.country) => ({
+  path: '/map', query: normalizeMapQuery({ ...query, country: hasAreaQuery(query) ? undefined : country || undefined, city: city || undefined, page: undefined }),
 })
 export const mapListLocation = input => {
   const query = normalizeConcertQuery(input)
   const selection = selectionQuery(query)
   return { path: '/', query: serializeConcertQuery({
-    ...Object.fromEntries(['dateFrom', 'dateTo', 'datePreset', 'composers', 'works'].map(key => [key, query[key]])),
+    ...Object.fromEntries(['country', 'dateFrom', 'dateTo', 'datePreset', 'composers', 'works'].map(key => [key, query[key]])),
     ...(Object.keys(selection).length ? selection : { bounds: query.bounds }),
   }) }
 }

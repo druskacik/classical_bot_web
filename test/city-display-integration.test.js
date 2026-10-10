@@ -110,11 +110,58 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
     assert.deepEqual((await origins({ query: { origin: 'Athens,US' } })).items, [])
   })
 
+  await t.test('country scopes map markers, viewport programmes and music facets', async () => {
+    await db('composer').insert([{ id: 1, name: 'Austria Composer', normalized_name: 'austria composer' }, { id: 2, name: 'Slovakia Composer', normalized_name: 'slovakia composer' }])
+    await db('work').insert([{ id: 1, composer_id: 1, title: 'Austria Work', normalized_title: 'austria work' }, { id: 2, composer_id: 2, title: 'Slovakia Work', normalized_title: 'slovakia work' }])
+    for (const [city, music] of [[4, 1], [7, 2]]) {
+      const concert = await db('classical_concert').where('city_id', city).first()
+      await db('classical_concert_composer').insert({ classical_concert_id: concert.id, composer_id: music })
+      await db('classical_concert_work').insert({ classical_concert_id: concert.id, work_id: music })
+    }
+    for (const [country, city, music] of [['AT', '4', '1'], ['SK', '7', '2']]) {
+      assert.deepEqual((await map({ query: { country } })).items.map(c => c.id), [city])
+      const query = { country, bounds: '10,40,20,55' }
+      const result = await concerts({ query })
+      assert.equal(result.total, 1)
+      assert.equal(result.items[0].city_id, city)
+      assert.equal((await concerts({ query: { country, city } })).total, 1)
+      for (const type of ['composer', 'work']) {
+        const items = (await facets({ query: { country, type } })).items
+        assert.equal(items.length, 1)
+        assert.equal(String(items[0].value), type === 'work' ? music : country === 'AT' ? 'Austria Composer' : 'Slovakia Composer')
+      }
+    }
+    assert.equal((await concerts({ query: { city: 'Bratislava,SK', radius: '100' } })).total, 2, 'global radius crosses the Austria/Slovakia border')
+  })
+
+  await t.test('exact names treat wildcard and escape characters literally in canonical and raw cities', async () => {
+    assert.equal((await concerts({ query: { city: '%,US' } })).total, 0)
+    for (const [offset, name] of ['%', '_', 'Back\\Slash', 'MiXeD'].entries()) {
+      const id = 100 + offset
+      await db('city').insert({ id, english_name: name, local_name: `Local${name}`, country_code: 'CZ', latitude: 50, longitude: 14 })
+      await db('classical_concert').insert([
+        { city_id: id, city_raw: 'Different', country_code_resolved: 'CZ' },
+        { city_raw: name, country_code_raw: 'CZ' },
+        { city_raw: name, country_code_raw: 'AT' },
+        { city_id: 4, city_raw: name, country_code_resolved: 'AT' },
+      ])
+      for (const country of [',CZ', '']) {
+        assert.equal((await concerts({ query: { city: `${name.toLowerCase()}${country}` } })).total, country ? 2 : 4)
+        assert.equal((await concerts({ query: { city: `local${name.toLowerCase()}${country}` } })).total, 1)
+      }
+      assert.equal((await concerts({ query: { city: String(id) } })).total, 1)
+    }
+    assert.equal((await concerts({ query: { city: 'BackSlash,CZ' } })).total, 0)
+    assert.equal((await concerts({ query: { city: 'Athens,US' } })).total, 4)
+  })
+
   await t.test('Slovak site retains localization and country scope', async () => {
     Object.assign(site, { country: 'SK', locale: 'sk-SK', cityRoutes: 'local' })
     assert.deepEqual(await options({ q: 'Athens' }), [])
     assert.equal((await options({ q: 'Bratislava' }))[0].label, 'Bratislava')
     assert.deepEqual((await origins({ query: { q: 'Athens', selected: '861' } })).items, [])
     assert.equal((await concerts({ query: { city: '861' } })).total, 0)
+    assert.equal((await concerts({ query: { city: 'Bratislava,SK', radius: '100' } })).total, 1)
+    await assert.rejects(map({ query: { country: 'AT' } }), { statusCode: 400 })
   })
 })

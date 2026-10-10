@@ -216,3 +216,71 @@ test('failed origin lookup keeps the public selection usable and clearable', asy
     assert.equal(view.state.listParams.value.city, undefined)
   } finally { view.unmount() }
 })
+
+test('country scope survives map links, selection, viewport, pagination and history', async () => {
+  const music = { dateFrom: '2026-10-01', datePreset: 'custom', composers: 'Bach', works: '12' }
+  for (const original of [{ ...music, country: 'CZ', page: '3' }, { ...music, page: '3' }]) {
+    const location = discovery.concertMapLocation(original, null, 'CZ')
+    assert.deepEqual(location.query, { ...music, country: 'CZ' })
+    const route = Vue.reactive({ query: { ...location.query, bounds: '10,40,20,55' } })
+    const saved = { ...route.query }
+    const view = mount(null, null, route)
+    try {
+      await view.ready
+      assert.equal(view.state.listParams.value.country, 'CZ')
+      view.state.selectCity({ id: '1', name: 'Prague', cityQuery: 'Prague,CZ' })
+      assert.equal(view.state.listParams.value.city, 'Prague,CZ')
+      assert.equal(view.state.listParams.value.country, 'CZ')
+      view.state.setPage(2)
+      assert.equal(view.state.listParams.value.country, 'CZ')
+      assert.equal(view.state.listParams.value.page, 2)
+      view.state.clearCity()
+      view.state.moveMap('11,41,21,56')
+      await new Promise(resolve => setTimeout(resolve, 350))
+      assert.deepEqual(view.state.listLocation.value.query, { ...music, country: 'CZ', bounds: '11,41,21,56' })
+      assert.equal(route.query.page, undefined)
+      route.query = saved
+      await Vue.nextTick()
+      assert.equal(view.state.listParams.value.country, 'CZ')
+      assert.equal(view.state.listParams.value.bounds, saved.bounds)
+      view.state.resetFilters()
+      assert.equal(view.state.listParams.value.country, 'CZ')
+      assert.equal(view.state.listParams.value.composers, undefined)
+    } finally { view.unmount() }
+  }
+  const radius = discovery.concertMapLocation({ city: 'Prague,CZ', radius: '50' }, 'Prague,CZ', 'CZ')
+  assert.equal(radius.query.country, undefined)
+  assert.equal(discovery.mapListLocation(radius.query).query.country, undefined)
+})
+
+test('worldwide city jumps clear conflicting country for readable and numeric identities only', async () => {
+  for (const [country, cityQuery] of [['AT', 'Vienna,AT'], ['AT', '25'], ['CZ', 'Prague,CZ'], ['CZ', '1']]) {
+    for (const source of ['autocomplete', 'marker']) {
+      const saved = { country: 'cz', bounds: '10,40,20,55', page: '3', composers: 'Bach', works: '12', dateFrom: '2026-10-01', datePreset: 'custom' }
+      const route = Vue.reactive({ query: { ...saved } })
+      const view = mount(null, null, route)
+      try {
+        await view.ready
+        const id = country === 'AT' ? '25' : '1'
+        if (source === 'autocomplete') view.state.jump({ value: id, label: 'City', country_code: country, cityQuery })
+        else view.state.selectCity({ id, name: 'City', country, cityQuery })
+        const expectedCountry = country === 'CZ' ? 'cz' : undefined
+        assert.equal(route.query.country, expectedCountry)
+        assert.equal(route.query.city, cityQuery)
+        assert.equal(route.query.page, undefined)
+        assert.equal(view.state.listParams.value.country, expectedCountry)
+        assert.doesNotThrow(() => parseConcertFilters(view.state.listParams.value))
+        assert.deepEqual(view.state.listLocation.value.query, {
+          composers: 'Bach', works: '12', dateFrom: saved.dateFrom, datePreset: 'custom', city: cityQuery,
+          ...(expectedCountry ? { country: expectedCountry } : {}),
+        })
+        view.state.clearCity()
+        assert.equal(view.state.listParams.value.country, expectedCountry)
+        assert.equal(view.state.listParams.value.bounds, saved.bounds)
+        route.query = saved
+        await Vue.nextTick()
+        assert.equal(view.state.listParams.value.country, 'cz', 'history restores the original scope')
+      } finally { view.unmount() }
+    }
+  }
+})
