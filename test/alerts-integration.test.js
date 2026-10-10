@@ -299,4 +299,24 @@ test('multiple alerts and combined delivery against disposable PostgreSQL', {ski
     assert.deepEqual(selected.query,{city:'1',radius:'50'})
     await assert.rejects(()=>criteria(db,{bounds:'1,2,3,4'}))
   })
+  await reset()
+  await t.test('quoted composer alerts survive save, reload, duplicate detection and mocked delivery', async () => {
+    const { serializeComposerSelections } = await import('../layers/concerts/shared/utils/concert-query.js')
+    const name = 'Louis F. "Chip" Davis, Jr.'
+    await db('composer').insert({ id: 100, name })
+    const composers = serializeComposerSelections([name])
+    const first = await activate({ composers })
+    const saved = (await listAlerts(db, first.token)).alerts[0]
+    assert.equal(saved.criteria.composers, composers)
+    assert.ok(saved.summary.includes(name))
+    const duplicate = await saveAlert(db, first.token, { composers })
+    assert.equal(duplicate.duplicate, true)
+    assert.equal(duplicate.alertId, first.alertId)
+    const id = await add({ title: 'Quoted composer concert' })
+    await db('classical_concert_composer').insert({ classical_concert_id: id, composer_id: 100 })
+    assert.equal((await run()).accepted, 1)
+    assert.ok(messages.at(-1).text.includes(name))
+    assert.ok(messages.at(-1).text.includes('Quoted composer concert'))
+  })
+
 })

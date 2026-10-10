@@ -110,7 +110,7 @@ const { t, locale, plural } = useConcertText()
 import { concertMapLocation, cityRadiusLocation } from '../utils/concert-discovery.js'
 import { AREA_KEYS } from '../../shared/utils/concert-area.js'
 import { createConcertDateFormatting } from '../utils/concert-dates.js'
-import { firstQueryValue as firstValue, querySelections as listValue, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
+import { composerSelections, serializeComposerSelections, firstQueryValue as firstValue, querySelections as listValue, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
 import { useConcertQuery } from '../composables/useConcertQuery.js'
 const props = defineProps({
   title: { type: String, required: true },
@@ -134,7 +134,7 @@ const filters = computed(() => ({
   dateFrom: firstValue(concertQuery.value.dateFrom) || null,
   dateTo: firstValue(concertQuery.value.dateTo) || null,
   datePreset: firstValue(concertQuery.value.datePreset) || null,
-  composers: listValue(concertQuery.value.composers),
+  composers: composerSelections(concertQuery.value.composers),
   works: listValue(concertQuery.value.works),
   page: Number(firstValue(concertQuery.value.page)) || 1,
 }))
@@ -151,7 +151,7 @@ const requestParams = computed(() => ({
   city: unresolvedArea.value ? undefined : filters.value.city || undefined,
   dateFrom: filters.value.dateFrom || undefined,
   dateTo: filters.value.dateTo || undefined,
-  composers: filters.value.composers.length ? filters.value.composers.join(',') : undefined,
+  composers: filters.value.composers.length ? serializeComposerSelections(filters.value.composers) : undefined,
   works: filters.value.works.length ? filters.value.works.join(',') : undefined,
   page: filters.value.page > 1 ? filters.value.page : undefined,
 }))

@@ -84,7 +84,7 @@ const { t, locale, activeFilters } = useConcertText()
 import { useConcertDateFilter } from '../composables/useConcertDateFilter.js'
 import { clearAreaQuery } from '../../shared/utils/concert-area.js'
 
-import { hasCoordinateQuery } from '../../shared/utils/concert-query.js'
+import { serializeComposerSelections, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
 const props = defineProps({
   radius: { type: Number, default: 0 },
   bounds: { type: String, default: null },
@@ -111,7 +111,7 @@ const cityControl = ref(null)
 defineExpose({ editArea: () => cityControl.value?.focusRadius() })
 const musicId = useId()
 const musicExpanded = ref(Boolean(props.composers.length || props.works.length))
-watch(() => [props.composers.join(','), props.works.join(',')], () => {
+watch(() => [serializeComposerSelections(props.composers), props.works.join(',')], () => {
   if (props.composers.length || props.works.length) musicExpanded.value = true
 })
 const route = useRoute()
@@ -128,7 +128,7 @@ const optionContext = computed(() => ({
   }),
   dateFrom: props.dateFrom || undefined,
   dateTo: props.dateTo || undefined,
-  composers: props.composers.join(',') || undefined,
+  composers: serializeComposerSelections(props.composers) || undefined,
   works: props.works.join(',') || undefined,
 }))
 const cityContext = computed(() => ({ ...optionContext.value, ...clearAreaQuery(), radius: undefined, city: undefined }))

@@ -1,4 +1,4 @@
-import { serializeConcertQuery, updateConcertQuery } from '../../layers/concerts/shared/utils/concert-query.js'
+import { composerSelections, serializeComposerSelections, querySelections, serializeConcertQuery, updateConcertQuery } from '../../layers/concerts/shared/utils/concert-query.js'
 
 // Keep the dialog independent of both route state and the caller's saved object.
 export function alertDraft(criteria = {}) {
@@ -6,7 +6,7 @@ export function alertDraft(criteria = {}) {
   return serializeConcertQuery(Object.fromEntries(
     ['country', 'city', 'radius', 'nearLat', 'nearLng', 'dateFrom', 'dateTo', 'datePreset', 'composers', 'works']
       .filter(key => source[key] != null && source[key] !== '')
-      .map(key => [key, Array.isArray(source[key]) ? source[key].join(',') : String(source[key])]),
+      .map(key => [key, Array.isArray(source[key]) ? (key === 'composers' ? serializeComposerSelections(source[key]) : source[key].join(',')) : String(source[key])]),
   ))
 }
 
@@ -22,6 +22,6 @@ export function alertCityRadius(draft, { city, radius }) {
 export function hasAlertFilter(draft) {
   const text = key => typeof draft[key] === 'string' && draft[key].trim().length > 0
   return ['country', 'city', 'dateFrom', 'dateTo'].some(text)
-    || ['composers', 'works'].some(key => typeof draft[key] === 'string' && draft[key].split(',').some(value => value.trim()))
+    || composerSelections(draft.composers).length > 0 || querySelections(draft.works).length > 0
     || (text('nearLat') && text('nearLng') && text('radius'))
 }

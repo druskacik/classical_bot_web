@@ -1,3 +1,4 @@
+import { serializeComposerSelections } from '../layers/concerts/shared/utils/concert-query.js'
 import { compileComponent, renderer } from '../test-support/vue.js'
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -10,6 +11,7 @@ test('search feedback stays pending through debounce and ignores superseded resp
   t.mock.timers.enable({ apis: ['setTimeout'] })
   const requests = []
   const component = compileComponent('../layers/concerts/app/components/filter-autocomplete.vue', {
+    serializeComposerSelections,
     $fetch: (_url, { params }) => new Promise((resolve, reject) => requests.push({ params, resolve, reject })),
     useConcertText: () => ({ t: text => text, availableOptions: count => `${count} options available` }),
     document: { addEventListener() {}, removeEventListener() {}, getElementById() {} },
@@ -87,6 +89,7 @@ for (const type of ['composer', 'city', 'work', 'area-city']) {
     const requests = []
     const selections = []
     const component = compileComponent('../layers/concerts/app/components/filter-autocomplete.vue', {
+      serializeComposerSelections,
       $fetch: async (_url, { params }) => {
         requests.push({ ...params, endpoint: _url })
         return { items: [{ value: '1', label: 'Mozart' }] }
@@ -136,3 +139,30 @@ for (const type of ['composer', 'city', 'work', 'area-city']) {
     }
   })
 }
+
+
+test('selected composers are quoted in restoration requests while city values stay unchanged', async () => {
+  for (const [type, value, expected] of [
+    ['composer', 'Louis F. "Chip" Davis, Jr.', '"Louis F. ""Chip"" Davis, Jr."'],
+    ['city', 'Washington, D.C.,US', 'Washington, D.C.,US'],
+  ]) {
+    const requests = []
+    const component = compileComponent('../layers/concerts/app/components/filter-autocomplete.vue', {
+      serializeComposerSelections,
+      $fetch: async (_url, { params }) => {
+        requests.push(params)
+        return { items: [{ value, label: value, count: 2 }] }
+      },
+      document: { addEventListener() {}, removeEventListener() {}, getElementById() {} },
+    }, { inlineTemplate: true })
+    const root = { children: [] }
+    const app = renderer.createApp(component, { type, label: type, placeholder: 'Search', modelValue: [value] })
+    app.mount(root)
+    try {
+      await Vue.nextTick()
+      await Vue.nextTick()
+      assert.equal(requests[0].selected, expected)
+      assert.equal(find(root, 'span').children[0].text, value)
+    } finally { app.unmount() }
+  }
+})

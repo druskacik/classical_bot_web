@@ -215,6 +215,15 @@ geographic restrictions, URL identity, sitemap scope, and translations.
 With both servers running, `npm run test:sites` exercises pages and APIs on ports
 3000 and 3001 (override with `GLOBAL_SITE_URL` and `SLOVAK_SITE_URL`).
 
+Composer filters keep readable names. The `composers` query parameter uses
+CSV-style quoting: `Mozart,"Joseph Bologne, Chevalier de Saint-Georges"`
+represents two selections (shown before URL encoding). Names containing double
+quotes escape them by doubling: `"Louis F. ""Chip"" Davis, Jr."`.
+Use the shared `composerSelections` / `serializeComposerSelections` helpers
+for composer query values, including autocomplete restoration and alert drafts.
+Unquoted lists retain their existing meaning; malformed quoting falls back to
+legacy comma splitting. City values and numeric work lists use their existing syntax.
+
 The Slovak routes are `/`, `/<local city name>` (including accents and spaces),
 `/kontakt`, `/zdroje`, `/blog`, and `/blog/<slug>`. Known unresolved city names from
 historical Slovak concerts remain routable, such as `/Pezinok`; arbitrary and

@@ -1,3 +1,4 @@
+import { serializeComposerSelections } from '../layers/concerts/shared/utils/concert-query.js'
 import { compileComponent, renderer } from '../test-support/vue.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -97,6 +98,7 @@ test('radius expansion requires current matching metadata and never reuses anoth
 test('rendered radius follows autocomplete metadata across reload, failure and selection changes', async () => {
   const requests = []
   const autocomplete = compileComponent('../layers/concerts/app/components/filter-autocomplete.vue', {
+    serializeComposerSelections,
     $fetch: (_url, { params }) => new Promise((resolve, reject) => requests.push({ params, resolve, reject })),
     document: { addEventListener() {}, removeEventListener() {}, getElementById() {} },
   }, { inlineTemplate: true })

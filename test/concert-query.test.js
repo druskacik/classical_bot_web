@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { reactive } from 'vue'
-import { normalizeConcertQuery, serializeConcertQuery, updateConcertQuery, querySelections } from '../layers/concerts/shared/utils/concert-query.js'
+import { normalizeConcertQuery, serializeConcertQuery, updateConcertQuery, composerSelections, serializeComposerSelections, querySelections } from '../layers/concerts/shared/utils/concert-query.js'
 import { useConcertQuery } from '../layers/concerts/app/composables/useConcertQuery.js'
 import { parseConcertFilters } from '../layers/concerts/server/utils/concert-filters.js'
 
@@ -78,4 +78,30 @@ test('map middleware preserves country scope on direct links and reloads', () =>
   assert.equal(middleware(location), undefined)
   const normalized = middleware({ ...location, query: { ...location.query, page: '1' } })
   assert.deepEqual(normalized.location, location)
+})
+
+
+test('composer CSV round trips commas, quotes, multiple names and legacy inputs', () => {
+  const names = ['Mozart', 'Joseph Bologne, Chevalier de Saint-Georges', 'Louis F. "Chip" Davis, Jr.']
+  const encoded = 'Mozart,"Joseph Bologne, Chevalier de Saint-Georges","Louis F. ""Chip"" Davis, Jr."'
+  assert.equal(serializeComposerSelections(names), encoded)
+  assert.deepEqual(composerSelections(encoded), names)
+  assert.deepEqual(composerSelections([encoded, 'Ignored']), names)
+  assert.deepEqual(composerSelections('  Bach, , "Mozart" ,Bach,'), ['Bach', 'Mozart'])
+  assert.deepEqual(composerSelections('Louis F. "Chip" Davis'), ['Louis F. "Chip" Davis'])
+  assert.deepEqual(composerSelections('Joseph Bologne, Chevalier de Saint-Georges'), ['Joseph Bologne', 'Chevalier de Saint-Georges'])
+  for (const value of ['"Unclosed,Mozart', '"Closed"junk,Bach', '"Good, Name","Unclosed']) {
+    assert.deepEqual(composerSelections(value), querySelections(value))
+    const normalized = normalizeConcertQuery({ composers: value })
+    assert.deepEqual(normalizeConcertQuery(normalized), normalized)
+    assert.deepEqual(parseConcertFilters(normalized).composers, querySelections(value))
+  }
+  for (const values of [[], ['  ', ''], names, [...names, names[1]], ['A\nB', 'A"B', '"', ',', 'é, 漢字']]) {
+    const serialized = serializeComposerSelections(values)
+    assert.equal(serializeComposerSelections(composerSelections(serialized)), serialized)
+    assert.deepEqual(normalizeConcertQuery({ composers: serialized }), { composers: serialized })
+  }
+  assert.equal(updateConcertQuery({}, { composers: names }).composers, encoded)
+  assert.deepEqual(parseConcertFilters({ composers: encoded }).composers, names)
+  assert.deepEqual(querySelections('1,2,1'), ['1', '2'])
 })

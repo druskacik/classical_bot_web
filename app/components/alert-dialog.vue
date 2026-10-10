@@ -12,7 +12,7 @@
           <legend class="sr-only">Alert criteria</legend>
           <ConcertFilters :country="draft.country || null" :city="draft.city || null" :radius="Number(draft.radius) || 0" :area-query="draft"
             :date-from="draft.dateFrom || null" :date-to="draft.dateTo || null" :date-preset="draft.datePreset || null"
-            :composers="selections(draft.composers)" :works="selections(draft.works)"
+            :composers="composerSelections(draft.composers)" :works="selections(draft.works)"
             :countries="countries" :countries-loading="countriesLoading" :countries-error="countriesError"
             @update="update" @city-radius="changeCityRadius" @clear="draft = {}" @retry-countries="loadCountries" />
         </fieldset>
@@ -46,7 +46,7 @@
 
 <script setup>
 import { alertDraft, updateAlertDraft, alertCityRadius, hasAlertFilter } from '../utils/alert-draft.js'
-import { querySelections as selections } from '../../layers/concerts/shared/utils/concert-query.js'
+import { composerSelections, querySelections as selections } from '../../layers/concerts/shared/utils/concert-query.js'
 
 const props = defineProps({
   initialCriteria: { type: Object, default: () => ({}) },

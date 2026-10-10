@@ -88,7 +88,7 @@
 definePageMeta({ layout: 'map' })
 import { useConcertMapNavigation } from '../composables/useConcertMapNavigation.js'
 import { useConcertDateFilter } from '../composables/useConcertDateFilter.js'
-import { querySelections as values, musicQuery, mapFilterQuery } from '../../shared/utils/concert-query.js'
+import { composerSelections, querySelections as values, musicQuery, mapFilterQuery } from '../../shared/utils/concert-query.js'
 import { useConcertQuery } from '../composables/useConcertQuery.js'
 import { concertCalendarDate } from '../utils/concert-dates.js'
 const { t, locale } = useConcertText()
@@ -97,7 +97,7 @@ const route = useRoute()
 const router = useRouter()
 const queryController = useConcertQuery(route, router)
 const { query: concertQuery } = queryController
-const composers = computed(() => values(concertQuery.value.composers))
+const composers = computed(() => composerSelections(concertQuery.value.composers))
 const works = computed(() => values(concertQuery.value.works))
 const filtersOpen = ref(false)
 const mobile = ref(false)

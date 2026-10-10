@@ -98,3 +98,16 @@ test('preset metadata follows navigation but is cleared by manual date edits and
   assert.equal(updateConcertQuery(selected, { dateFrom: null, dateTo: null }).datePreset, undefined)
   assert.equal(updateConcertQuery(selected, { dateFrom: '2026-09-04', dateTo: '2026-09-04', datePreset: 'today' }).datePreset, 'today')
 })
+
+
+test('composer discovery and map/list links preserve quoted names', async () => {
+  const { composerSelections } = await import('../layers/concerts/shared/utils/concert-query.js')
+  const { concertMapLocation, mapListLocation } = await import('../layers/concerts/app/utils/concert-discovery.js')
+  const name = 'Joseph Bologne, Chevalier de Saint-Georges'
+  const location = concertComposerLocation({ path: '/', query: { composers: 'Mozart', country: 'AT' } }, name)
+  assert.deepEqual(composerSelections(location.query.composers), ['Mozart', name])
+  assert.deepEqual(concertComposerLocation(location, name), location)
+  const map = concertMapLocation(location.query)
+  const list = mapListLocation(map.query)
+  assert.deepEqual(list.query, location.query)
+})

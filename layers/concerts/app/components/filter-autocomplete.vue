@@ -103,6 +103,7 @@
 </template>
 
 <script setup>
+import { serializeComposerSelections } from '../../shared/utils/concert-query.js'
 const { t, availableOptions: describeOptions } = useConcertText()
 const props = defineProps({
   compact: Boolean,
@@ -164,7 +165,7 @@ const loadOptions = async () => {
         country: props.country || undefined,
         cityId: props.cityId || undefined,
         q: search.value || undefined,
-        selected: props.modelValue.length ? props.modelValue.join(',') : undefined,
+        selected: props.modelValue.length ? (props.type === 'composer' ? serializeComposerSelections(props.modelValue) : props.modelValue.join(',')) : undefined,
       },
     })
     if (sequence !== requestSequence.value) return

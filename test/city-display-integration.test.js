@@ -224,4 +224,62 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
     assert.equal((await concerts({ query: { city: 'Bratislava,SK', radius: '100' } })).total, 1)
     await assert.rejects(map({ query: { country: 'AT' } }), { statusCode: 400 })
   })
+
+  await t.test('quoted composers survive facets, list/map, restoration and alert criteria on both sites', async () => {
+    const { serializeComposerSelections } = await import('../layers/concerts/shared/utils/concert-query.js')
+    const { criteria, matching } = await import('../server/utils/alerts/criteria.js')
+    const { criteriaIdentity } = await import('../server/utils/alerts/service.js')
+    const names = ['Joseph Bologne, Chevalier de Saint-Georges', 'Louis F. "Chip" Davis, Jr.']
+    await db('composer').insert(names.map((name, i) => ({ id: 100 + i, name, normalized_name: name.toLowerCase() })))
+    await db('work').insert({ id: 100, composer_id: 100, title: 'Comma Work', normalized_title: 'comma work' })
+    for (const country of ['AT', 'SK']) {
+      for (let i = 0; i < names.length; i++) {
+        const [row] = await db('classical_concert').insert({ city_id: country === 'AT' ? 4 : 7, country_code_resolved: country }).returning('id')
+        await db('classical_concert_composer').insert({ classical_concert_id: row.id, composer_id: 100 + i })
+        if (!i) await db('classical_concert_work').insert({ classical_concert_id: row.id, work_id: 100 })
+      }
+    }
+    for (const country of [null, 'SK']) {
+      Object.assign(site, { country, locale: country ? 'sk-SK' : 'en-GB' })
+      const expected = country ? 1 : 2
+      for (const name of names) {
+        const composers = serializeComposerSelections([name])
+        const items = (await facets({ query: { type: 'composer', q: name.slice(0, 6), selected: composers } })).items
+        assert.equal(items.find(item => item.value === name).count, expected)
+        assert.equal((await concerts({ query: { composers } })).total, expected)
+        assert.equal((await map({ query: { composers } })).total, expected)
+        const restored = (await facets({ query: { type: 'composer', q: 'no match', selected: composers, dateFrom: '2099-01-01' } })).items
+        assert.deepEqual(restored.map(item => [item.value, item.count]), [[name, 0]])
+        const query = { composers, ...(country ? { country } : {}) }
+        const saved = await criteria(db, query)
+        assert.deepEqual(saved.filters.composers, [name])
+        assert.ok(saved.summary.includes(name))
+        assert.equal((await matching(db, saved.filters)).length, expected)
+        const reloaded = await criteria(db, JSON.parse(JSON.stringify(saved.query)))
+        assert.equal(criteriaIdentity(saved), criteriaIdentity(reloaded))
+      }
+      const composers = serializeComposerSelections(names)
+      assert.equal((await concerts({ query: { composers } })).total, expected * 2)
+      const works = (await facets({ query: { type: 'work', composers: serializeComposerSelections([names[0]]) } })).items
+      assert.deepEqual(works.map(item => [item.value, item.count]), [['100', expected]])
+    }
+    Object.assign(site, { country: null, locale: 'en-GB' })
+  })
+
+  await t.test('commas in canonical and unresolved cities preserve exact names and radius origins', async () => {
+    await db('city').insert({ id: 9000, english_name: 'Test City, District', local_name: 'Test City, District', country_code: 'US', latitude: 20, longitude: 20 })
+    await db('classical_concert').insert([
+      { city_id: 9000, country_code_resolved: 'US' },
+      { city_raw: 'Washington, D.C.', country_code_raw: 'US' },
+    ])
+    for (const value of ['Test City, District,US', 'Washington, D.C.,US']) {
+      const restored = (await options({ q: 'no match', selected: value })).find(item => item.value === value)
+      assert.equal(restored.count, 1)
+      assert.equal((await concerts({ query: { city: value } })).total, 1)
+    }
+    const area = await concerts({ query: { city: 'Test City, District,US', radius: '25' } })
+    assert.equal(area.total, 1)
+    assert.equal(area.area.label, 'Test City, District')
+  })
+
 })

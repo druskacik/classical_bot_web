@@ -1,4 +1,4 @@
-import { cleanConcertQuery, updateConcertQuery, normalizeConcertQuery, serializeConcertQuery, querySelections, selectionQuery, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
+import { cleanConcertQuery, updateConcertQuery, normalizeConcertQuery, serializeConcertQuery, composerSelections, querySelections, selectionQuery, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
 import { clearAreaQuery, hasAreaQuery, areaQuery } from '../../shared/utils/concert-area.js'
 import { getCountryPath } from './countries.js'
 
@@ -20,7 +20,7 @@ export const concertCountryLocation = (query, country) => ({
 })
 
 export const concertComposerLocation = (route, composer) => {
-  const selected = querySelections(route.query.composers)
+  const selected = composerSelections(route.query.composers)
   return { path: route.path, query: updateConcertQuery(route.query, { composers: [...new Set([...selected, composer])] }) }
 }
 

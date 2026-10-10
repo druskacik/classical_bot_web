@@ -1,5 +1,5 @@
 import { createError } from 'h3'
-import { firstQueryValue, querySelections as parseCommaSeparatedValues, normalizeConcertQuery } from '../../shared/utils/concert-query.js'
+import { firstQueryValue, composerSelections, querySelections as parseCommaSeparatedValues, normalizeConcertQuery } from '../../shared/utils/concert-query.js'
 import { parseMapBounds } from '../../shared/utils/concert-map.js'
 import { parseArea } from './concert-area.js'
 import { normalizeCountryCode } from './countries.js'
@@ -180,7 +180,7 @@ export const parseConcertFilters = (input, siteCountry = null) => {
     city,
     dateFrom,
     dateTo,
-    composers: parseCommaSeparatedValues(query.composers),
+    composers: composerSelections(query.composers),
     works: parseWorkIds(query.works),
   }
 

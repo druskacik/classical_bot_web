@@ -35,3 +35,12 @@ test('alert drafts require an actual filter rather than navigation or empty sele
     assert.equal(hasAlertFilter(draft), true)
   }
 })
+
+test('alert drafts keep comma-containing composers intact through edit and reload', async () => {
+  const { composerSelections } = await import('../layers/concerts/shared/utils/concert-query.js')
+  const names = ['Joseph Bologne, Chevalier de Saint-Georges', 'Mozart']
+  const draft = alertDraft({ composers: names })
+  assert.deepEqual(composerSelections(draft.composers), names)
+  assert.deepEqual(alertDraft(JSON.parse(JSON.stringify(draft))), draft)
+  assert.deepEqual(composerSelections(updateAlertDraft(draft, { composers: names.slice(0, 1) }).composers), names.slice(0, 1))
+})
