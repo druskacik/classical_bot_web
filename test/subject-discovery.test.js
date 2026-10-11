@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import knex from 'knex'
 import { getConcertListSeoState } from '../layers/concerts/app/composables/useConcertListSeo.js'
 import { singleSubjectSelection, subjectListingPath, subjectMetadata } from '../layers/concerts/shared/utils/subject-discovery.js'
-import { subjectDiscoveryLocation } from '../layers/concerts/app/utils/concert-discovery.js'
+import { subjectDiscoveryLocation, broaderSubjectLocation } from '../layers/concerts/app/utils/concert-discovery.js'
 import { resolveDiscoverySubject } from '../layers/concerts/server/utils/subject-discovery.js'
 import { buildSitemapInventory } from '../shared/utils/sitemap-inventory.js'
 import { buildCityCatalogue } from '../layers/concerts/shared/utils/city-catalogue.js'
@@ -44,9 +44,69 @@ test('CSV composer names and accented text round-trip across links and canonical
   assert.deepEqual(singleSubjectSelection(query), { type: 'composer', value: subject.name })
   assert.equal(seo(query, subject, { canonicalPath: '/czechia' }).canonicalHref, `https://classicalbot.com${path}`)
   const route = { path: '/czechia', query: { composers: 'Other', works: '7', page: '3', dateFrom: '2026-11-01', radius: '50' } }
-  assert.equal(subjectDiscoveryLocation(route, subject), path)
-  assert.equal(subjectDiscoveryLocation({ ...route, path: '/map' }, work), '/?works=2')
+  assert.equal(subjectDiscoveryLocation(route, subject), `${path}&radius=50&dateFrom=2026-11-01`)
+  assert.equal(subjectDiscoveryLocation({ ...route, path: '/map' }, work), '/?works=2&radius=50&dateFrom=2026-11-01')
   assert.equal(route.query.page, '3')
+})
+
+test('programme discovery preserves date and spatial constraints but resets subjects, tracking and page', () => {
+  for (const context of [
+    { country: 'CZ', city: 'Prague,CZ', radius: '50', dateFrom: '2026-11-01', dateTo: '2026-11-02', datePreset: 'weekend' },
+    { nearLat: '50.1', nearLng: '14.4', radius: '25' },
+    { bounds: '14,49,15,51', dateFrom: '2026-11-01' },
+  ]) {
+    for (const subject of [composer, work]) {
+      const href = subjectDiscoveryLocation({ path: '/map', query: { ...context, composers: 'Other', works: '99', page: '3', utm_source: 'email' } }, subject)
+      const actual = Object.fromEntries(new URL(href, 'https://classicalbot.com').searchParams)
+      assert.deepEqual(actual, { ...(subject.type === 'composer' ? { composers: composer.name } : { works: '2' }), ...context })
+      assert.equal(seo(actual, subject).robots, 'noindex, follow')
+    }
+  }
+  assert.equal(subjectDiscoveryLocation({ path: '/czechia/prague', query: { composers: 'Other', page: '2' } }, composer), '/czechia/prague?composers=Claude+Debussy')
+})
+
+test('map subject links prefer selected geography over viewport bounds, without changing list semantics', () => {
+  const bounds = '-74,40,-73,41' // Viewport panned far away from the Prague selection.
+  const dates = { dateFrom: '2026-11-01', dateTo: '2026-11-02', datePreset: 'weekend' }
+  for (const selection of [
+    { city: '1' }, { city: '1', radius: '50' },
+    { nearLat: '50.1', nearLng: '14.4', radius: '50' },
+  ]) {
+    for (const subject of [composer, work]) {
+      const query = { ...selection, ...dates, bounds, composers: 'Other', works: '99', page: '3', utm_source: 'email' }
+      const music = subject.type === 'composer' ? { composers: composer.name } : { works: '2' }
+      for (const path of ['/map', '/map/']) {
+        const href = subjectDiscoveryLocation({ path, query }, subject)
+        const url = new URL(href, 'https://classicalbot.com')
+        assert.equal(url.pathname, '/')
+        assert.deepEqual(Object.fromEntries(url.searchParams), { ...music, ...selection, ...dates })
+      }
+      const listHref = subjectDiscoveryLocation({ path: '/', query }, subject)
+      assert.equal(new URL(listHref, 'https://classicalbot.com').searchParams.get('bounds'), bounds)
+    }
+  }
+  const viewportOnly = subjectDiscoveryLocation({ path: '/map', query: { bounds, ...dates } }, composer)
+  assert.deepEqual(Object.fromEntries(new URL(viewportOnly, 'https://classicalbot.com').searchParams), {
+    composers: composer.name, bounds, ...dates,
+  })
+})
+
+test('broader links explicitly remove restrictions while retaining equivalent fixed geography', () => {
+  const query = { composers: composer.name, dateFrom: '2026-11-01' }
+  const cityPage = { path: '/czechia/prague', name: 'Prague', countryName: 'Czechia' }
+  assert.deepEqual(broaderSubjectLocation({ query }, composer, { cityPage }), {
+    href: '/czechia/prague?composers=Claude+Debussy', label: 'See all upcoming Claude Debussy concerts in Prague, Czechia',
+  })
+  assert.equal(broaderSubjectLocation({ query }, composer, { countryCode: 'CZ', canonicalPath: '/czechia' }).href, '/czechia?composers=Claude+Debussy')
+  assert.equal(broaderSubjectLocation({ query: { ...query, country: 'CZ' } }, composer).href, '/czechia?composers=Claude+Debussy')
+  for (const extra of [{ radius: '50' }, { bounds: '14,49,15,51' }, { nearLat: '50', nearLng: '14', radius: '10' }]) {
+    const link = broaderSubjectLocation({ query: { ...query, ...extra } }, composer, { cityPage })
+    assert.equal(link.href, '/?composers=Claude+Debussy')
+    assert.ok(link.label.endsWith('worldwide'))
+  }
+  assert.equal(broaderSubjectLocation({ query: { ...query, city: 'Prague,CZ' } }, composer).href, '/?composers=Claude+Debussy')
+  assert.equal(broaderSubjectLocation({ query: { works: '2', dateTo: '2026-12-01' } }, work).label, 'See all upcoming performances of Claude Debussy: La mer worldwide')
+  assert.equal(broaderSubjectLocation({ query: { composers: composer.name, page: '2', utm_source: 'email' } }, composer), null)
 })
 
 test('subject metadata is geographic and catalogue numbers are not repeated', () => {

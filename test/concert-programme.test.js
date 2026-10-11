@@ -34,7 +34,7 @@ const works = [
   { id: 3, title: 'Suite', composer: { id: 1, name: 'Bach' } },
   { id: 4, title: 'Adagio', composer: null },
 ]
-test('enabled subject discovery uses followed links and clears accumulated filters', () => {
+test('enabled subject discovery replaces music and preserves search context in followed links', () => {
   const route = { path: '/czechia/prague', query: { composers: 'Mozart', works: '9', page: '3', dateFrom: '2026-12-01' } }
   const component = compileComponent('../layers/concerts/app/components/concert-programme.vue', {
     useRoute: () => route, useAppConfig: () => ({ concertSite: { subjectDiscovery: true } }),
@@ -47,9 +47,9 @@ test('enabled subject discovery uses followed links and clears accumulated filte
   app.component('UIcon', { render: () => Vue.h('i') })
   app.mount(root)
   const links = all(root, 'a')
-  assert.ok(links.some(link => link.props.href === '/czechia/prague?composers=Bach'))
-  assert.ok(links.some(link => link.props.href === '/czechia/prague?works=2'))
-  assert.ok(links.every(link => !link.props.rel && !link.props.href.includes('&')))
+  assert.ok(links.some(link => link.props.href === '/czechia/prague?composers=Bach&dateFrom=2026-12-01'))
+  assert.ok(links.some(link => link.props.href === '/czechia/prague?works=2&dateFrom=2026-12-01'))
+  assert.ok(links.every(link => !link.props.rel && !link.props.href.includes('page=') && !link.props.href.includes('Mozart')))
   app.unmount()
 })
 

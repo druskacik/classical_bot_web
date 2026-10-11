@@ -41,6 +41,10 @@
         </div>
       </div>
 
+      <p v-if="broaderSubject" class="mt-2 text-sm">
+        <NuxtLink :to="broaderSubject.href" :prefetch="false" class="inline-flex min-h-11 items-center text-primary underline underline-offset-4 hover:no-underline focus-visible:outline-2 focus-visible:outline-primary">{{ broaderSubject.label }}</NuxtLink>
+      </p>
+
       <div v-if="concertStatus === 'pending' && !concertPage" class="py-10">
         <UProgress animation="swing" />
       </div>
@@ -116,7 +120,7 @@
 
 <script setup>
 const { t, locale, plural } = useConcertText()
-import { concertMapLocation, cityRadiusLocation, updateConcertQuery } from '../utils/concert-discovery.js'
+import { concertMapLocation, cityRadiusLocation, updateConcertQuery, broaderSubjectLocation } from '../utils/concert-discovery.js'
 import { AREA_KEYS } from '../../shared/utils/concert-area.js'
 import { createConcertDateFormatting } from '../utils/concert-dates.js'
 import { composerSelections, serializeComposerSelections, firstQueryValue as firstValue, querySelections as listValue, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
@@ -208,6 +212,12 @@ if (concertError.value) {
   throw createError({ statusCode: concertError.value.statusCode || 500, statusMessage: t('Concerts could not be loaded') })
 }
 const approvedSubjectQuery = computed(() => concertSite.subjectDiscovery && isSubjectDiscoveryQuery(route.query))
+const broaderSubject = computed(() => {
+  const discovery = concertPage.value?.discovery
+  if (!concertSite.subjectDiscovery || concertStatus.value !== 'success' || discovery?.status !== 'resolved'
+    || !subjectMatchesQuery(discovery.subject, route.query)) return null
+  return broaderSubjectLocation(route, discovery.subject, props)
+})
 const discoveryMeta = computed(() => {
   const discovery = concertPage.value?.discovery
   if (!approvedSubjectQuery.value || discovery?.status !== 'resolved' || !subjectMatchesQuery(discovery.subject, route.query)) return null

@@ -1,14 +1,44 @@
 import { cleanConcertQuery, updateConcertQuery, normalizeConcertQuery, serializeConcertQuery, composerSelections, querySelections, selectionQuery, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
 import { clearAreaQuery, hasAreaQuery, areaQuery } from '../../shared/utils/concert-area.js'
-import { getCountryPath } from './countries.js'
+import { getCountryPath, getCountryName } from './countries.js'
 import { subjectListingPath } from '../../shared/utils/subject-discovery.js'
 
 export { cleanConcertQuery, updateConcertQuery } from '../../shared/utils/concert-query.js'
 
-// Programme links discover one subject; filter controls still accumulate selections.
+const subjectContextKeys = ['country', 'city', 'nearLat', 'nearLng', 'radius', 'bounds', 'dateFrom', 'dateTo', 'datePreset']
+
+// Replace the music selection, preserving where and when the listener is searching.
 export const subjectDiscoveryLocation = (route, subject) => {
   const path = route.path?.replace(/\/+$/, '') || '/'
-  return subjectListingPath(path === '/map' ? '/' : path, subject)
+  // The map's selected city/area takes precedence over its viewport, just as
+  // it does for the displayed programme and the ordinary list-navigation link.
+  const query = path === '/map' ? mapListLocation(route.query || {}).query : route.query || {}
+  const context = serializeConcertQuery(Object.fromEntries(subjectContextKeys.map(key => [key, query[key]])))
+  const suffix = new URLSearchParams(context).toString()
+  return subjectListingPath(path === '/map' ? '/' : path, subject) + (suffix ? `&${suffix}` : '')
+}
+
+// Broadening is explicit. A radius/map area or unresolved query city must not
+// silently become a fixed-city search; those links clearly lead worldwide.
+export const broaderSubjectLocation = (route, subject, { cityPage, countryCode, canonicalPath } = {}) => {
+  const query = route.query || {}
+  if (!subjectContextKeys.some(key => query[key] !== undefined && query[key] !== '')) return null
+  const area = hasAreaQuery(query) || Boolean(query.bounds)
+  let path = '/', phrase = 'worldwide'
+  if (!area && cityPage) {
+    path = cityPage.path
+    phrase = `in ${cityPage.name}, ${cityPage.countryName}`
+  } else if (!area && !query.city) {
+    const country = countryCode || query.country
+    const countryPath = getCountryPath(country)
+    if (countryPath) {
+      path = canonicalPath || countryPath
+      phrase = `in ${getCountryName(country)}`
+    }
+  }
+  const label = subject.type === 'composer' ? `${subject.name} concerts`
+    : `performances of ${subject.composerName}: ${subject.title}`
+  return { href: subjectListingPath(path, subject), label: `See all upcoming ${label} ${phrase}` }
 }
 
 export const concertCityLocation = (query, concert) => ({
