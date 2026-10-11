@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 import * as Vue from 'vue'
 import { createConcertText } from '../layers/concerts/app/utils/concert-text.js'
 import * as discovery from '../layers/concerts/app/utils/concert-discovery.js'
+import * as subjectDiscovery from '../layers/concerts/shared/utils/subject-discovery.js'
 import * as area from '../layers/concerts/shared/utils/concert-area.js'
 import * as map from '../layers/concerts/shared/utils/concert-map.js'
 import * as dates from '../layers/concerts/app/utils/concert-dates.js'
@@ -29,11 +30,11 @@ async function mount(path, props, route = Vue.reactive({ query: {} }), fetcher =
     },
   }
   const component = compileComponent(path, {
-    ...discovery, ...area, ...map, ...dates, ...queryHelpers, useConcertQuery, useConcertMapNavigation, useConcertDateFilter,
+    ...discovery, ...subjectDiscovery, ...area, ...map, ...dates, ...queryHelpers, useConcertQuery, useConcertMapNavigation, useConcertDateFilter,
     onMounted: callback => mounted.push(callback), window: browserWindow, $fetch: fetcher,
     useRoute: () => route,
     useRouter: () => ({ push: location => { route.query = location.query }, replace: location => { route.query = location.query } }),
-    definePageMeta() {}, useConcertListSeo() {},
+    definePageMeta() {}, useConcertListSeo() {}, useRequestEvent: () => undefined,
     useCountries: () => Promise.resolve({ data: Vue.ref([]) }),
     useAsyncData: (key, handler) => {
       dataRequests.push({ key, handler })

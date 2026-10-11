@@ -15,8 +15,8 @@ test('composer identity survives diacritics, duplicate names, and renamed slugs'
 })
 
 test('work and composer links start a fresh worldwide concert search', () => {
-  assert.deepEqual(workLocation(241), { path: '/', query: { works: '241' } })
-  assert.deepEqual(composerConcertLocation('Antonín Dvořák'), { path: '/', query: { composers: 'Antonín Dvořák' } })
+  assert.equal(workLocation(241), '/?works=241')
+  assert.equal(composerConcertLocation('Antonín Dvořák'), '/?composers=Anton%C3%ADn+Dvo%C5%99%C3%A1k')
 })
 
 test('catalogue numbers are not repeated and actual playlist season is formatted', () => {

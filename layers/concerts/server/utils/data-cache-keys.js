@@ -15,4 +15,5 @@ export const concertFilterCacheInput = filters => ({
 
 export const siteDataCacheKey = (site, input) => JSON.stringify([
   site.country || null, site.locale, site.cityRoutes, input,
+  Boolean(site.subjectDiscovery),
 ])

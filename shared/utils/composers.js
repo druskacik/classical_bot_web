@@ -1,8 +1,5 @@
-export const composerPath = (id, name) => {
-  const slug = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-  return `/composers/${id}-${slug || 'composer'}`
-}
+export { composerProfilePath as composerPath } from '../../layers/concerts/shared/utils/subject-discovery.js'
+import { subjectListingPath } from '../../layers/concerts/shared/utils/subject-discovery.js'
 
 export const composerIdFromSlug = (slug) => {
   const match = typeof slug === 'string' && /^([1-9]\d*)(?:-[a-z0-9-]+)?$/.exec(slug)
@@ -10,8 +7,8 @@ export const composerIdFromSlug = (slug) => {
   return Number.isSafeInteger(id) && id <= 2147483647 ? id : null
 }
 
-export const workLocation = id => ({ path: '/', query: { works: String(id) } })
-export const composerConcertLocation = name => ({ path: '/', query: { composers: name } })
+export const workLocation = id => subjectListingPath('/', { type: 'work', id })
+export const composerConcertLocation = name => subjectListingPath('/', { type: 'composer', name })
 
 export const catalogueLabel = (title, catalogue) => {
   const normalized = value => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')

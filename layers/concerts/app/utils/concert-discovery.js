@@ -1,8 +1,15 @@
 import { cleanConcertQuery, updateConcertQuery, normalizeConcertQuery, serializeConcertQuery, composerSelections, querySelections, selectionQuery, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
 import { clearAreaQuery, hasAreaQuery, areaQuery } from '../../shared/utils/concert-area.js'
 import { getCountryPath } from './countries.js'
+import { subjectListingPath } from '../../shared/utils/subject-discovery.js'
 
 export { cleanConcertQuery, updateConcertQuery } from '../../shared/utils/concert-query.js'
+
+// Programme links discover one subject; filter controls still accumulate selections.
+export const subjectDiscoveryLocation = (route, subject) => {
+  const path = route.path?.replace(/\/+$/, '') || '/'
+  return subjectListingPath(path === '/map' ? '/' : path, subject)
+}
 
 export const concertCityLocation = (query, concert) => ({
   // Fallback cities must leave fixed-location routes so their query takes effect.

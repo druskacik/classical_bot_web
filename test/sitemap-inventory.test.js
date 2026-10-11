@@ -5,7 +5,7 @@ import { buildCityCatalogue } from '../layers/concerts/shared/utils/city-catalog
 import { buildSitemapInventory } from '../shared/utils/sitemap-inventory.js'
 import { applyPublicConcertScope } from '../layers/concerts/server/utils/public-concerts.js'
 
-test('sitemap includes only explicit pages, current countries, and matching cities with 10+ concerts', () => {
+test('sitemap includes only explicit pages, current countries, and matching cities with 1+ concerts', () => {
   const catalogue = buildCityCatalogue([0, 1, 9, 10].map((count, id) => ({
     id: id + 1, english_name: `City ${count}`, country_code: 'CZ',
   })))
@@ -13,7 +13,7 @@ test('sitemap includes only explicit pages, current countries, and matching citi
   counts.push({ city_id: 1, country_code_resolved: 'SK', count: '100' })
   counts.push({ city_id: null, country_code_resolved: 'AT', count: '2' })
   const paths = buildSitemapInventory(catalogue, counts).map(item => item.loc)
-  assert.deepEqual(paths, ['/', '/about', '/api', '/austria', '/blog', '/composers', '/contact', '/czechia', '/czechia/city-10', '/slovakia', '/sources'])
+  assert.deepEqual(paths, ['/', '/about', '/api', '/austria', '/blog', '/composers', '/contact', '/czechia', '/czechia/city-1', '/czechia/city-10', '/czechia/city-9', '/slovakia', '/sources'])
   assert.equal(new Set(paths).size, paths.length)
 })
 

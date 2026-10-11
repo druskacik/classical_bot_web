@@ -6,4 +6,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://classicalbot.com/sitemap.xml
+Sitemap: https://classicalbot.com/sitemap_index.xml

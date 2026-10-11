@@ -1,6 +1,9 @@
 <template>
   <main class="concert-list-page container mx-auto px-4 py-4 sm:py-8 sm:px-6 lg:px-8">
-    <h1 :class="{ 'home-title': !countryCode && !cityPage }" class="mx-auto max-w-4xl text-center font-serif text-gray-950 sm:text-4xl">{{ title }}</h1>
+    <h1 :class="{ 'home-title': !countryCode && !cityPage }" class="mx-auto max-w-4xl text-center font-serif text-gray-950 sm:text-4xl">{{ discoveryMeta?.heading || title }}</h1>
+    <p v-if="profilePath" class="mt-3 text-center text-sm">
+      <NuxtLink :to="profilePath" class="text-primary hover:underline">Explore {{ concertPage.discovery.subject.name }}’s playlist and repertoire</NuxtLink>
+    </p>
 
     <div class="mx-auto mt-3 max-w-6xl sm:mt-5">
       <ConcertFilters
@@ -118,6 +121,7 @@ import { AREA_KEYS } from '../../shared/utils/concert-area.js'
 import { createConcertDateFormatting } from '../utils/concert-dates.js'
 import { composerSelections, serializeComposerSelections, firstQueryValue as firstValue, querySelections as listValue, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
 import { useConcertQuery } from '../composables/useConcertQuery.js'
+import { isSubjectDiscoveryQuery, subjectMatchesQuery, subjectMetadata, subjectListingPath } from '../../shared/utils/subject-discovery.js'
 const props = defineProps({
   title: { type: String, required: true },
   countryCode: { type: String, default: null },
@@ -203,13 +207,30 @@ const cityParentPath = computed(() => countries.value?.some(country => country.c
 if (concertError.value) {
   throw createError({ statusCode: concertError.value.statusCode || 500, statusMessage: t('Concerts could not be loaded') })
 }
+const approvedSubjectQuery = computed(() => concertSite.subjectDiscovery && isSubjectDiscoveryQuery(route.query))
+const discoveryMeta = computed(() => {
+  const discovery = concertPage.value?.discovery
+  if (!approvedSubjectQuery.value || discovery?.status !== 'resolved' || !subjectMatchesQuery(discovery.subject, route.query)) return null
+  const locationPhrase = props.cityPage ? `in ${props.cityPage.name}, ${props.cityPage.countryName}`
+    : props.countryCode ? `in ${countries.value?.find(country => country.code === props.countryCode)?.name || props.countryCode}` : 'worldwide'
+  return subjectMetadata(discovery.subject, locationPhrase)
+})
+const profilePath = computed(() => discoveryMeta.value && !props.countryCode && !props.cityPage
+  ? concertPage.value?.discovery?.subject?.profilePath : null)
+const requestEvent = useRequestEvent()
+if (requestEvent && approvedSubjectQuery.value && concertStatus.value === 'success'
+  && (concertPage.value?.discovery?.status === 'unknown'
+    || (concertPage.value?.discovery?.status === 'resolved' && concertPage.value.total === 0))) {
+  setResponseStatus(requestEvent, 404)
+}
 useConcertListSeo({
-  title: () => props.seoTitle || `${props.title} — ${concertSite.name}`,
-  description: () => props.seoDescription || (props.cityPage
+  title: () => discoveryMeta.value?.title || props.seoTitle || `${props.title} — ${concertSite.name}`,
+  description: () => discoveryMeta.value?.description || props.seoDescription || (props.cityPage
     ? t('Discover upcoming classical music concerts in {city}, {country}.', { city: props.cityPage.name, country: props.cityPage.countryName })
     : undefined),
   canonicalPath: () => props.cityPage?.path || props.canonicalPath || route.path,
   indexable: () => concertStatus.value === 'success' && (concertPage.value?.total || 0) > 0,
+  discovery: () => concertPage.value?.discovery,
 })
 
 const { groupByMonth } = createConcertDateFormatting(locale, t('Date unavailable'))
@@ -246,7 +267,9 @@ const clearFilters = async () => {
   await router.push({ query: {} })
 }
 
-const pageHref = page => router.resolve({
+const pageHref = page => discoveryMeta.value ? subjectListingPath(
+  props.cityPage?.path || props.canonicalPath || route.path, concertPage.value.discovery.subject, page,
+) : router.resolve({
   path: route.path,
   query: updateConcertQuery(concertQuery.value, { page: String(page) }, { resetPage: false }),
 }).href
@@ -256,7 +279,8 @@ const goToPage = async (event, page) => {
   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
   event.preventDefault()
   if (page < 1 || page > (concertPage.value?.totalPages || 1) || page === concertPage.value?.page) return
-  await updateQuery({ page: String(page) }, { resetPage: false })
+  if (discoveryMeta.value) await router.push(pageHref(page))
+  else await updateQuery({ page: String(page) }, { resetPage: false })
   await nextTick()
   resultsHeading.value?.focus({ preventScroll: true })
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches

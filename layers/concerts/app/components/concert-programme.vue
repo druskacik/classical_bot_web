@@ -5,7 +5,7 @@
         v-if="group.composer"
         :to="composerPath(group.composer.name)"
         :prefetch="false"
-        rel="nofollow"
+        :rel="concertSite.subjectDiscovery ? undefined : 'nofollow'"
         class="inline-flex min-h-6 min-w-0 max-w-full items-center justify-self-start self-start py-0.5 font-semibold leading-5 text-gray-600 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:font-normal [@media(min-width:640px)_and_(pointer:coarse)]:min-h-11"
       >{{ group.composer.name }}</NuxtLink>
       <ul
@@ -18,7 +18,7 @@
           <NuxtLink
             :to="workPath(work.id)"
             :prefetch="false"
-            rel="nofollow"
+            :rel="concertSite.subjectDiscovery ? undefined : 'nofollow'"
             class="inline-flex min-h-6 max-w-full items-center py-0.5 leading-5 text-gray-800 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary [@media(min-width:640px)_and_(pointer:coarse)]:min-h-11"
             :aria-label="t('Find concerts featuring {work}', { work: work.composer ? `${work.composer.name}: ${work.title}` : work.title })"
           >{{ work.title }}</NuxtLink>
@@ -32,7 +32,7 @@
 <script setup>
 import { querySelections } from '../../shared/utils/concert-query.js'
 import { normalizeProgrammeItems } from '../utils/concert-programme.js'
-import { concertWorkLocation, concertComposerLocation } from '../utils/concert-discovery.js'
+import { concertWorkLocation, concertComposerLocation, subjectDiscoveryLocation } from '../utils/concert-discovery.js'
 
 const props = defineProps({
   works: { type: Array, default: () => [] },
@@ -40,6 +40,7 @@ const props = defineProps({
 })
 const { t } = useConcertText()
 const route = useRoute()
+const { concertSite } = useAppConfig()
 const safeWorks = computed(() => normalizeProgrammeItems(props.works))
 const safeComposers = computed(() => normalizeProgrammeItems(props.composers))
 const selectedWorks = computed(() => new Set(querySelections(route.query.works).map(Number)))
@@ -57,8 +58,8 @@ const groups = computed(() => {
   }
   return [...grouped.values()].sort((a, b) => (a.composer?.name || '').localeCompare(b.composer?.name || ''))
 })
-const workPath = id => concertWorkLocation(route, id)
-const composerPath = name => concertComposerLocation(route, name)
+const workPath = id => concertSite.subjectDiscovery ? subjectDiscoveryLocation(route, { type: 'work', id }) : concertWorkLocation(route, id)
+const composerPath = name => concertSite.subjectDiscovery ? subjectDiscoveryLocation(route, { type: 'composer', name }) : concertComposerLocation(route, name)
 </script>
 
 <style scoped>

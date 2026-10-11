@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as Vue from 'vue'
 import { groupConcertWorks } from '../layers/concerts/server/utils/concert-works.js'
-import { concertWorkLocation, concertComposerLocation } from '../layers/concerts/app/utils/concert-discovery.js'
+import { concertWorkLocation, concertComposerLocation, subjectDiscoveryLocation } from '../layers/concerts/app/utils/concert-discovery.js'
 import { createConcertText } from '../layers/concerts/app/utils/concert-text.js'
 
 test('programme data is deduplicated, grouped by concert and ordered deterministically', () => {
@@ -34,12 +34,31 @@ const works = [
   { id: 3, title: 'Suite', composer: { id: 1, name: 'Bach' } },
   { id: 4, title: 'Adagio', composer: null },
 ]
+test('enabled subject discovery uses followed links and clears accumulated filters', () => {
+  const route = { path: '/czechia/prague', query: { composers: 'Mozart', works: '9', page: '3', dateFrom: '2026-12-01' } }
+  const component = compileComponent('../layers/concerts/app/components/concert-programme.vue', {
+    useRoute: () => route, useAppConfig: () => ({ concertSite: { subjectDiscovery: true } }),
+    useConcertText: () => createConcertText('en-GB'),
+    concertWorkLocation, concertComposerLocation, subjectDiscoveryLocation, querySelections, normalizeProgrammeItems,
+  }, { inlineTemplate: true })
+  const root = { children: [] }
+  const app = renderer.createApp({ render: () => Vue.h(component, { works, composers: [] }) })
+  app.component('NuxtLink', { props: ['to', 'prefetch'], setup: (props, { slots }) => () => Vue.h('a', { href: props.to }, slots.default()) })
+  app.component('UIcon', { render: () => Vue.h('i') })
+  app.mount(root)
+  const links = all(root, 'a')
+  assert.ok(links.some(link => link.props.href === '/czechia/prague?composers=Bach'))
+  assert.ok(links.some(link => link.props.href === '/czechia/prague?works=2'))
+  assert.ok(links.every(link => !link.props.rel && !link.props.href.includes('&')))
+  app.unmount()
+})
+
 for (const locale of ['en-GB', 'sk-SK']) {
   test(`complete programme and composer-only rows (${locale})`, async () => {
     const route = Vue.reactive({ path: '/', fullPath: '/', query: {} })
     const component = compileComponent('../layers/concerts/app/components/concert-programme.vue', {
       useRoute: () => route, useConcertText: () => createConcertText(locale),
-      concertWorkLocation, concertComposerLocation, querySelections, normalizeProgrammeItems,
+      concertWorkLocation, concertComposerLocation, subjectDiscoveryLocation, querySelections, normalizeProgrammeItems,
     }, { inlineTemplate: true })
     const props = Vue.reactive({ works, composers: [{ id: 1, name: 'Bach' }, { id: 8, name: 'Mozart' }] })
     const root = { children: [] }

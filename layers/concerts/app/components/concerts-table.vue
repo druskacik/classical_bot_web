@@ -63,7 +63,7 @@
               :key="composer.id"
               :to="composerPath(composer.name)"
               :prefetch="false"
-              rel="nofollow"
+              :rel="concertSite.subjectDiscovery ? undefined : 'nofollow'"
               class="composer-link inline-block min-h-6 max-w-full py-0.5 text-sm font-semibold leading-5 text-gray-600 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:font-normal [@media(min-width:640px)_and_(pointer:coarse)]:min-h-11"
             >
               {{ composer.name }}
@@ -81,7 +81,7 @@ const { t, locale } = useConcertText()
 import { getCountryName, getCountryPath } from '../utils/countries.js'
 import { normalizeProgrammeItems } from '../utils/concert-programme.js'
 import { concertCalendarDate, createConcertDateFormatting, formatConcertTime as formatTime, formatConcertDateTime as formatDateTime } from '../utils/concert-dates.js'
-import { concertCityLocation, concertCountryLocation, concertComposerLocation } from '../utils/concert-discovery.js'
+import { concertCityLocation, concertCountryLocation, concertComposerLocation, subjectDiscoveryLocation } from '../utils/concert-discovery.js'
 
 const BADGE_BASE_CLASSES = 'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium'
 const BADGE_OUTLINE_CLASSES = {
@@ -149,6 +149,7 @@ const props = defineProps({
 })
 
 const route = useRoute()
+const { concertSite } = useAppConfig()
 const hasText = value => typeof value === 'string' && Boolean(value.trim())
 const displayConcerts = computed(() => props.concerts.map(concert => ({
   ...concert,
@@ -176,7 +177,7 @@ const badgeClasses = (label, variant = 'solid') => {
 
 const cityPath = concert => concertCityLocation(route.query, concert)
 const countryPath = country => concertCountryLocation(route.query, country)
-const composerPath = composer => concertComposerLocation(route, composer)
+const composerPath = composer => concertSite.subjectDiscovery ? subjectDiscoveryLocation(route, { type: 'composer', name: composer }) : concertComposerLocation(route, composer)
 
 </script>
 

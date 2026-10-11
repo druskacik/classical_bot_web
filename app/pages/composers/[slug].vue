@@ -11,7 +11,7 @@
         <h1 class="max-w-4xl text-balance font-serif text-4xl leading-tight text-gray-950 sm:text-5xl lg:text-6xl">{{ composer.name }}</h1>
         <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1">
           <p class="text-gray-600">{{ formatCount(composer.concertCount) }} upcoming {{ composer.concertCount === 1 ? 'concert' : 'concerts' }} worldwide</p>
-          <NuxtLink :to="composerConcertLocation(composer.name)" rel="nofollow" :prefetch="false" class="composer-action inline-flex min-h-11 items-center gap-2">Browse concerts<UIcon name="i-lucide-arrow-right" class="size-4" aria-hidden="true" /></NuxtLink>
+          <NuxtLink :to="composerConcertLocation(composer.name)" :prefetch="false" class="composer-action inline-flex min-h-11 items-center gap-2">Browse concerts<UIcon name="i-lucide-arrow-right" class="size-4" aria-hidden="true" /></NuxtLink>
         </div>
       </header>
       <div class="mt-8 grid items-start gap-10 sm:mt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.9fr)] lg:gap-14">
@@ -21,7 +21,7 @@
           <p class="mt-3 text-sm leading-6 text-gray-600">Ranked by upcoming concerts listed on ClassicalBot. Choose a work to find a performance.</p>
           <ol v-if="composer.works.length" class="mt-6 border-b border-gray-200">
             <li v-for="(work, index) in composer.works" :key="work.id" class="border-t border-gray-200">
-              <NuxtLink :to="workLocation(work.id)" rel="nofollow" :prefetch="false" class="composer-work-link group grid min-h-20 grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3 py-5 sm:grid-cols-[2rem_minmax(0,1fr)_auto] sm:gap-x-4">
+              <NuxtLink :to="workLocation(work.id)" :prefetch="false" class="composer-work-link group grid min-h-20 grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3 py-5 sm:grid-cols-[2rem_minmax(0,1fr)_auto] sm:gap-x-4">
                 <span class="pt-0.5 text-sm tabular-nums text-gray-500" aria-hidden="true">{{ String(index + 1).padStart(2, '0') }}</span>
                 <span class="min-w-0">
                   <span class="block text-base leading-6 text-gray-950 group-hover:underline">{{ work.title }}</span>

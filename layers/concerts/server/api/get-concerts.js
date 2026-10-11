@@ -7,6 +7,7 @@ import knex from '../utils/connection.js'
 import { applyFilters, parseConcertFilters, parsePage } from '../utils/concert-filters.js'
 import { getCityCatalogue } from '../utils/city-catalogue.js'
 import { groupConcertWorks } from '../utils/concert-works.js'
+import { resolveDiscoverySubject } from '../utils/subject-discovery.js'
 
 const PAGE_SIZE = 50
 export default defineEventHandler(async (event) => {
@@ -51,7 +52,10 @@ export default defineEventHandler(async (event) => {
         .limit(PAGE_SIZE)
         .offset((page - 1) * PAGE_SIZE)
 
-      const [countRow, concerts, catalogue] = await Promise.all([countQuery, itemQuery, getCityCatalogue()])
+      const [countRow, concerts, catalogue, discovery] = await Promise.all([
+        countQuery, itemQuery, getCityCatalogue(),
+        concertSite.subjectDiscovery ? resolveDiscoverySubject(knex, filters) : null,
+      ])
       const total = Number(countRow.total)
       if (page > Math.max(1, Math.ceil(total / PAGE_SIZE))) {
         throw createError({ statusCode: 404, statusMessage: 'Concert page not found' })
@@ -83,6 +87,7 @@ export default defineEventHandler(async (event) => {
       }, {})
 
       return {
+        ...(discovery ? { discovery } : {}),
         items: concerts.map(concert => ({
           ...concert,
           city_path: (catalogue.byId.get(String(concert.city_id)) || (concertSite.cityRoutes === 'local' ? catalogue.byPath.get(`/${concert.city}`) : null))?.path || null,

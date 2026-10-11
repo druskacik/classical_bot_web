@@ -2,6 +2,7 @@ import { classicalBotSite } from './site.config.js'
 import { fileURLToPath } from 'node:url'
 export default defineNuxtConfig({
   extends: ['./layers/concerts'],
+  alias: { '#concert-site': fileURLToPath(new URL('./site.config.js', import.meta.url)) },
   runtimeConfig: { public: { alertsEnabled: false } },
   nitro: {
     experimental: { tasks: true },
@@ -34,6 +35,8 @@ export default defineNuxtConfig({
   modules: ['@nuxt/content', '@nuxtjs/sitemap'],
   site: { url: classicalBotSite.origin },
   sitemap: {
+    sitemaps: true,
+    defaultSitemapsChunkSize: 5000,
     excludeAppSources: true,
     cacheMaxAgeSeconds: 3600,
     autoLastmod: false,
