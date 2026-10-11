@@ -234,7 +234,7 @@ test('fixed-city radius requests use the page origin and omit the exact-country 
       await view.dataRequests[0].handler()
       assert.deepEqual(requests, [{ url: '/api/get-concerts', params: {
         radius: '50', bounds: undefined, country: undefined, city: cityPage.id,
-        dateFrom: undefined, dateTo: undefined, composers: 'Bach', works: undefined, page: 2,
+        dateFrom: undefined, dateTo: undefined, composers: 'Bach', works: undefined, page: '2',
       } }])
       assert.deepEqual(parseConcertFilters(requests[0].params, cityPage.countryCode === 'SK' ? 'SK' : null).area, { origin: cityPage.id, radiusKm: 50 })
     } finally { view.unmount() }

@@ -58,35 +58,41 @@
         </div>
 
         <nav v-if="concertPage.totalPages > 1" class="mt-10 flex items-center justify-center gap-1" :aria-label="t('Concert pages')">
-          <button
-            type="button"
+          <a
+            v-if="concertPage.page > 1"
+            :href="pageHref(concertPage.page - 1)"
             class="pagination-link"
-            :disabled="concertPage.page === 1"
             :aria-label="t('Previous page')"
-            @click="goToPage(concertPage.page - 1)"
+            @click="goToPage($event, concertPage.page - 1)"
           >
+            <UIcon name="i-lucide-arrow-left" class="size-4" aria-hidden="true" />
+          </a>
+          <button v-else type="button" class="pagination-link" disabled :aria-label="t('Previous page')">
             <UIcon name="i-lucide-arrow-left" class="size-4" aria-hidden="true" />
           </button>
           <template v-for="item in paginationItems" :key="item.key">
             <span v-if="item.ellipsis" class="px-2 text-gray-400" aria-hidden="true">…</span>
-            <button
+            <a
               v-else
-              type="button"
+              :href="pageHref(item.page)"
               :class="['pagination-link', item.page === concertPage.page && 'pagination-link-active']"
               :aria-current="item.page === concertPage.page ? 'page' : undefined"
               :aria-label="t('Page {page}', { page: item.page })"
-              @click="goToPage(item.page)"
+              @click="goToPage($event, item.page)"
             >
               {{ item.page }}
-            </button>
+            </a>
           </template>
-          <button
-            type="button"
+          <a
+            v-if="concertPage.page < concertPage.totalPages"
+            :href="pageHref(concertPage.page + 1)"
             class="pagination-link"
-            :disabled="concertPage.page === concertPage.totalPages"
             :aria-label="t('Next page')"
-            @click="goToPage(concertPage.page + 1)"
+            @click="goToPage($event, concertPage.page + 1)"
           >
+            <UIcon name="i-lucide-arrow-right" class="size-4" aria-hidden="true" />
+          </a>
+          <button v-else type="button" class="pagination-link" disabled :aria-label="t('Next page')">
             <UIcon name="i-lucide-arrow-right" class="size-4" aria-hidden="true" />
           </button>
         </nav>
@@ -107,7 +113,7 @@
 
 <script setup>
 const { t, locale, plural } = useConcertText()
-import { concertMapLocation, cityRadiusLocation } from '../utils/concert-discovery.js'
+import { concertMapLocation, cityRadiusLocation, updateConcertQuery } from '../utils/concert-discovery.js'
 import { AREA_KEYS } from '../../shared/utils/concert-area.js'
 import { createConcertDateFormatting } from '../utils/concert-dates.js'
 import { composerSelections, serializeComposerSelections, firstQueryValue as firstValue, querySelections as listValue, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
@@ -116,6 +122,9 @@ const props = defineProps({
   title: { type: String, required: true },
   countryCode: { type: String, default: null },
   cityPage: { type: Object, default: null },
+  seoTitle: { type: String, default: null },
+  seoDescription: { type: String, default: null },
+  canonicalPath: { type: String, default: null },
 })
 
 const { concertSite } = useAppConfig()
@@ -136,7 +145,6 @@ const filters = computed(() => ({
   datePreset: firstValue(concertQuery.value.datePreset) || null,
   composers: composerSelections(concertQuery.value.composers),
   works: listValue(concertQuery.value.works),
-  page: Number(firstValue(concertQuery.value.page)) || 1,
 }))
 
 const hasRemovableFilters = computed(() => Boolean(
@@ -153,7 +161,8 @@ const requestParams = computed(() => ({
   dateTo: filters.value.dateTo || undefined,
   composers: filters.value.composers.length ? serializeComposerSelections(filters.value.composers) : undefined,
   works: filters.value.works.length ? filters.value.works.join(',') : undefined,
-  page: filters.value.page > 1 ? filters.value.page : undefined,
+  // Preserve invalid page values for API validation instead of silently serving page one.
+  page: firstValue(concertQuery.value.page),
 }))
 
 const countriesRequest = useCountries()
@@ -191,17 +200,17 @@ const cityParentPath = computed(() => countries.value?.some(country => country.c
   ? props.cityPage?.countryPath || '/'
   : '/')
 
-if (props.cityPage) {
-  if (concertError.value) {
-    throw createError({ statusCode: concertError.value.statusCode || 500, statusMessage: t('Concerts could not be loaded') })
-  }
-  useConcertListSeo({
-    title: () => `${props.title} — ${concertSite.name}`,
-    description: () => t('Discover upcoming classical music concerts in {city}, {country}.', { city: props.cityPage.name, country: props.cityPage.countryName }),
-    canonicalPath: () => props.cityPage.path,
-    indexable: () => concertStatus.value === 'success' && (concertPage.value?.total || 0) > 0,
-  })
+if (concertError.value) {
+  throw createError({ statusCode: concertError.value.statusCode || 500, statusMessage: t('Concerts could not be loaded') })
 }
+useConcertListSeo({
+  title: () => props.seoTitle || `${props.title} — ${concertSite.name}`,
+  description: () => props.seoDescription || (props.cityPage
+    ? t('Discover upcoming classical music concerts in {city}, {country}.', { city: props.cityPage.name, country: props.cityPage.countryName })
+    : undefined),
+  canonicalPath: () => props.cityPage?.path || props.canonicalPath || route.path,
+  indexable: () => concertStatus.value === 'success' && (concertPage.value?.total || 0) > 0,
+})
 
 const { groupByMonth } = createConcertDateFormatting(locale, t('Date unavailable'))
 const groupedConcerts = computed(() => groupByMonth(concertPage.value?.items || []))
@@ -237,7 +246,15 @@ const clearFilters = async () => {
   await router.push({ query: {} })
 }
 
-const goToPage = async (page) => {
+const pageHref = page => router.resolve({
+  path: route.path,
+  query: updateConcertQuery(concertQuery.value, { page: String(page) }, { resetPage: false }),
+}).href
+
+const goToPage = async (event, page) => {
+  // Keep native link behavior for new tabs/windows and modified clicks.
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  event.preventDefault()
   if (page < 1 || page > (concertPage.value?.totalPages || 1) || page === concertPage.value?.page) return
   await updateQuery({ page: String(page) }, { resetPage: false })
   await nextTick()

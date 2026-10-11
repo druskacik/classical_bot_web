@@ -1,6 +1,8 @@
 <template>
-  <ConcertListPage title="Koncerty klasickej hudby na Slovensku" country-code="SK" />
+  <ConcertListPage
+    title="Koncerty klasickej hudby na Slovensku"
+    country-code="SK"
+    seo-title="Klasická hudba na Slovensku"
+    seo-description="Prehľad nadchádzajúcich koncertov klasickej hudby na Slovensku."
+  />
 </template>
-<script setup>
-useConcertListSeo({ title: 'Klasická hudba na Slovensku', description: 'Prehľad nadchádzajúcich koncertov klasickej hudby na Slovensku.', canonicalPath: '/' })
-</script>

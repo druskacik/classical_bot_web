@@ -39,6 +39,6 @@ test('index eligibility and sitemap promotion have independent boundaries', () =
     assert.equal(state.robots, count === 0 ? 'noindex, follow' : 'index, follow')
     assert.equal(state.canonicalHref, count === 0 ? null : 'https://classicalbot.com/czechia/prague')
     assert.equal(count >= CITY_SITEMAP_MIN_CONCERTS, count === 10)
-    assert.equal(getConcertListSeoState({ origin: 'https://classicalbot.com', canonicalPath: '/czechia/prague', query: { page: '2' }, indexable: count > 0 }).canonicalHref, null)
+    assert.equal(getConcertListSeoState({ origin: 'https://classicalbot.com', canonicalPath: '/czechia/prague', query: { page: '2' }, indexable: count > 0 }).canonicalHref, count > 0 ? 'https://classicalbot.com/czechia/prague?page=2' : null)
   }
 })

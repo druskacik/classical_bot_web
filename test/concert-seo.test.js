@@ -25,7 +25,7 @@ test('indexes a clean country page with an absolute canonical URL', () => {
   )
 })
 
-test('does not index filter, pagination, tracking, or unknown query URLs', () => {
+test('does not index subject, location, date, area, or unknown query URLs', () => {
   const queries = [
     { country: 'CZ' },
     { city: 'Prague,CZ' },
@@ -33,8 +33,9 @@ test('does not index filter, pagination, tracking, or unknown query URLs', () =>
     { dateTo: '2026-09-30' },
     { composers: 'Wolfgang Amadeus Mozart' },
     { works: '1' },
-    { page: '2' },
-    { utm_source: 'test' },
+    { radius: '25' },
+    { bounds: '1,2,3,4' },
+    { composers: 'Claude Debussy', page: '2', utm_source: 'test' },
     { unknown: '' },
   ]
 
@@ -56,7 +57,36 @@ test('canonical URLs use the consuming site origin without changing indexing pol
   )
   assert.deepEqual(
     getConcertListSeoState({ origin: 'https://classical.sk', canonicalPath: '/Bratislava', query: { page: '2' } }),
-    { robots: 'noindex, follow', canonicalHref: null },
+    { robots: 'index, follow', canonicalHref: 'https://classical.sk/Bratislava?page=2' },
   )
   assert.throws(() => getConcertListSeoState({ canonicalPath: '/', query: {} }), TypeError)
+})
+
+test('pagination has a page-specific canonical, without tracking parameters', () => {
+  for (const canonicalPath of ['/', '/czechia', '/czechia/prague']) {
+    for (const page of ['1', '2', '003']) {
+      const state = getConcertListSeoState({ origin: 'https://classicalbot.com', canonicalPath, query: { page, utm_source: 'newsletter', utm_campaign: 'autumn', gclid: '123' } })
+      assert.deepEqual(state, {
+        robots: 'index, follow',
+        canonicalHref: `https://classicalbot.com${canonicalPath}${Number(page) > 1 ? `?page=${Number(page)}` : ''}`,
+      })
+    }
+  }
+})
+
+test('tracking-only variants consolidate to the clean listing', () => {
+  assert.deepEqual(getConcertListSeoState({ origin: 'https://classicalbot.com', canonicalPath: '/', query: { utm_medium: 'email', fbclid: 'abc' } }), {
+    robots: 'index, follow', canonicalHref: 'https://classicalbot.com/',
+  })
+})
+
+test('invalid pagination and unavailable or empty listings are not indexable', () => {
+  for (const page of ['', null, '0', '-1', '2.5', 'bad', 'Infinity', '9007199254740992', ['2', '3']]) {
+    assert.deepEqual(getConcertListSeoState({ origin: 'https://classicalbot.com', canonicalPath: '/', query: { page } }), {
+      robots: 'noindex, follow', canonicalHref: null,
+    })
+  }
+  assert.deepEqual(getConcertListSeoState({ origin: 'https://classicalbot.com', canonicalPath: '/', query: { page: '2', utm_source: 'test' }, indexable: false }), {
+    robots: 'noindex, follow', canonicalHref: null,
+  })
 })

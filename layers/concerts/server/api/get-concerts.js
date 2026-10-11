@@ -15,7 +15,6 @@ export default defineEventHandler(async (event) => {
     const page = parsePage(query.page)
     const filters = parseConcertFilters(query, concertSite.country)
     if (filters.area) filters.area = resolveArea(filters.area, await getAreaCities(), concertSite.locale)
-    const { city } = filters
 
     return await cachedConcertData('concerts', { filters: concertFilterCacheInput(filters), page }, async () => {
       const countQuery = applyFilters(
@@ -54,7 +53,7 @@ export default defineEventHandler(async (event) => {
 
       const [countRow, concerts, catalogue] = await Promise.all([countQuery, itemQuery, getCityCatalogue()])
       const total = Number(countRow.total)
-      if (city?.id && page > Math.max(1, Math.ceil(total / PAGE_SIZE))) {
+      if (page > Math.max(1, Math.ceil(total / PAGE_SIZE))) {
         throw createError({ statusCode: 404, statusMessage: 'Concert page not found' })
       }
       const concertIds = concerts.map(concert => concert.id)

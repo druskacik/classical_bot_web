@@ -97,6 +97,9 @@ test('real endpoints preserve uncached output, skip DB on hits, and isolate both
   await assert.rejects(facets({ query: { type: 'country', cityId: '1' } }), { statusCode: 400 })
   catalogue.byId.set('1', city)
   await assert.rejects(concerts({ query: { city: '1', page: '2' } }), { statusCode: 404 })
+  for (const query of [{ page: '2' }, { country: 'SK', page: '2' }, { city: 'Bratislava,SK', page: '2' }, { composers: 'Mozart', page: '2' }]) {
+    await assert.rejects(concerts({ query }), { statusCode: 404 })
+  }
 
   // The async cache wrapper must preserve the endpoint's public error mapping.
   fail = true
@@ -109,6 +112,6 @@ test('real endpoints preserve uncached output, skip DB on hits, and isolate both
     console.error = originalError
   }
   const beforeRetry = queries
-  await concerts({ query: { page: '3' } })
+  await assert.rejects(concerts({ query: { page: '3' } }), { statusCode: 404 })
   assert.ok(queries > beforeRetry, 'A failure must permit a fresh database attempt')
 })

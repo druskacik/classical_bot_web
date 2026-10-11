@@ -2,6 +2,8 @@
   <ConcertListPage
     :title="`Classical music concerts in ${country.name}`"
     :country-code="country.code"
+    :seo-description="`Discover upcoming classical music concerts in ${country.name}.`"
+    :canonical-path="`/${requestedSlug}`"
  >
     <template #alerts="{ criteria }"><AlertSignup :criteria="criteria" /></template>
   </ConcertListPage>
@@ -26,10 +28,4 @@ if (!country) {
     statusMessage: 'Country not found',
   })
 }
-
-useConcertListSeo({
-  title: `Classical music concerts in ${country.name} — ClassicalBot`,
-  description: `Discover upcoming classical music concerts in ${country.name}.`,
-  canonicalPath: `/${requestedSlug}`,
-})
 </script>
