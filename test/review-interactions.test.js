@@ -297,7 +297,7 @@ test('list presentation survives filter refreshes without leaking old subjects o
   const view = await mount('../layers/concerts/app/components/concert-list-page.vue', { title: 'Concerts' }, route, undefined, { subjectDiscovery: true })
   try {
     view.state.concertPage.value = { items: [], total: 120, totalPages: 3, discovery: { status: 'resolved', subject: composer }, displayQuery: { composers: composer.name } }
-    assert.equal(view.state.presentation.value.heading, 'Ludwig van Beethoven concerts')
+    assert.equal(view.state.presentation.value.heading, 'Ludwig van Beethoven concerts around the world')
     route.query = { composers: composer.name, country: 'AU', dateFrom: '2026-11-01' }
     view.state.concertPage.value = undefined
     view.state.concertStatus.value = 'pending'

@@ -29,7 +29,8 @@ export function concertListPresentation(query, { subject = null, city = null, ar
   const selected = matchingDisplaySubject(query, subject)
   const location = concertLocationPhrase(query, { city, area })
   const metadata = selected ? subjectMetadata(selected, location || 'worldwide') : null
-  const heading = selected ? subjectMetadata(selected, location).heading.trim()
+  const headingLocation = location || (selected?.type === 'composer' ? 'around the world' : '')
+  const heading = selected ? subjectMetadata(selected, headingLocation).heading.trim()
     : `Classical music concerts ${location || 'around the world'}`
   return {
     heading,

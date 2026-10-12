@@ -11,7 +11,7 @@ const work = { type: 'work', id: 6825, composerName: 'Claude Debussy', title: 'L
 const present = (query, extra = {}) => concertListPresentation(query, { subject: composer, ...extra })
 
 test('composer heading, title and profile remain specific under combined filters', () => {
-  assert.equal(present(music).heading, 'Ludwig van Beethoven concerts')
+  assert.equal(present(music).heading, 'Ludwig van Beethoven concerts around the world')
   assert.equal(present(music).title, 'Ludwig van Beethoven concerts worldwide — ClassicalBot')
   for (const dates of [{}, { dateFrom: '2026-11-01', dateTo: '2026-11-02' }]) {
     const query = { ...music, country: 'AU', ...dates }
