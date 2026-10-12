@@ -41,7 +41,7 @@ export function subjectListingPath(path, subject, page = 1) {
 export function subjectMetadata(subject, locationPhrase = 'worldwide') {
   if (subject.type === 'composer') return {
     title: `${subject.name} concerts ${locationPhrase} — ClassicalBot`,
-    heading: `Concerts featuring ${subject.name}’s music ${locationPhrase}`,
+    heading: `${subject.name} concerts ${locationPhrase}`,
     description: `Find upcoming concerts featuring ${subject.name}’s music ${locationPhrase}. Browse dates, venues and programmes.`,
   }
   const normalize = value => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')

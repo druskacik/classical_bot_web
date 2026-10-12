@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import knex from 'knex'
 import { getConcertListSeoState } from '../layers/concerts/app/composables/useConcertListSeo.js'
 import { singleSubjectSelection, subjectListingPath, subjectMetadata } from '../layers/concerts/shared/utils/subject-discovery.js'
-import { subjectDiscoveryLocation, broaderSubjectLocation } from '../layers/concerts/app/utils/concert-discovery.js'
+import { subjectDiscoveryLocation } from '../layers/concerts/app/utils/concert-discovery.js'
 import { resolveDiscoverySubject } from '../layers/concerts/server/utils/subject-discovery.js'
 import { buildSitemapInventory } from '../shared/utils/sitemap-inventory.js'
 import { buildCityCatalogue } from '../layers/concerts/shared/utils/city-catalogue.js'
@@ -89,24 +89,6 @@ test('map subject links prefer selected geography over viewport bounds, without 
   assert.deepEqual(Object.fromEntries(new URL(viewportOnly, 'https://classicalbot.com').searchParams), {
     composers: composer.name, bounds, ...dates,
   })
-})
-
-test('broader links explicitly remove restrictions while retaining equivalent fixed geography', () => {
-  const query = { composers: composer.name, dateFrom: '2026-11-01' }
-  const cityPage = { path: '/czechia/prague', name: 'Prague', countryName: 'Czechia' }
-  assert.deepEqual(broaderSubjectLocation({ query }, composer, { cityPage }), {
-    href: '/czechia/prague?composers=Claude+Debussy', label: 'See all upcoming Claude Debussy concerts in Prague, Czechia',
-  })
-  assert.equal(broaderSubjectLocation({ query }, composer, { countryCode: 'CZ', canonicalPath: '/czechia' }).href, '/czechia?composers=Claude+Debussy')
-  assert.equal(broaderSubjectLocation({ query: { ...query, country: 'CZ' } }, composer).href, '/czechia?composers=Claude+Debussy')
-  for (const extra of [{ radius: '50' }, { bounds: '14,49,15,51' }, { nearLat: '50', nearLng: '14', radius: '10' }]) {
-    const link = broaderSubjectLocation({ query: { ...query, ...extra } }, composer, { cityPage })
-    assert.equal(link.href, '/?composers=Claude+Debussy')
-    assert.ok(link.label.endsWith('worldwide'))
-  }
-  assert.equal(broaderSubjectLocation({ query: { ...query, city: 'Prague,CZ' } }, composer).href, '/?composers=Claude+Debussy')
-  assert.equal(broaderSubjectLocation({ query: { works: '2', dateTo: '2026-12-01' } }, work).label, 'See all upcoming performances of Claude Debussy: La mer worldwide')
-  assert.equal(broaderSubjectLocation({ query: { composers: composer.name, page: '2', utm_source: 'email' } }, composer), null)
 })
 
 test('subject metadata is geographic and catalogue numbers are not repeated', () => {

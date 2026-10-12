@@ -1,8 +1,8 @@
 <template>
   <main class="concert-list-page container mx-auto px-4 py-4 sm:py-8 sm:px-6 lg:px-8">
-    <h1 :class="{ 'home-title': !countryCode && !cityPage }" class="mx-auto max-w-4xl text-center font-serif text-gray-950 sm:text-4xl">{{ discoveryMeta?.heading || title }}</h1>
-    <p v-if="profilePath" class="mt-3 text-center text-sm">
-      <NuxtLink :to="profilePath" class="text-primary hover:underline">Explore {{ concertPage.discovery.subject.name }}’s playlist and repertoire</NuxtLink>
+    <h1 :class="{ 'home-title': !countryCode && !cityPage }" class="mx-auto max-w-4xl text-center font-serif text-gray-950 sm:text-4xl">{{ presentation?.heading || title }}</h1>
+    <p v-if="presentation?.profilePath" class="mt-3 text-center text-sm">
+      <NuxtLink :to="presentation.profilePath" class="text-primary hover:underline">{{ presentation.profileLabel }}</NuxtLink>
     </p>
 
     <div class="mx-auto mt-3 max-w-6xl sm:mt-5">
@@ -40,10 +40,6 @@
           <NuxtLink :to="concertMapLocation(concertQuery, filters.city, filters.country)" class="inline-flex min-h-11 shrink-0 items-center gap-2 text-sm text-primary hover:underline"><UIcon name="i-lucide-map" class="size-4" />{{ t('Map') }}</NuxtLink>
         </div>
       </div>
-
-      <p v-if="broaderSubject" class="mt-2 text-sm">
-        <NuxtLink :to="broaderSubject.href" :prefetch="false" class="inline-flex min-h-11 items-center text-primary underline underline-offset-4 hover:no-underline focus-visible:outline-2 focus-visible:outline-primary">{{ broaderSubject.label }}</NuxtLink>
-      </p>
 
       <div v-if="concertStatus === 'pending' && !concertPage" class="py-10">
         <UProgress animation="swing" />
@@ -121,7 +117,8 @@
 
 <script setup>
 const { t, locale, plural } = useConcertText()
-import { concertMapLocation, cityRadiusLocation, updateConcertQuery, broaderSubjectLocation } from '../utils/concert-discovery.js'
+import { concertMapLocation, cityRadiusLocation, updateConcertQuery } from '../utils/concert-discovery.js'
+import { concertListPresentation, concertLocationKey } from '../utils/concert-list-presentation.js'
 import { AREA_KEYS } from '../../shared/utils/concert-area.js'
 import { createConcertDateFormatting } from '../utils/concert-dates.js'
 import { composerSelections, serializeComposerSelections, firstQueryValue as firstValue, querySelections as listValue, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
@@ -177,7 +174,11 @@ const requestParams = computed(() => ({
 const countriesRequest = useCountries()
 const concertsRequest = useAsyncData(
   computed(() => `concerts:${JSON.stringify(requestParams.value)}`),
-  () => $fetch('/api/get-concerts', { params: requestParams.value }),
+  async () => {
+    const displayQuery = { ...requestParams.value }
+    const page = await $fetch('/api/get-concerts', { params: displayQuery })
+    return { ...page, displayQuery }
+  },
 )
 const [
   { data: countries },
@@ -214,12 +215,26 @@ if (concertError.value) {
   throw createError({ statusCode: concertError.value.statusCode || 500, statusMessage: t('Concerts could not be loaded') })
 }
 const approvedSubjectQuery = computed(() => concertSite.subjectDiscovery && isSubjectDiscoveryQuery(route.query))
-const broaderSubject = computed(() => {
-  const discovery = concertPage.value?.discovery
-  if (!concertSite.subjectDiscovery || concertStatus.value !== 'success' || discovery?.status !== 'resolved'
-    || !subjectMatchesQuery(discovery.subject, route.query)) return null
-  return broaderSubjectLocation(route, discovery.subject, props)
+// Keep resolved labels across refreshes, but only use them for matching selections.
+const lastDisplayPage = shallowRef(concertPage.value)
+watch(concertPage, page => {
+  if (!page) return
+  lastDisplayPage.value = page
+}, { immediate: true, flush: 'sync' })
+const presentation = computed(() => {
+  if (!concertSite.subjectDiscovery) return null
+  const query = requestParams.value
+  const page = lastDisplayPage.value
+  const sameLocation = concertLocationKey(query) === concertLocationKey(page?.displayQuery)
+  const fixedCity = props.cityPage && !radius.value && !unresolvedArea.value
+    ? { label: props.cityPage.name, countryCode: props.cityPage.countryCode } : null
+  return concertListPresentation(query, {
+    subject: page?.discovery?.status === 'resolved' ? page.discovery.subject : null,
+    city: fixedCity || (sameLocation ? page?.displayCity : null),
+    area: sameLocation ? page?.area : null,
+  })
 })
+// SEO eligibility still controls canonical pagination, independently of display text.
 const discoveryMeta = computed(() => {
   const discovery = concertPage.value?.discovery
   if (!approvedSubjectQuery.value || discovery?.status !== 'resolved' || !subjectMatchesQuery(discovery.subject, route.query)) return null
@@ -227,8 +242,6 @@ const discoveryMeta = computed(() => {
     : props.countryCode ? `in ${countries.value?.find(country => country.code === props.countryCode)?.name || props.countryCode}` : 'worldwide'
   return subjectMetadata(discovery.subject, locationPhrase)
 })
-const profilePath = computed(() => discoveryMeta.value && !props.countryCode && !props.cityPage
-  ? concertPage.value?.discovery?.subject?.profilePath : null)
 const requestEvent = useRequestEvent()
 if (requestEvent && approvedSubjectQuery.value && concertStatus.value === 'success'
   && (concertPage.value?.discovery?.status === 'unknown'
@@ -236,8 +249,8 @@ if (requestEvent && approvedSubjectQuery.value && concertStatus.value === 'succe
   setResponseStatus(requestEvent, 404)
 }
 useConcertListSeo({
-  title: () => discoveryMeta.value?.title || props.seoTitle || `${props.title} — ${concertSite.name}`,
-  description: () => discoveryMeta.value?.description || props.seoDescription || (props.cityPage
+  title: () => presentation.value?.title || props.seoTitle || `${props.title} — ${concertSite.name}`,
+  description: () => presentation.value?.description || discoveryMeta.value?.description || props.seoDescription || (props.cityPage
     ? t('Discover upcoming classical music concerts in {city}, {country}.', { city: props.cityPage.name, country: props.cityPage.countryName })
     : undefined),
   canonicalPath: () => props.cityPage?.path || props.canonicalPath || route.path,

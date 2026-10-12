@@ -8,6 +8,7 @@ import { applyFilters, parseConcertFilters, parsePage } from '../utils/concert-f
 import { getCityCatalogue } from '../utils/city-catalogue.js'
 import { groupConcertWorks } from '../utils/concert-works.js'
 import { resolveDiscoverySubject } from '../utils/subject-discovery.js'
+import { resolveConcertDisplayCity } from '../utils/concert-display-city.js'
 
 const PAGE_SIZE = 50
 export default defineEventHandler(async (event) => {
@@ -52,9 +53,11 @@ export default defineEventHandler(async (event) => {
         .limit(PAGE_SIZE)
         .offset((page - 1) * PAGE_SIZE)
 
-      const [countRow, concerts, catalogue, discovery] = await Promise.all([
+      const [countRow, concerts, catalogue, discovery, displayCity] = await Promise.all([
         countQuery, itemQuery, getCityCatalogue(),
         concertSite.subjectDiscovery ? resolveDiscoverySubject(knex, filters) : null,
+        concertSite.subjectDiscovery ? resolveConcertDisplayCity(knex, filters.city
+          ? { ...filters.city, country: filters.city.country || filters.country } : null, concertSite.locale) : null,
       ])
       const total = Number(countRow.total)
       if (page > Math.max(1, Math.ceil(total / PAGE_SIZE))) {
@@ -88,6 +91,7 @@ export default defineEventHandler(async (event) => {
 
       return {
         ...(discovery ? { discovery } : {}),
+        ...(displayCity ? { displayCity } : {}),
         items: concerts.map(concert => ({
           ...concert,
           city_path: (catalogue.byId.get(String(concert.city_id)) || (concertSite.cityRoutes === 'local' ? catalogue.byPath.get(`/${concert.city}`) : null))?.path || null,

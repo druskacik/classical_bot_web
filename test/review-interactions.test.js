@@ -9,6 +9,7 @@ import * as Vue from 'vue'
 import { createConcertText } from '../layers/concerts/app/utils/concert-text.js'
 import * as discovery from '../layers/concerts/app/utils/concert-discovery.js'
 import * as subjectDiscovery from '../layers/concerts/shared/utils/subject-discovery.js'
+import * as presentation from '../layers/concerts/app/utils/concert-list-presentation.js'
 import * as area from '../layers/concerts/shared/utils/concert-area.js'
 import * as map from '../layers/concerts/shared/utils/concert-map.js'
 import * as dates from '../layers/concerts/app/utils/concert-dates.js'
@@ -16,7 +17,7 @@ import { parseConcertFilters } from '../layers/concerts/server/utils/concert-fil
 import { parseArea } from '../layers/concerts/server/utils/concert-area.js'
 
 globalThis.createError = fields => Object.assign(new Error(fields.statusMessage), fields)
-async function mount(path, props, route = Vue.reactive({ query: {} }), fetcher = async () => ({ items: [] })) {
+async function mount(path, props, route = Vue.reactive({ query: {} }), fetcher = async () => ({ items: [] }), site = {}) {
   const mounted = []
   const dataRequests = []
   // Each mount gets desktop media queries and its own listener lifecycle.
@@ -30,10 +31,12 @@ async function mount(path, props, route = Vue.reactive({ query: {} }), fetcher =
     },
   }
   const component = compileComponent(path, {
-    ...discovery, ...subjectDiscovery, ...area, ...map, ...dates, ...queryHelpers, useConcertQuery, useConcertMapNavigation, useConcertDateFilter,
+    ...discovery, ...subjectDiscovery, ...presentation, ...area, ...map, ...dates, ...queryHelpers, useConcertQuery, useConcertMapNavigation, useConcertDateFilter,
     onMounted: callback => mounted.push(callback), window: browserWindow, $fetch: fetcher,
     useRoute: () => route,
-    useRouter: () => ({ push: location => { route.query = location.query }, replace: location => { route.query = location.query } }),
+    useRouter: () => ({ push: location => { route.query = location.query }, replace: location => { route.query = location.query },
+      resolve: location => ({ href: `${location.path}?${new URLSearchParams(location.query)}` }) }),
+    useAppConfig: () => ({ concertSite: site }),
     definePageMeta() {}, useConcertListSeo() {}, useRequestEvent: () => undefined,
     useCountries: () => Promise.resolve({ data: Vue.ref([]) }),
     useAsyncData: (key, handler) => {
@@ -286,4 +289,37 @@ test('cross-country city jump updates marker and programme requests together', a
       assert.deepEqual(view.state.filterContext.value, { composers: 'Bach' })
     } finally { view.unmount() }
   }
+})
+
+test('list presentation survives filter refreshes without leaking old subjects or dropping pagination filters', async () => {
+  const composer = { type: 'composer', id: 1, name: 'Ludwig van Beethoven', profilePath: '/composers/1-ludwig-van-beethoven' }
+  const route = Vue.reactive({ path: '/', query: { composers: composer.name } })
+  const view = await mount('../layers/concerts/app/components/concert-list-page.vue', { title: 'Concerts' }, route, undefined, { subjectDiscovery: true })
+  try {
+    view.state.concertPage.value = { items: [], total: 120, totalPages: 3, discovery: { status: 'resolved', subject: composer }, displayQuery: { composers: composer.name } }
+    assert.equal(view.state.presentation.value.heading, 'Ludwig van Beethoven concerts')
+    route.query = { composers: composer.name, country: 'AU', dateFrom: '2026-11-01' }
+    view.state.concertPage.value = undefined
+    view.state.concertStatus.value = 'pending'
+    await Vue.nextTick()
+    assert.equal(view.state.presentation.value.heading, 'Ludwig van Beethoven concerts in Australia')
+    assert.equal(view.state.presentation.value.profilePath, composer.profilePath)
+    const pageTwo = new URL(view.state.pageHref(2), 'https://classicalbot.com')
+    assert.equal(pageTwo.searchParams.get('country'), 'AU')
+    assert.equal(pageTwo.searchParams.get('dateFrom'), '2026-11-01')
+    assert.equal(pageTwo.searchParams.get('composers'), composer.name)
+    assert.equal(pageTwo.searchParams.get('page'), '2')
+    // The same selected composer remains useful even when the new search is empty.
+    view.state.concertPage.value = { items: [], total: 0, discovery: { status: 'resolved', subject: composer }, displayQuery: { ...route.query } }
+    view.state.concertStatus.value = 'success'
+    assert.equal(view.state.presentation.value.profilePath, composer.profilePath)
+    route.query = { composers: 'Claude Debussy', country: 'AU' }
+    assert.equal(view.state.presentation.value.heading, 'Classical music concerts in Australia')
+    assert.equal(view.state.presentation.value.profilePath, null)
+    route.query = {}
+    assert.equal(view.state.presentation.value.heading, 'Classical music concerts')
+    route.query = { composers: composer.name, country: 'AU' }
+    view.state.concertPage.value = { items: [], discovery: { status: 'ambiguous' }, displayQuery: { ...route.query } }
+    assert.equal(view.state.presentation.value.profilePath, null)
+  } finally { view.unmount() }
 })

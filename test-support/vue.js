@@ -24,7 +24,7 @@ export const renderer = Vue.createRenderer({
 export function compileComponent(path, bindings = {}, { inlineTemplate = false, modules = {} } = {}) {
   const { descriptor } = parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
   const scope = {
-    ...Object.fromEntries(['ref', 'computed', 'watch', 'nextTick', 'useId', 'onMounted', 'onUnmounted', 'onBeforeUnmount'].map(key => [key, Vue[key]])),
+    ...Object.fromEntries(['ref', 'shallowRef', 'computed', 'watch', 'nextTick', 'useId', 'onMounted', 'onUnmounted', 'onBeforeUnmount'].map(key => [key, Vue[key]])),
     useConcertText: () => createConcertText('en-GB'),
     useAppConfig: () => ({ concertSite: {} }),
     useRuntimeConfig: () => ({ public: {} }),
