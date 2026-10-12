@@ -317,7 +317,8 @@ test('list presentation survives filter refreshes without leaking old subjects o
     assert.equal(view.state.presentation.value.heading, 'Classical music concerts in Australia')
     assert.equal(view.state.presentation.value.profilePath, null)
     route.query = {}
-    assert.equal(view.state.presentation.value.heading, 'Classical music concerts')
+    assert.equal(view.state.presentation.value.heading, 'Classical music concerts around the world')
+    assert.equal(view.state.presentation.value.title, null)
     route.query = { composers: composer.name, country: 'AU' }
     view.state.concertPage.value = { items: [], discovery: { status: 'ambiguous' }, displayQuery: { ...route.query } }
     assert.equal(view.state.presentation.value.profilePath, null)

@@ -75,6 +75,7 @@ const slovak = {
   "Work": "Dielo",
   "Search works or composers": "Hľadať diela alebo skladateľov",
   "Clear filters": "Zrušiť filtre",
+  "Clear all filters": "Zrušiť všetky filtre",
   "Remove {label} filter": "Odstrániť filter {label}",
   "Change city…": "Zmeniť mesto…",
   "Add another…": "Pridať ďalší…",

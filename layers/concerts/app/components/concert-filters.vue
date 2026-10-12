@@ -72,7 +72,7 @@
 
     <div v-if="activeFilterCount" class="mt-4 flex min-h-11 items-center justify-between" :class="fixedCity && 'md:col-span-3'">
       <p class="text-xs text-gray-500">{{ activeFilters(activeFilterCount) }}</p>
-      <button type="button" class="cursor-pointer text-sm text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="clearFilters">{{ t('Clear filters') }}</button>
+      <button type="button" class="cursor-pointer text-sm text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="clearFilters">{{ t('Clear all filters') }}</button>
     </div>
   </section>
 </template>

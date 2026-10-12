@@ -30,10 +30,11 @@ export function concertListPresentation(query, { subject = null, city = null, ar
   const location = concertLocationPhrase(query, { city, area })
   const metadata = selected ? subjectMetadata(selected, location || 'worldwide') : null
   const heading = selected ? subjectMetadata(selected, location).heading.trim()
-    : `Classical music concerts${location ? ` ${location}` : ''}`
+    : `Classical music concerts ${location || 'around the world'}`
   return {
     heading,
-    title: metadata?.title || `Classical music concerts ${location || 'worldwide'} — ClassicalBot`,
+    // Let the page retain its explicit SEO title when there is no specific subject or location.
+    title: metadata?.title || (location ? `Classical music concerts ${location} — ClassicalBot` : null),
     description: metadata?.description,
     profilePath: selected?.type === 'composer' ? selected.profilePath || null : null,
     profileLabel: selected?.type === 'composer' ? `${selected.name}’s playlist and repertoire` : null,

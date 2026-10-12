@@ -108,7 +108,7 @@
           <button v-if="filters.dateFrom || filters.dateTo" type="button" class="min-h-11 cursor-pointer text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" @click="updateFilter({ changes: { dateFrom: null, dateTo: null } })">{{ t('Try any date') }}</button>
           <button v-if="filters.composers.length || filters.works.length" type="button" class="min-h-11 cursor-pointer text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" @click="updateFilter({ changes: { composers: [], works: [] } })">{{ t('Remove music filters') }}</button>
         </div>
-        <button v-if="!cityPage || hasRemovableFilters" type="button" class="mt-3 cursor-pointer text-sm text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="clearFilters">{{ t('Clear filters') }}</button>
+        <button v-if="!cityPage || hasRemovableFilters" type="button" class="mt-3 cursor-pointer text-sm text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="clearFilters">{{ t('Clear all filters') }}</button>
         <NuxtLink v-else :to="cityParentPath" class="mt-3 inline-block text-sm text-primary hover:underline">{{ cityParentPath === '/' ? t('Browse all concerts') : t('Browse concerts in {country}', { country: cityPage.countryName }) }}</NuxtLink>
       </div>
     </div>
