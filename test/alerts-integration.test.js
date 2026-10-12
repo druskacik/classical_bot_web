@@ -137,6 +137,28 @@ test('multiple alerts and combined delivery against disposable PostgreSQL', {ski
     assert.equal(duplicate.duplicate,true); assert.equal(duplicate.alertId,first.alertId)
   })
   await reset()
+  await t.test('zero-match alerts activate, remain quiet, and deliver a later matching concert once', async () => {
+    await reset()
+    await db('composer').insert({ id: 500, name: 'Philip Glass' })
+    await db('work').insert({ id: 500, composer_id: 500, title: 'Glassworks' })
+    const saved = await activate({ country: 'SK', composers: 'Philip Glass', works: '500' })
+    assert.equal((await db('concert_alert').where('id', saved.alertId).first()).status, 'active')
+    assert.equal((await db('concert_alert_seen').where('alert_id', saved.alertId)).length, 0)
+    messages.length = 0
+    await run()
+    assert.equal(messages.length, 0)
+    const concertId = await add({ country_code_resolved: 'SK' })
+    await db('classical_concert_composer').insert({ classical_concert_id: concertId, composer_id: 500 })
+    await db('classical_concert_work').insert({ classical_concert_id: concertId, work_id: 500 })
+    // A daily pass with no matches must not prevent a later daily pass from finding new ones.
+    const tomorrow = new Date(now.valueOf() + 86400_000)
+    await run({ now: tomorrow })
+    assert.equal(messages.length, 1)
+    assert.match(messages[0].text, /Philip Glass/)
+    await run({ now: tomorrow })
+    assert.equal(messages.length, 1)
+    await reset()
+  })
   await t.test('one digest, overlapping matches, baseline suppression and recipient delivery history',async()=>{
     const baseline=await add()
     const first=await activate({city:'1'})

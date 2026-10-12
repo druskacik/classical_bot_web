@@ -51,7 +51,6 @@
       <FilterAutocomplete
         type="composer"
         :context="optionContext"
-        :show-count="false"
         :city-id="radius ? null : fixedCityId"
         :label="t('Composer')"
         :placeholder="t('Search composers')"
@@ -62,7 +61,6 @@
       <FilterAutocomplete
         type="work"
         :context="optionContext"
-        :show-count="false"
         :city-id="radius ? null : fixedCityId"
         :label="t('Work')"
         :placeholder="t('Search works or composers')"

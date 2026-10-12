@@ -127,7 +127,9 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
       assert.equal((await concerts({ query: { country, city } })).total, 1)
       for (const type of ['composer', 'work']) {
         const items = (await facets({ query: { country, type } })).items
-        assert.equal(items.length, 1)
+        assert.equal(items.length, 2)
+        assert.equal(items[0].count, 1)
+        assert.equal(items[1].count, 0)
         assert.equal(String(items[0].value), type === 'work' ? music : country === 'AT' ? 'Austria Composer' : 'Slovakia Composer')
       }
     }
@@ -179,7 +181,13 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
     assert.equal(czech.radiusAvailable, false)
     assert.equal((await concerts({ query: { city: czech.value } })).total, czech.count)
     assert.equal((await options({ q: 'nove', country: 'CZ' }))[0].count, 1, 'existing resolved-country scope remains unchanged')
-    for (const query of [{ q: 'hidden' }, { q: 'no country' }, { q: 'invalid country' }, { q: 'nove', composers: 'Austria Composer' }, { q: 'nove', works: '1' }, { q: 'nove', dateFrom: '2099-01-01' }]) assert.deepEqual(await options(query), [])
+    for (const query of [{ q: 'no country' }, { q: 'invalid country' }]) assert.deepEqual(await options(query), [])
+    for (const query of [{ q: 'hidden' }, { q: 'nove', composers: 'Austria Composer' }, { q: 'nove', works: '1' }, { q: 'nove', dateFrom: '2099-01-01' }]) {
+      const items = await options(query)
+      assert.ok(items.length)
+      assert.ok(items.every(item => item.count === 0))
+    }
+    assert.deepEqual((await options({ q: 'hidden' })).map(item => item.label), ['Hidden past'])
     const selected = (await options({ q: 'Vienna', selected: czech.value, dateFrom: '2099-01-01' })).find(item => item.value === czech.value)
     assert.equal(selected.count, 0)
     assert.equal(selected.radiusAvailable, false)
@@ -215,9 +223,9 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
     assert.equal(unresolved[0].radiusAvailable, false)
     assert.deepEqual(await options({ q: 'nove' }), [])
     assert.deepEqual(await options({ selected: 'Nové Město nad Metují,CZ' }), (await options({})))
-    const restored = await options({ selected: 'Unlinked Slovak City,SK', dateFrom: '2099-01-01' })
-    assert.equal(restored[0].count, 0)
-    assert.equal(restored[0].radiusAvailable, false)
+    const restored = (await options({ selected: 'Unlinked Slovak City,SK', dateFrom: '2099-01-01' })).find(item => item.value === 'Unlinked Slovak City,SK')
+    assert.equal(restored.count, 0)
+    assert.equal(restored.radiusAvailable, false)
     assert.equal((await options({ q: 'Bratislava' }))[0].label, 'Bratislava')
     assert.deepEqual((await origins({ query: { q: 'Athens', selected: '861' } })).items, [])
     assert.equal((await concerts({ query: { city: '861' } })).total, 0)
@@ -280,6 +288,81 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
     const area = await concerts({ query: { city: 'Test City, District,US', radius: '25' } })
     assert.equal(area.total, 1)
     assert.equal(area.area.label, 'Test City, District')
+  })
+
+  await t.test('catalogue-only music and locations remain discoverable with contextual availability', async () => {
+    Object.assign(site, { country: null, locale: 'en-GB' })
+    await db('composer').insert([
+      { id: 500, name: 'Philip Glass', normalized_name: 'philip glass' },
+      ...Array.from({ length: 22 }, (_, i) => ({ id: 501 + i, name: `Philip Glass Ensemble ${i}`, normalized_name: `philip glass ensemble ${i}` })),
+      { id: 550, name: 'Émpty_Name', normalized_name: 'empty_name' },
+    ])
+    await db('work').insert([{ id: 500, composer_id: 500, title: 'Glassworks', normalized_title: 'glassworks' }])
+    const query = async input => (await facets({ query: input })).items
+    for (const country of [null, 'SK']) {
+      site.country = country
+      const found = await query({ type: 'composer', country: 'SK', q: 'Philip Glass' })
+      assert.equal(found.length, 20)
+      assert.equal(found[0].value, 'Philip Glass')
+      assert.equal(found[0].count, 0)
+      assert.ok((await query({ type: 'composer', selected: 'Philip Glass', q: 'unmatched' })).some(item => item.value === 'Philip Glass'))
+      assert.deepEqual((await query({ type: 'work', composers: 'Philip Glass' })).map(item => [item.value, item.count]), [['500', 0]])
+      assert.ok((await query({ type: 'work', composers: 'Austria Composer', selected: '500' })).some(item => item.value === '500'))
+      assert.equal((await query({ type: 'composer', q: 'émpty_' }))[0].value, 'Émpty_Name')
+      const countries = await query({ type: 'country', composers: 'Philip Glass' })
+      assert.ok(countries.some(item => item.value === 'SK' && item.count === 0))
+      if (country) assert.ok(countries.every(item => item.value === 'SK'))
+      const cities = await query({ type: 'city', country: 'SK', composers: 'Philip Glass', q: 'Bratislava' })
+      assert.equal(cities[0].count, 0)
+      assert.equal(cities[0].radiusAvailable, true)
+      assert.ok(cities.every(item => item.country_code === 'SK'))
+      const radius = await query({ type: 'composer', city: 'Bratislava,SK', radius: '25', q: 'Philip Glass' })
+      assert.equal(radius[0].value, 'Philip Glass')
+      assert.equal(radius[0].count, 0)
+    }
+    site.country = null
+    const concert = await db('classical_concert').where({ city_id: 4 }).first()
+    await db('classical_concert_composer').insert(Array.from({ length: 22 }, (_, i) => ({ classical_concert_id: concert.id, composer_id: 501 + i })))
+    assert.equal((await query({ type: 'composer', q: 'Philip Glass' }))[0].value, 'Philip Glass', 'exact zero-match result outranks 22 available partial matches')
+    await db('classical_concert_composer').insert({ classical_concert_id: concert.id, composer_id: 500 })
+    await db('classical_concert_work').insert({ classical_concert_id: concert.id, work_id: 500 })
+    assert.equal((await query({ type: 'composer', q: 'Philip Glass', country: 'AT' }))[0].count, 1)
+    assert.equal((await query({ type: 'work', composers: 'Philip Glass', dateFrom: '2099-01-01' }))[0].count, 0)
+    assert.equal((await query({ type: 'composer', q: 'Philip Glass', country: 'SK' }))[0].count, 0)
+  })
+
+  await t.test('work suggestions preserve mixed-composer programmes while scoping zero-match catalogue entries', async () => {
+    await db('composer').insert([
+      { id: 700, name: 'Mozart', normalized_name: 'mozart' },
+      { id: 701, name: 'Beethoven', normalized_name: 'beethoven' },
+    ])
+    await db('work').insert([
+      { id: 700, composer_id: 700, title: 'Mozart catalogue work', normalized_title: 'mozart catalogue work' },
+      { id: 701, composer_id: 701, title: 'Beethoven shared programme', normalized_title: 'beethoven shared programme' },
+      { id: 702, composer_id: 701, title: 'Beethoven catalogue work', normalized_title: 'beethoven catalogue work' },
+      { id: 703, composer_id: 701, title: 'Beethoven Austria programme', normalized_title: 'beethoven austria programme' },
+    ])
+    for (const [country, city, work] of [['SK', 7, 701], ['AT', 4, 703]]) {
+      const [concert] = await db('classical_concert').insert({ city_id: city, country_code_resolved: country }).returning('id')
+      await db('classical_concert_composer').insert([700, 701].map(composer_id => ({ classical_concert_id: concert.id, composer_id })))
+      await db('classical_concert_work').insert({ classical_concert_id: concert.id, work_id: work })
+    }
+    const works = async query => (await facets({ query: { type: 'work', composers: 'Mozart', ...query } })).items
+    for (const country of [null, 'SK']) {
+      site.country = country
+      const available = await works({})
+      assert.equal(available.find(item => item.value === '700').count, 0, 'selected composer catalogue works remain selectable')
+      assert.equal(available.find(item => item.value === '701')?.count, 1, 'other composers on matching programmes remain discoverable')
+      assert.equal(available.some(item => item.value === '702'), false, 'unrelated zero-match catalogue works stay scoped out')
+      assert.equal(available.some(item => item.value === '703'), !country, 'availability observes the site country')
+      const searched = await works({ q: 'Beethoven', country: 'SK' })
+      assert.deepEqual(searched.map(item => [item.value, item.count]), [['701', 1]], 'text and country restrictions apply to both sides of the eligibility condition')
+      assert.equal((await concerts({ query: { composers: 'Mozart', works: '701', country: 'SK' } })).total, searched[0].count)
+      assert.deepEqual((await works({ dateFrom: '2099-01-01' })).map(item => [item.value, item.count]), [['700', 0]])
+      const restored = await works({ q: 'unmatched', dateFrom: '2099-01-01', selected: '701' })
+      assert.deepEqual(restored.map(item => [item.value, item.count]), [['701', 0]])
+    }
+    site.country = null
   })
 
 })

@@ -36,7 +36,7 @@
           {{ resultSummary }}
         </p>
         <div class="flex w-full flex-wrap items-center gap-x-6 gap-y-1 sm:ml-auto sm:w-auto sm:justify-end">
-          <slot name="alerts" :criteria="requestParams" />
+          <slot v-if="!emptyResults" name="alerts" :criteria="requestParams" />
           <NuxtLink :to="concertMapLocation(concertQuery, filters.city, filters.country)" class="inline-flex min-h-11 shrink-0 items-center gap-2 text-sm text-primary hover:underline"><UIcon name="i-lucide-map" class="size-4" />{{ t('Map') }}</NuxtLink>
         </div>
       </div>
@@ -106,6 +106,7 @@
       </div>
       <div v-else class="py-16 text-center">
         <p class="font-serif text-xl text-gray-800">{{ cityPage && !hasRemovableFilters ? t('No upcoming concerts listed in {city}.', { city: cityPage.name }) : t('No upcoming concerts match these filters.') }}</p>
+        <div v-if="emptyResults && $slots.alerts" class="mt-3 flex justify-center text-left"><slot name="alerts" :criteria="requestParams" /></div>
         <div class="mt-3 flex flex-wrap justify-center gap-x-6 gap-y-2">
           <button v-if="radius" type="button" class="min-h-11 cursor-pointer text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" @click="filterControls?.editArea()">{{ t('Increase distance') }}</button>
           <button v-if="filters.dateFrom || filters.dateTo" type="button" class="min-h-11 cursor-pointer text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" @click="updateFilter({ changes: { dateFrom: null, dateTo: null } })">{{ t('Try any date') }}</button>
@@ -198,6 +199,7 @@ const { data: countryOptions, status: countryOptionsStatus, refresh: refreshCoun
   computed(() => `country-options:${JSON.stringify(countryOptionParams.value)}`),
   () => props.countryCode ? Promise.resolve({ items: [] }) : $fetch('/api/get-concert-filter-options', { params: countryOptionParams.value }),
 )
+const emptyResults = computed(() => concertStatus.value === 'success' && concertPage.value?.total === 0)
 const filterCountries = computed(() => {
   if (countryOptionsStatus.value === 'success') return (countryOptions.value?.items || []).map(item => ({ code: item.value, name: item.label, count: item.count }))
   const selected = countries.value?.find(item => item.code === filters.value.country)

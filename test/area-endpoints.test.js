@@ -69,7 +69,7 @@ test('real area endpoints resolve coordinates, constrain all SQL, cache repeats 
     for (const type of ['composer', 'work', 'country']) {
       statements.length = 0
       await facets({ query: { ...query, type } })
-      const constrained = statements.filter(statement => statement.sql.includes('from "classical_concert" as "cc"'))
+      const constrained = statements.filter(statement => statement.sql.includes('count(distinct'))
       assert.ok(constrained.length)
       for (const statement of constrained) {
         assert.match(statement.sql, /"cc"\."city_id" in/)

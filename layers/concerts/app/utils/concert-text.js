@@ -1,4 +1,5 @@
 const slovak = {
+  "No upcoming matches": "Žiadne nadchádzajúce zhody",
   "Filters": "Filtre",
   "About the map": "O mape",
   "Selected area ({radius} km radius)": "Vybraná oblasť (okruh {radius} km)",

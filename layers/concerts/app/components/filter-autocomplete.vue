@@ -88,7 +88,7 @@
             {{ option.secondaryLabel }}
           </span>
         </span>
-        <span v-if="showCount" class="shrink-0 pt-0.5 text-xs tabular-nums text-gray-500">{{ option.count }}</span>
+        <span v-if="showCount" class="max-w-32 shrink-0 pt-0.5 text-right text-xs tabular-nums text-gray-500">{{ option.count ? `${option.count} ${plural('concert', option.count)}` : t('No upcoming matches') }}</span>
       </button>
       <p v-if="loading" class="px-3 py-3 text-sm text-gray-500">{{ t('Searching…') }}</p>
       <p v-else-if="!availableOptions.length" class="px-3 py-3 text-sm text-gray-500">
@@ -104,7 +104,7 @@
 
 <script setup>
 import { serializeComposerSelections } from '../../shared/utils/concert-query.js'
-const { t, availableOptions: describeOptions } = useConcertText()
+const { t, plural, availableOptions: describeOptions } = useConcertText()
 const props = defineProps({
   compact: Boolean,
   type: { type: String, required: true },

@@ -166,3 +166,33 @@ test('selected composers are quoted in restoration requests while city values st
     } finally { app.unmount() }
   }
 })
+
+test('zero-match suggestions expose availability and remain keyboard selectable', async () => {
+  const selections = []
+  const component = compileComponent('../layers/concerts/app/components/filter-autocomplete.vue', {
+    serializeComposerSelections,
+    $fetch: async () => ({ items: [
+      { value: 'Philip Glass', label: 'Philip Glass', count: 0 },
+      { value: 'Mozart', label: 'Mozart', count: 2 },
+    ] }),
+    document: { addEventListener() {}, removeEventListener() {}, getElementById() {} },
+  }, { inlineTemplate: true })
+  const root = { children: [] }
+  const app = renderer.createApp(component, {
+    type: 'composer', label: 'Composer', placeholder: 'Search', modelValue: [],
+    'onUpdate:modelValue': value => selections.push(value),
+  })
+  app.mount(root)
+  try {
+    const input = find(root, 'input')
+    input.props.onFocus()
+    await settle()
+    const allText = node => [node.text || '', ...(node.children || []).map(allText)].join(' ')
+    assert.match(allText(root), /No upcoming matches/)
+    assert.match(allText(root), /2 concerts/)
+    input.props.onKeydown({ key: 'ArrowDown', preventDefault() {}, isComposing: false })
+    input.props.onKeydown({ key: 'Enter', preventDefault() {}, isComposing: false })
+    await Vue.nextTick()
+    assert.deepEqual(selections, [['Philip Glass']])
+  } finally { app.unmount() }
+})

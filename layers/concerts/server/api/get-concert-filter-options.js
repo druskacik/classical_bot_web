@@ -12,6 +12,11 @@ import { getCityCatalogue } from '../utils/city-catalogue.js'
 import { cityDisplayName, cityQueryValues } from '../../shared/utils/city-query.js'
 
 const OPTION_LIMIT = 20
+const searchRank = (values, search) => {
+  if (!search) return 0
+  const names = values.map(normalizeSearchText)
+  return names.includes(search) ? 0 : names.some(name => name.startsWith(search)) ? 1 : 2
+}
 
 
 export default defineEventHandler(async (event) => {
@@ -45,24 +50,38 @@ export default defineEventHandler(async (event) => {
     return await cachedConcertData('filter-options', { type, filters: concertFilterCacheInput(context), search, selected }, async () => {
       const base = () => applyFilters(knex('classical_concert as cc')
         .leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), context)
+      // Catalogue locations include past public records, independent of availability.
+      const publicLocations = () => knex('classical_concert as cc')
+        .where('cc.inclusion_status', 'included').whereNull('cc.duplicate_of_id')
+        .modify(builder => { if (concertSite.country) builder.where('cc.country_code_resolved', concertSite.country) })
       let suggestions
       let labels = []
       if (type === 'country') {
         const rows = await base().select('cc.country_code_resolved as value')
           .whereNotNull('cc.country_code_resolved').countDistinct('cc.id as count').groupBy('cc.country_code_resolved')
-        suggestions = rows.map(row => ({ ...row, label: getCountryName(row.value) }))
+        const catalogue = await knex('city').distinct('country_code as value')
+          .modify(builder => { if (concertSite.country) builder.where('country_code', concertSite.country) })
+          .union(publicLocations().distinct(knex.raw('COALESCE(cc.country_code_resolved, cc.country_code_raw) as value')))
+        const counts = new Map(rows.map(row => [row.value, Number(row.count)]))
+        suggestions = catalogue.filter(row => /^[A-Z]{2}$/.test(row.value || ''))
+          .map(row => ({ value: row.value, label: getCountryName(row.value), count: counts.get(row.value) || 0 }))
         labels = selected.filter(value => !concertSite.country || value === concertSite.country).map(value => ({ value, label: getCountryName(value) }))
       } else if (type === 'city') {
         const cities = await knex('city').select('id', 'english_name', 'local_name', 'display_name', 'country_code')
           .modify(query => { if (concertSite.country) query.where('country_code', concertSite.country) })
         const values = cityQueryValues(cities)
-        const [counts, rawCounts, coordinateCities] = await Promise.all([
+        const [counts, rawCounts, rawLocations, coordinateCities] = await Promise.all([
           base().whereNotNull('canonical_city.id').select('canonical_city.id')
             .countDistinct('cc.id as count').groupBy('canonical_city.id'),
           base().whereNull('cc.city_id').whereNotNull('cc.city_raw')
             .select(knex.raw('LOWER(cc.city_raw) as name'), knex.raw('MIN(cc.city_raw) as label'),
               knex.raw('COALESCE(cc.country_code_resolved, cc.country_code_raw) as country_code'))
             .countDistinct('cc.id as count')
+            .groupByRaw('LOWER(cc.city_raw), COALESCE(cc.country_code_resolved, cc.country_code_raw)'),
+          publicLocations().whereNull('cc.city_id').whereNotNull('cc.city_raw')
+            .modify(builder => { if (context.country) builder.whereRaw('COALESCE(cc.country_code_resolved, cc.country_code_raw) = ?', [context.country]) })
+            .select(knex.raw('LOWER(cc.city_raw) as name'), knex.raw('MIN(cc.city_raw) as label'),
+              knex.raw('COALESCE(cc.country_code_resolved, cc.country_code_raw) as country_code'))
             .groupByRaw('LOWER(cc.city_raw), COALESCE(cc.country_code_resolved, cc.country_code_raw)'),
           getAreaCities(),
         ])
@@ -85,14 +104,14 @@ export default defineEventHandler(async (event) => {
         }
         const options = new Map()
         const add = option => {
-          if (option.count > 0 && option.value.length <= 160) options.set(option.value.toLowerCase(), option)
+          if (option.value.length <= 160) options.set(option.value.toLowerCase(), option)
         }
-        for (const row of rawCounts) {
+        for (const row of rawLocations) {
           // Only offer values that parse into the same exact name/country.
           if (!row.label.trim() || row.label !== row.label.trim() || !/^[A-Z]{2}$/.test(row.country_code || '')) continue
           if (search && !containsNormalizedText(row.label, search)) continue
           const value = `${row.label},${row.country_code}`
-          add({ value, label: row.label, country_code: row.country_code, count: byName.get(key(row.name, row.country_code)) })
+          add({ value, label: row.label, country_code: row.country_code, count: byName.get(key(row.name, row.country_code)) || 0, searchRank: searchRank([row.label], search) })
         }
         for (const city of cities) {
           if (context.country && city.country_code !== context.country) continue
@@ -101,11 +120,12 @@ export default defineEventHandler(async (event) => {
           // Prefer the reviewed label even when the raw name supplied the search match.
           if (!options.has(identity) && search && ![city.english_name, city.local_name, city.display_name].some(name => containsNormalizedText(name, search))) continue
           add({ value, label: cityDisplayName(city, concertSite.locale), country_code: city.country_code,
-            count: /^\d+$/.test(value) ? byId.get(String(city.id)) || 0 : byName.get(identity) || 0 })
+            count: /^\d+$/.test(value) ? byId.get(String(city.id)) || 0 : byName.get(identity) || 0,
+            searchRank: Math.min(options.get(identity)?.searchRank ?? 2, searchRank([city.english_name, city.local_name, city.display_name], search)) })
         }
         suggestions = [...options.values()]
-          .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, concertSite.locale) || a.value.localeCompare(b.value))
-          .slice(0, OPTION_LIMIT).map(option => ({ ...option, radiusAvailable: radiusAvailable(option.value) }))
+          .sort((a, b) => a.searchRank - b.searchRank || b.count - a.count || a.label.localeCompare(b.label, concertSite.locale) || a.value.localeCompare(b.value))
+          .slice(0, OPTION_LIMIT).map(({ searchRank, ...option }) => ({ ...option, radiusAvailable: radiusAvailable(option.value) }))
         for (const value of selected) {
           const parsed = parseCity(value)
           if (concertSite.country && parsed?.country && parsed.country !== concertSite.country) continue
@@ -131,21 +151,32 @@ export default defineEventHandler(async (event) => {
         const fields = type === 'composer' ? ['c.name as value', 'c.name as label'] : [knex.raw('w.id::text as value'), 'w.title as label', 'c.name as secondaryLabel']
         const grouped = () => music(base()).select(...fields).countDistinct('cc.id as count')
           .groupBy(...(type === 'composer' ? ['c.name'] : ['w.id', 'w.title', 'c.name']))
-        const matching = grouped()
-        if (search) matching.where(inner => {
-          inner.whereILike('c.normalized_name', normalizedLikePattern(search))
-          if (type === 'work') inner.orWhereILike('w.normalized_title', normalizedLikePattern(search))
-        })
-        suggestions = await matching.orderBy('count', 'desc').orderBy('label').limit(OPTION_LIMIT)
+        const identities = () => type === 'composer' ? knex('composer as c') : knex('work as w').join('composer as c', 'c.id', 'w.composer_id')
+        const key = type === 'composer' ? 'c.name' : 'w.id'
+        const matching = identities().select(...fields)
+          .select(knex.raw('COALESCE(availability.count, 0) as count'))
+          .leftJoin(grouped().as('availability'), type === 'composer' ? 'c.name' : knex.raw('w.id::text'), 'availability.value')
+        if (type === 'work' && context.composers.length) {
+          // Composer and work filters match the concert independently: retain
+          // other composers' works on matching programmes, while limiting only
+          // zero-match catalogue suggestions to the selected composers.
+          matching.where(inner => inner.whereIn('c.name', context.composers).orWhere('availability.count', '>', 0))
+        }
+        const searchFields = type === 'composer' ? ['c.normalized_name'] : ['w.normalized_title', 'c.normalized_name']
+        if (search) {
+          matching.where(inner => {
+            for (const field of searchFields) inner.orWhereILike(field, normalizedLikePattern(search))
+          })
+          const rank = operator => searchFields.map(() => `?? ${operator} ?`).join(' OR ')
+          matching.orderByRaw(`CASE WHEN ${rank('=')} THEN 0 WHEN ${rank('ILIKE')} THEN 1 ELSE 2 END`, [
+            ...searchFields.flatMap(field => [field, search]),
+            ...searchFields.flatMap(field => [field, normalizedLikePattern(search).slice(1)]),
+          ])
+        }
+        suggestions = await matching.orderBy('count', 'desc').orderBy('label').orderByRaw('?? ASC', [key]).limit(OPTION_LIMIT)
         if (selected.length) {
           const values = type === 'composer' ? selected : selected.map(Number).filter(id => Number.isSafeInteger(id) && id > 0)
-          const key = type === 'composer' ? 'c.name' : 'w.id'
-          const identities = type === 'composer' ? knex('composer as c') : knex('work as w').join('composer as c', 'c.id', 'w.composer_id')
-          if (concertSite.country) {
-            const scope = parseConcertFilters({}, concertSite.country)
-            identities.whereIn(key, music(applyFilters(knex('classical_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), scope)).select(key))
-          }
-          const [identitiesRows, counts] = await Promise.all([identities.select(...fields).whereIn(key, values), grouped().whereIn(key, values)])
+          const [identitiesRows, counts] = await Promise.all([identities().select(...fields).whereIn(key, values), grouped().whereIn(key, values)])
           labels = identitiesRows.map(row => ({ ...row, count: Number(counts.find(item => item.value === row.value)?.count || 0) }))
         }
       }

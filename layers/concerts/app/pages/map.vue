@@ -22,8 +22,8 @@
           <option value="any">{{ t('Any upcoming date') }}</option><option value="today">{{ t('Today') }}</option><option value="week">{{ t('This week') }}</option><option value="weekend">{{ t('This weekend') }}</option><option value="custom">{{ t('Custom dates') }}</option>
         </select>
       </label>
-      <FilterAutocomplete type="composer" :label="t('Composer')" :placeholder="t('Search composers')" :show-count="false" :context="filterContext" :model-value="composers" @update:model-value="setFilter('composers', $event)" />
-      <FilterAutocomplete type="work" :label="t('Work')" :placeholder="t('Search works or composers')" :show-count="false" :context="filterContext" :model-value="works" @update:model-value="setFilter('works', $event)" />
+      <FilterAutocomplete type="composer" :label="t('Composer')" :placeholder="t('Search composers')" :context="filterContext" :model-value="composers" @update:model-value="setFilter('composers', $event)" />
+      <FilterAutocomplete type="work" :label="t('Work')" :placeholder="t('Search works or composers')" :context="filterContext" :model-value="works" @update:model-value="setFilter('works', $event)" />
       <div v-if="dateMode === 'custom'" class="col-span-full flex flex-wrap gap-4 text-sm">
         <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('From') }} <input type="date" :value="concertQuery.dateFrom || ''" :max="concertQuery.dateTo || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="updateDate('dateFrom', $event.target.value)"></label>
         <label class="flex min-w-0 flex-wrap items-center gap-2">{{ t('To') }} <input type="date" :value="concertQuery.dateTo || ''" :min="concertQuery.dateFrom || undefined" class="min-h-11 min-w-0 max-w-full border-b border-gray-300" @change="updateDate('dateTo', $event.target.value)"></label>
