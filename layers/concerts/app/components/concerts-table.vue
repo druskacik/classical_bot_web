@@ -7,7 +7,8 @@
     >
       <div class="entry-layout grid">
         <div class="entry-date">
-          <time v-if="concertCalendarDate(concert.date)" :datetime="concertCalendarDate(concert.date)" :aria-label="formatDate(concert.date)" class="calendar-date">
+          <time v-if="concertCalendarDate(concert.date)" :datetime="concertCalendarDate(concert.date)" class="calendar-date">
+            <span class="sr-only">{{ formatDate(concert.date) }}</span>
             <span class="calendar-weekday" aria-hidden="true">{{ weekday(concert.date) }}</span>
             <span class="calendar-day" aria-hidden="true">{{ Number(concertCalendarDate(concert.date).slice(8)) }}</span>
           </time>
