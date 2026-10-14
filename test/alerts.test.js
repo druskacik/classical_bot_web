@@ -130,6 +130,10 @@ test('saving alerts rejects semantically empty filters while previews and existi
   assert.equal((await criteria(db, {})).summary, 'Worldwide · Any upcoming date')
   assert.equal((await criteria(db, {}, { allowExpired: true })).summary, 'Worldwide · Any upcoming date')
   for (const input of [{ country: 'AT' }, { city: 'Vienna' }, { composers: 'Bach' }, { dateFrom: '2099-10-01' }]) {
-    assert.ok((await criteria(db, input, { requireFilter: true })).summary)
+    const lookup = input.city ? table => {
+      assert.equal(table, 'city')
+      return { select: async () => [] }
+    } : db
+    assert.ok((await criteria(lookup, input, { requireFilter: true })).summary)
   }
 })

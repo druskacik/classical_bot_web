@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import knex from 'knex'
 import { distanceKm, citiesWithinArea, areaQuery, clearAreaQuery } from '../layers/concerts/shared/utils/concert-area.js'
-import { parseArea, resolveArea, publicArea } from '../layers/concerts/server/utils/concert-area.js'
+import { parseArea, resolveArea, publicArea, matchingAreaCities } from '../layers/concerts/server/utils/concert-area.js'
 import { parseConcertFilters, applyFilters, facetFilters } from '../layers/concerts/server/utils/concert-filters.js'
 import { concertFilterCacheInput, siteDataCacheKey } from '../layers/concerts/server/utils/data-cache-keys.js'
 import { concertAreaLocation, normalizeAreaLocation, concertCityLocation, concertCountryLocation, concertComposerLocation, concertWorkLocation, updateConcertQuery } from '../layers/concerts/app/utils/concert-discovery.js'
@@ -90,4 +90,22 @@ test('area navigation resets geography/page, preserves music/dates, and round tr
   const cleared = updateConcertQuery(next.query, { ...clearAreaQuery(), city: undefined })
   assert.equal(cleared.city, undefined)
   assert.equal(cleared.composers, 'Mozart')
+})
+
+
+test('countryless radius origins consider all aliases, not only aliases safe for unlinked concerts', () => {
+  const athens = [
+    { id: 861, english_name: 'Athens', local_name: 'Athens', country_code: 'US', latitude: 33.96, longitude: -83.37, uniqueAliases: [] },
+    { id: 3745, english_name: 'Athens', local_name: 'Athens', country_code: 'US', latitude: 39.32, longitude: -82.10, uniqueAliases: [] },
+    { id: 3, english_name: 'Athens', local_name: 'Αθήνα', country_code: 'GR', latitude: 37.98, longitude: 23.72, uniqueAliases: ['athens', 'αθήνα'] },
+  ]
+  assert.equal(matchingAreaCities(athens, 'Athens').length, 3)
+  for (const origin of ['Athens', 'ATHENS', 'Athens,US']) {
+    assert.throws(() => resolveArea({ origin, radiusKm: 50 }, athens), { statusCode: 400 })
+  }
+  assert.equal(resolveArea({ origin: 'Athens,GR', radiusKm: 50 }, athens).cityId, '3')
+  assert.equal(resolveArea({ origin: 'Αθήνα', radiusKm: 50 }, athens).cityId, '3')
+  const ohio = resolveArea({ origin: '3745', radiusKm: 50 }, athens)
+  assert.equal(ohio.cityId, '3745')
+  assert.deepEqual(ohio.unresolvedCity.names, [], 'ambiguous raw aliases still cannot be assigned to a specific city')
 })

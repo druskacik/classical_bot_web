@@ -1,5 +1,6 @@
 import { firstQueryValue as first, composerSelections, querySelections } from '../../shared/utils/concert-query.js'
-import { getAreaCities } from '../utils/area-cities.js'
+import { buildCityIdentities, resolveCitySelection } from '../../shared/utils/city-identity.js'
+import { getAreaCities, getIdentityCities } from '../utils/area-cities.js'
 import { resolveArea, matchingAreaCities } from '../utils/concert-area.js'
 import { concertFilterCacheInput } from '../utils/data-cache-keys.js'
 import { cachedConcertData } from '../utils/concert-data-cache.js'
@@ -41,6 +42,9 @@ export default defineEventHandler(async (event) => {
       filters.country = city.countryCode
       if (!filters.city) filters.city = parseCity(id)
     }
+    const identityCities = type === 'city' || filters.city ? await getIdentityCities() : []
+    const identities = buildCityIdentities(identityCities)
+    if (filters.city) filters.city = resolveCitySelection(filters.city, identities)
     const context = facetFilters(filters, type)
     if (concertSite.country) context.country = concertSite.country
     const search = normalizeSearchText(String(first(query.q) || '').trim().slice(0, 100))
@@ -67,8 +71,7 @@ export default defineEventHandler(async (event) => {
           .map(row => ({ value: row.value, label: getCountryName(row.value), count: counts.get(row.value) || 0 }))
         labels = selected.filter(value => !concertSite.country || value === concertSite.country).map(value => ({ value, label: getCountryName(value) }))
       } else if (type === 'city') {
-        const cities = await knex('city').select('id', 'english_name', 'local_name', 'display_name', 'country_code')
-          .modify(query => { if (concertSite.country) query.where('country_code', concertSite.country) })
+        const cities = identityCities.filter(city => !concertSite.country || city.country_code === concertSite.country)
         const values = cityQueryValues(cities)
         const [counts, rawCounts, rawLocations, coordinateCities] = await Promise.all([
           base().whereNotNull('canonical_city.id').select('canonical_city.id')
@@ -91,7 +94,7 @@ export default defineEventHandler(async (event) => {
         const byId = new Map(counts.map(row => [String(row.id), Number(row.count)]))
         const byName = new Map()
         // A readable filter includes every canonical English/local alias, but
-        // an unlinked concert matches only its literal raw name and country.
+        // legacy ambiguous options retain literal raw-name matching.
         for (const city of cities) {
           for (const name of new Set([city.english_name, city.local_name].filter(Boolean).map(name => name.toLowerCase()))) {
             const identity = key(name, city.country_code)
@@ -102,6 +105,9 @@ export default defineEventHandler(async (event) => {
           const identity = key(row.name, row.country_code)
           byName.set(identity, (byName.get(identity) || 0) + Number(row.count))
         }
+        const rawByName = new Map(rawCounts.map(row => [key(row.name, row.country_code), Number(row.count)]))
+        const canonicalCount = city => (byId.get(String(city.id)) || 0) + identities.uniqueAliases(city)
+          .reduce((sum, name) => sum + (rawByName.get(key(name, city.country_code)) || 0), 0)
         const options = new Map()
         const add = option => {
           if (option.value.length <= 160) options.set(option.value.toLowerCase(), option)
@@ -109,6 +115,7 @@ export default defineEventHandler(async (event) => {
         for (const row of rawLocations) {
           // Only offer values that parse into the same exact name/country.
           if (!row.label.trim() || row.label !== row.label.trim() || !/^[A-Z]{2}$/.test(row.country_code || '')) continue
+          if (identities.resolve({ name: row.name, country: row.country_code })) continue
           if (search && !containsNormalizedText(row.label, search)) continue
           const value = `${row.label},${row.country_code}`
           add({ value, label: row.label, country_code: row.country_code, count: byName.get(key(row.name, row.country_code)) || 0, searchRank: searchRank([row.label], search) })
@@ -120,14 +127,14 @@ export default defineEventHandler(async (event) => {
           // Prefer the reviewed label even when the raw name supplied the search match.
           if (!options.has(identity) && search && ![city.english_name, city.local_name, city.display_name].some(name => containsNormalizedText(name, search))) continue
           add({ value, label: cityDisplayName(city, concertSite.locale), country_code: city.country_code,
-            count: /^\d+$/.test(value) ? byId.get(String(city.id)) || 0 : byName.get(identity) || 0,
+            count: canonicalCount(city),
             searchRank: Math.min(options.get(identity)?.searchRank ?? 2, searchRank([city.english_name, city.local_name, city.display_name], search)) })
         }
         suggestions = [...options.values()]
           .sort((a, b) => a.searchRank - b.searchRank || b.count - a.count || a.label.localeCompare(b.label, concertSite.locale) || a.value.localeCompare(b.value))
           .slice(0, OPTION_LIMIT).map(({ searchRank, ...option }) => ({ ...option, radiusAvailable: radiusAvailable(option.value) }))
         for (const value of selected) {
-          const parsed = parseCity(value)
+          const parsed = resolveCitySelection(parseCity(value), identities)
           if (concertSite.country && parsed?.country && parsed.country !== concertSite.country) continue
           const matches = cities.filter(city => parsed?.id ? Number(city.id) === parsed.id :
             (!parsed?.country || city.country_code === parsed.country) &&
@@ -140,8 +147,9 @@ export default defineEventHandler(async (event) => {
               || (new Set(matches.map(city => city.country_code)).size === 1 ? matches[0].country_code : undefined),
             count: Number(row.count), radiusAvailable: radiusAvailable(value) }
           // Keep the selected spelling so the control can restore its exact value,
-          // without showing a second suggestion for a case-only variant.
-          suggestions = suggestions.filter(item => item.value.toLowerCase() !== value.toLowerCase())
+          // without showing another suggestion for the same canonical city.
+          suggestions = suggestions.filter(item => item.value.toLowerCase() !== value.toLowerCase()
+            && !(parsed?.canonicalId && identities.resolve(parseCity(item.value))?.id.toString() === parsed.canonicalId))
           labels.push(option)
         }
       } else {

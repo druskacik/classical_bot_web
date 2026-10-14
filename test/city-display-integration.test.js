@@ -90,6 +90,26 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
     await assert.rejects(concerts({ query: { city: 'Athens,US', radius: '25' } }), { statusCode: 400 })
   })
 
+  await t.test('countryless ambiguous radius origins are rejected by listings, maps, facets and alerts', async () => {
+    const { criteria } = await import('../server/utils/alerts/criteria.js')
+    for (const city of ['Athens', 'ATHENS', 'Athens,US']) {
+      const query = { city, radius: '50' }
+      await assert.rejects(concerts({ query }), { statusCode: 400 })
+      await assert.rejects(map({ query }), { statusCode: 400 })
+      await assert.rejects(facets({ query: { ...query, type: 'composer' } }), { statusCode: 400 })
+      await assert.rejects(criteria(db, query), { statusCode: 400 })
+      assert.deepEqual((await origins({ query: { origin: city } })).items, [])
+      const selected = (await options({ selected: city })).find(row => row.value === city)
+      assert.equal(selected.radiusAvailable, false)
+    }
+    for (const city of ['Athens,GR', 'Αθήνα', '861', '3745']) {
+      const selected = (await options({ selected: city })).find(row => row.value === city)
+      assert.equal(selected.radiusAvailable, true)
+      const result = await concerts({ query: { city, radius: '50' } })
+      assert.equal(result.area.cityId, /^\d+$/.test(city) ? city : '3')
+    }
+  })
+
   await t.test('both Athens IDs resolve exact results and independent radius origins across map/list', async () => {
     for (const [id, label, latitude, total] of [['861', 'Athens (Georgia)', 33.96095, 3], ['3745', 'Athens (Ohio)', 39.32924, 1]]) {
       const exact = await concerts({ query: { city: id } })
@@ -148,10 +168,10 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
         { city_id: 4, city_raw: name, country_code_resolved: 'AT' },
       ])
       for (const country of [',CZ', '']) {
-        assert.equal((await concerts({ query: { city: `${name.toLowerCase()}${country}` } })).total, country ? 2 : 4)
-        assert.equal((await concerts({ query: { city: `local${name.toLowerCase()}${country}` } })).total, 1)
+        assert.equal((await concerts({ query: { city: `${name.toLowerCase()}${country}` } })).total, 2)
+        assert.equal((await concerts({ query: { city: `local${name.toLowerCase()}${country}` } })).total, 2)
       }
-      assert.equal((await concerts({ query: { city: String(id) } })).total, 1)
+      assert.equal((await concerts({ query: { city: String(id) } })).total, 2)
     }
     assert.equal((await concerts({ query: { city: 'BackSlash,CZ' } })).total, 0)
     assert.equal((await concerts({ query: { city: 'Athens,US' } })).total, 4)
@@ -363,6 +383,69 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
       assert.deepEqual(restored.map(item => [item.value, item.count]), [['701', 0]])
     }
     site.country = null
+  })
+
+  await t.test('city aliases merge before limiting, count all unique aliases, and restore old selections', async () => {
+    const { criteria, matching } = await import('../server/utils/alerts/criteria.js')
+    await db('city').insert([
+      { id: 19000, english_name: 'Prague', local_name: 'Praha', country_code: 'CZ', latitude: 50.08, longitude: 14.43 },
+      { id: 19001, english_name: 'Alias town', local_name: 'Shared alias', country_code: 'CZ', latitude: 49, longitude: 15 },
+      { id: 19002, english_name: 'Other town', local_name: 'Shared alias', country_code: 'CZ' },
+    ])
+    await db('classical_concert').insert([
+      { city_id: 19000, country_code_resolved: 'CZ' },
+      { city_raw: 'Prague', country_code_resolved: 'CZ' },
+      { city_raw: 'Wien', country_code_resolved: 'AT' },
+      { city_raw: 'Wien', country_code_resolved: 'CZ' },
+      { city_raw: 'Praha', country_code_resolved: 'CZ' },
+      { city_raw: 'PRAHA', country_code_resolved: 'CZ' },
+      { city_raw: 'Praha', country_code_resolved: 'AT' },
+      { city_id: 4, city_raw: 'Praha', country_code_resolved: 'AT' },
+      { city_raw: 'Praha', country_code_resolved: 'CZ', inclusion_status: 'rejected' },
+      { city_raw: 'Praha', country_code_resolved: 'CZ', duplicate_of_id: 1 },
+      { city_raw: 'Praha', country_code_resolved: 'CZ', date: '2000-01-01' },
+      { city_id: 19001, country_code_resolved: 'CZ' },
+      { city_raw: 'Alias town', country_code_resolved: 'CZ' },
+      { city_raw: 'Shared alias', country_code_resolved: 'CZ' },
+    ])
+    for (const q of ['', 'Prague', 'Praha', 'praha']) {
+      const rows = (await options({ q })).filter(row => row.country_code === 'CZ' && /prague|praha/i.test(row.label))
+      assert.deepEqual(rows.map(row => [row.value, row.label, row.count]), [['Prague,CZ', 'Prague', 4]])
+    }
+    const vienna = (await options({ q: 'Wien' })).filter(row => row.country_code === 'AT')
+    assert.equal(vienna.length, 1)
+    assert.equal(vienna[0].value, 'Vienna,AT')
+    assert.equal(vienna[0].count, (await concerts({ query: { city: 'Wien,AT' } })).total)
+    assert.equal((await concerts({ query: { city: 'Vienna,AT' } })).total, vienna[0].count)
+    assert.ok((await options({ q: 'Wien' })).some(row => row.value === 'Wien,CZ'), 'do not guess that a wrong-country raw name belongs to Austria')
+    const expectedIds = (await concerts({ query: { city: 'Prague,CZ' } })).items.map(row => row.id).sort()
+    for (const city of ['Prague,CZ', 'Praha,CZ', 'PRAHA,CZ', '19000', 'Praha']) {
+      const result = await concerts({ query: { city } })
+      assert.equal(result.total, 4)
+      assert.deepEqual(result.items.map(row => row.id).sort(), expectedIds)
+      const restored = (await options({ q: 'Praha', selected: city })).filter(row => row.country_code === 'CZ' && row.label === 'Prague')
+      assert.deepEqual(restored.map(row => [row.value, row.count]), [[city, 4]])
+      const alert = await criteria(db, { city })
+      assert.deepEqual((await matching(db, alert.filters).select('cc.id')).map(row => row.id).sort(), expectedIds)
+      for (const context of [{ dateFrom: '2099-01-01' }, { composers: 'Missing composer' }, { works: '999999' }, { country: 'CZ' }]) {
+        const selected = (await options({ ...context, selected: city })).find(row => row.value === city)
+        assert.equal(selected.count, (await concerts({ query: { ...context, city } })).total)
+      }
+    }
+    const mapped = await map({ query: { city: 'Praha,CZ' } })
+    assert.equal(mapped.total, 4)
+    assert.equal(mapped.mapped, 1)
+    assert.equal(mapped.unmapped, 3)
+    for (const city of ['Prague,CZ', 'Praha,CZ', '19000']) {
+      assert.equal((await concerts({ query: { city, radius: '1' } })).total, 4)
+    }
+    assert.equal((await concerts({ query: { city: 'Alias town,CZ' } })).total, 2, 'ambiguous raw aliases cannot be assigned to one city')
+    assert.equal((await concerts({ query: { city: '19001', radius: '1' } })).total, 2, 'a city without coordinates still makes the raw alias ambiguous')
+    const ambiguous = await options({ q: 'Shared alias' })
+    assert.ok(ambiguous.some(row => row.value === 'Shared alias,CZ'))
+    for (const row of ambiguous) assert.equal(row.count, (await concerts({ query: { city: row.value } })).total)
+    const radiusAlert = await criteria(db, { city: '19001', radius: '1' })
+    assert.equal((await matching(db, radiusAlert.filters).count('* as total').first()).total, '2')
   })
 
 })

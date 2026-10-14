@@ -1,13 +1,18 @@
+import { buildCityIdentities } from '../../shared/utils/city-identity.js'
 import { cityDisplayName, cityQueryValues } from '../../shared/utils/city-query.js'
 import knex from './connection.js'
 import { cachedConcertData } from './concert-data-cache.js'
 import { validCoordinates } from '../../shared/utils/concert-area.js'
 import { containsNormalizedText, normalizeSearchText } from './search-text.js'
 
+export const getIdentityCities = () => cachedConcertData('city-identities', {}, () =>
+  knex('city').select('id', 'english_name', 'local_name', 'display_name', 'country_code', 'latitude', 'longitude'))
+
 export const getAreaCities = () => cachedConcertData('area-cities', {}, async () => {
-  const cities = await knex('city').select('id', 'english_name', 'local_name', 'display_name', 'country_code', 'latitude', 'longitude')
+  const cities = await getIdentityCities()
+  const identities = buildCityIdentities(cities)
   const values = cityQueryValues(cities)
-  return cities.filter(validCoordinates).map(city => ({ ...city, cityQuery: values.get(String(city.id)) }))
+  return cities.filter(validCoordinates).map(city => ({ ...city, uniqueAliases: identities.uniqueAliases(city), cityQuery: values.get(String(city.id)) }))
 })
 export function areaCityOptions(cities, query, selected, locale, countryName) {
   const search = normalizeSearchText(query)

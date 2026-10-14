@@ -1,7 +1,8 @@
 import { concertSite } from '#concert-site'
 import knex from '../utils/connection.js'
 import { applyFilters, parseConcertFilters } from '../utils/concert-filters.js'
-import { getAreaCities } from '../utils/area-cities.js'
+import { buildCityIdentities, resolveCitySelection } from '../../shared/utils/city-identity.js'
+import { getAreaCities, getIdentityCities } from '../utils/area-cities.js'
 import { resolveArea } from '../utils/concert-area.js'
 import { cachedConcertData } from '../utils/concert-data-cache.js'
 import { concertFilterCacheInput } from '../utils/data-cache-keys.js'
@@ -9,6 +10,7 @@ import { cityDisplayName } from '../../shared/utils/city-query.js'
 
 export default defineEventHandler(async event => {
   const filters = parseConcertFilters(getQuery(event), concertSite.country)
+  if (filters.city) filters.city = resolveCitySelection(filters.city, buildCityIdentities(await getIdentityCities()))
   const cities = await getAreaCities()
   if (filters.area) filters.area = resolveArea(filters.area, cities, concertSite.locale)
   return cachedConcertData('map-cities', concertFilterCacheInput(filters), async () => {

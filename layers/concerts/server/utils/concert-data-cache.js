@@ -7,6 +7,7 @@ const lifetimes = {
   concerts: 120_000,
   'map-cities': 120_000,
   'area-cities': 300_000,
+  'city-identities': 300_000,
   'filter-options': 120_000,
   countries: 300_000,
   sources: 300_000,

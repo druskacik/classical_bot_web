@@ -1,6 +1,7 @@
 import { createError } from 'h3'
 import { normalizeConcertQuery, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
 import { citiesWithinArea } from '../../shared/utils/concert-area.js'
+import { buildCityIdentities } from '../../shared/utils/city-identity.js'
 import { cityDisplayName } from '../../shared/utils/city-query.js'
 
 const invalid = message => { throw createError({ statusCode: 400, statusMessage: message }) }
@@ -32,6 +33,8 @@ export function matchingAreaCities(cities, origin) {
   const separator = origin.lastIndexOf(',')
   const name = (separator < 0 ? origin : origin.slice(0, separator)).toLowerCase()
   const country = separator < 0 ? null : origin.slice(separator + 1).toUpperCase()
+  // Origin ambiguity must include every alias. uniqueAliases is only safe for
+  // assigning unlinked concerts after a specific origin has been chosen.
   return cities.filter(item => /^\d+$/.test(origin) ? String(item.id) === origin
     : (!country || item.country_code === country) && [item.english_name, item.local_name].some(value => value?.toLowerCase() === name))
 }
@@ -48,7 +51,7 @@ export function resolveArea(area, cities, locale = 'en-GB') {
     label: cityDisplayName(city, locale),
     countryCode: city.country_code,
     unresolvedCity: {
-      names: [...new Set([city.english_name, city.local_name].filter(Boolean).map(name => name.toLowerCase()))].sort(),
+      names: city.uniqueAliases || buildCityIdentities(cities).uniqueAliases(city),
       countryCode: city.country_code,
     } } : { ...area, label: null }
   return { ...resolved, cityIds: citiesWithinArea(cities, resolved) }

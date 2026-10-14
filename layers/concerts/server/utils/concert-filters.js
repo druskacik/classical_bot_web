@@ -94,7 +94,15 @@ export const applyFilters = (builder, filters) => {
       }
     })
   }
-  if (filters.city?.id) builder.where('cc.city_id', filters.city.id)
+  if (filters.city?.canonicalId) {
+    const { canonicalId, countryCode, aliases } = filters.city
+    builder.where(cityFilter => {
+      cityFilter.where('cc.city_id', canonicalId)
+      if (aliases.length) cityFilter.orWhere(unresolved => unresolved.whereNull('cc.city_id')
+        .whereRaw('COALESCE(cc.country_code_resolved, cc.country_code_raw) = ?', [countryCode])
+        .whereIn(builder.client.raw('LOWER(cc.city_raw)'), aliases))
+    })
+  } else if (filters.city?.id) builder.where('cc.city_id', filters.city.id)
   else if (filters.city?.name) {
     if (filters.city.country) {
       builder.whereRaw(

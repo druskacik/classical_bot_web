@@ -1,3 +1,4 @@
+import { buildCityIdentities, resolveCitySelection } from '../../../layers/concerts/shared/utils/city-identity.js'
 import { createError } from 'h3'
 import { parseConcertFilters, applyFilters } from '../../../layers/concerts/server/utils/concert-filters.js'
 import { resolveArea } from '../../../layers/concerts/server/utils/concert-area.js'
@@ -25,13 +26,16 @@ export async function criteria(db, input, { allowExpired = false, requireFilter 
   const labels = []
   if (filters.area) {
     const cities = await db('city').select('id', 'english_name', 'local_name', 'country_code', 'latitude', 'longitude')
-    filters.area = resolveArea(filters.area, cities)
+    const identities = buildCityIdentities(cities)
+    filters.area = resolveArea(filters.area, cities.map(city => ({ ...city, uniqueAliases: identities.uniqueAliases(city) })))
     if (filters.area.cityId) {
       query.city = filters.area.cityId; query.radius = String(filters.area.radiusKm)
     }
     labels.push(`${filters.area.label || `${filters.area.latitude}, ${filters.area.longitude}`} + ${filters.area.radiusKm} km`)
   } else if (filters.city) {
-    const city = filters.city.id ? await db('city').where('id', filters.city.id).first() : null
+    const identities = buildCityIdentities(await db('city').select('id', 'english_name', 'local_name', 'country_code'))
+    const city = identities.resolve(filters.city)
+    filters.city = resolveCitySelection(filters.city, identities)
     if (filters.city.id && !city) throw createError({ statusCode: 400, statusMessage: 'Choose a valid city.' })
     labels.push(city ? `${city.english_name || city.local_name}, ${city.country_code}` : query.city)
   }
