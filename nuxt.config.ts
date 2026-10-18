@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 export default defineNuxtConfig({
   extends: ['./layers/concerts'],
   alias: { '#concert-site': fileURLToPath(new URL('./site.config.js', import.meta.url)) },
-  runtimeConfig: { public: { alertsEnabled: false } },
+  runtimeConfig: { maintenanceMode: false, public: { alertsEnabled: false } },
   nitro: {
     experimental: { tasks: true },
     scheduledTasks: { '*/15 * * * *': ['concert-alerts'] },

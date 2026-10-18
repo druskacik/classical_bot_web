@@ -65,6 +65,22 @@ test('page middleware replaces canonical URLs once, preserves hashes, and leaves
     { path: '/', query: { city: 'Vienna,AT', radius: '50', composers: 'Bach' }, hash: '#results' })
 })
 
+test('maintenance routes bypass area and query redirects without changing the URL', () => {
+  const routes = [
+    { path: '/countries/SK', query: { city: 'Bratislava,SK', radius: '50' } },
+    { path: '/map', query: { city: '123', radius: '50', page: '1' } },
+    { path: '/', query: { composers: ' Bach, Bach ', page: '1' } },
+  ]
+  for (const route of routes) {
+    assert.ok(middleware({ ...route, hash: '#programme' }), 'Normal routes still normalize')
+    assert.ok(middleware({ ...route, meta: { maintenance: false }, hash: '#programme' }))
+    const maintenance = { ...route, meta: { maintenance: true }, hash: '#programme' }
+    const original = structuredClone(maintenance)
+    assert.equal(middleware(maintenance), undefined)
+    assert.deepEqual(maintenance, original)
+  }
+})
+
 test('radius-only fixed-city links retain their route origin, pagination, filters and hash', () => {
   for (const path of ['/austria/vienna', '/Bratislava']) {
     const query = { radius: '50', page: '2', composers: 'Bach', dateFrom: '2026-10-01' }

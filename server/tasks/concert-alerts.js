@@ -3,9 +3,11 @@ import { runAlerts } from '../utils/alerts/worker.js'
 import { sendMail, mailSettings } from '../utils/mail.js'
 import { managementToken } from '../utils/alerts/core.js'
 import { classicalBotSite } from '../../site.config.js'
+import { maintenanceEnabled } from '../utils/maintenance.js'
 export default defineTask({
   meta: { name: 'concert-alerts', description: 'Send due confirmed concert alerts' },
   async run() {
+    if (maintenanceEnabled(useRuntimeConfig().maintenanceMode)) return { result: { maintenance: true } }
     if (process.env.NUXT_PUBLIC_ALERTS_ENABLED !== 'true') return { result: { disabled: true } }
     try {
       mailSettings(); managementToken({ id: 0, generation: 0 })

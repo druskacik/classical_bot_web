@@ -20,6 +20,36 @@ npm test
 npm run build
 ```
 
+## Maintenance mode
+
+For the main ClassicalBot app, set `NUXT_MAINTENANCE_MODE=true` in the deployment
+environment and restart the application. No rebuild is needed. The default is
+`false`; only `true` enables maintenance. The Slovak app is unaffected.
+
+During maintenance, Nuxt renders a Vue maintenance page at the original URL,
+using the existing branding and styles without the normal layout or data fetching.
+APIs return a JSON error. Dynamic requests receive HTTP 503 with
+`Cache-Control: no-store`; existing public and Nuxt build assets remain available.
+The production database warm-up and concert-alert task are skipped, so the web
+server can start with PostgreSQL offline. No completion time is promised.
+
+1. Put the HetrixTools monitor into maintenance without notifications.
+2. Set `NUXT_MAINTENANCE_MODE=true` and restart every ClassicalBot web instance.
+3. Perform the database maintenance, coordinating the separate crawler as needed.
+4. Restore database access, set `NUXT_MAINTENANCE_MODE=false`, and restart.
+5. Verify normal pages and APIs, then end maintenance mode in HetrixTools.
+
+This flag prevents new database work from the restarted web app. It does not
+cancel previously running work or pause the separate crawler. Resume with a
+restart so the normal database warm-up runs before accepting requests. There is
+no admin bypass or separate public maintenance route.
+
+After building, verify maintenance startup against an isolated fake database with:
+
+```bash
+TEST_MAINTENANCE_STARTUP=1 node --test test/maintenance.test.js test/maintenance-startup.test.js
+```
+
 ## Local Lighthouse audits
 
 Run Lighthouse against a production build of the current checkout:

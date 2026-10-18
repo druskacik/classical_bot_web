@@ -5,6 +5,7 @@ import { getCityCatalogue } from '#layers/concerts/server/utils/city-catalogue.j
 import { legacyConcertLocation } from '#shared/utils/legacy-concert-location.js'
 
 export default defineEventHandler(async event => {
+  if (event.context.maintenance) return
   if (!['GET', 'HEAD'].includes(event.method) || getRequestURL(event).pathname !== '/') return
   const query = getQuery(event)
   if (typeof query.country !== 'string') return
