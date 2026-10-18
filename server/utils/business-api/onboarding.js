@@ -73,12 +73,22 @@ export async function lookupSource(db, url) {
   return { ...resolved, status: row.status, next_attempt_at: row.next_attempt_at ? new Date(row.next_attempt_at).toISOString() : null }
 }
 
+async function lookupAndPromoteSource(db, url) {
+  const source = await lookupSource(db, url)
+  // Check eligibility in the UPDATE too: a worker may have changed the row since lookup.
+  await db('crawler_source').where('id', source.id)
+    .whereIn('status', ['pending', 'processing', 'pr_open', 'retry_wait', 'active'])
+    .where('priority', '<', 100)
+    .update({ priority: 100 })
+  return source
+}
+
 export async function registerSource(db, input, dailyLimit = 50) {
   try {
     return await db.transaction(async trx => {
       await trx.raw("SET LOCAL statement_timeout = '10s'")
       await trx.raw("SELECT pg_advisory_xact_lock(hashtext('business-api-source-registration'))")
-      try { return await lookupSource(trx, input.url) }
+      try { return await lookupAndPromoteSource(trx, input.url) }
       catch (error) { if (error.code !== 'source_not_found') throw error }
       const { count } = await trx('crawler_source as s').whereRaw("s.created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'")
         .whereExists(trx('crawler_source_url as u').select(trx.raw('1')).whereRaw('u.crawler_source_id = s.id').where('u.discovered_by', 'business_api'))
@@ -95,7 +105,7 @@ export async function registerSource(db, input, dailyLimit = 50) {
     })
   } catch (error) {
     // Another registry writer may have won the unique normalized-URL constraint.
-    if (error.code === '23505') return lookupSource(db, input.url)
+    if (error.code === '23505') return lookupAndPromoteSource(db, input.url)
     throw error
   }
 }
@@ -103,7 +113,11 @@ export async function registerSource(db, input, dailyLimit = 50) {
 export function createSourceOnboarding(db, { env = process.env, validate = validateWebsite, limiter = createSubmissionLimiter({ limit: positiveSetting(env, 'BUSINESS_API_SUBMISSIONS_PER_IP_HOUR', 10) }) } = {}) {
   const dailyLimit = positiveSetting(env, 'BUSINESS_API_SUBMISSIONS_PER_DAY', 50)
   return async (input, ip) => {
-    try { return await lookupSource(db, input.url) }
+    try {
+      return await (env.BUSINESS_API_REGISTRATION_ENABLED === 'true'
+        ? lookupAndPromoteSource(db, input.url)
+        : lookupSource(db, input.url))
+    }
     catch (error) { if (error.code !== 'source_not_found') throw error }
     if (env.BUSINESS_API_REGISTRATION_ENABLED !== 'true') throw fail(404, 'source_not_found', 'This organisation is not registered.')
     await validate(input.submittedUrl || input.url)

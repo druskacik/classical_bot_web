@@ -101,7 +101,13 @@ Neither creates records. Existing registered sources are looked up without DNS v
 New sources receive priority **100**, status `pending`, unknown geography, and no crawler
 path. Submitted protocol and www are retained in the canonical URL; normalized identity
 is used for matching. Registration and the submitted alias are atomic and duplicate-safe.
-Repeated requests do not reset status, increase priority, or retry blocked/disabled sources.
+When registration is enabled, requests for existing sources in `pending`, `processing`,
+`pr_open`, `retry_wait`, or `active` status raise their priority to at least **100**, preserving
+higher values. Aliases and duplicate URLs promote the resolved primary source only. This
+also happens when concert results are cached and does not consume new-submission quotas
+or require DNS validation. Repeated requests do not rewrite already promoted sources,
+reset status, or change retry timing. `blocked`, `disabled`, and `needs_attention` sources
+are unchanged. Disabling registration keeps existing-source lookups read-only.
 
 When no concerts exist, `pending`, `processing`, `pr_open`, and `retry_wait` return 202 JSON
 with the regular response envelope, current source status, a message, and `Retry-After: 60`.
@@ -121,8 +127,10 @@ Submission defaults, configurable with positive integer environment variables:
   with a database advisory lock enforcing the cap. Existing sources remain accessible.
 
 Registration needs SELECT/INSERT on `crawler_source` and `crawler_source_url`, plus access
-to their ID sequences. It does not update existing registry records. Disable registration
-to stop new submissions while keeping lookup and exports working. No schema migration is required.
+to their ID sequences and UPDATE(priority) on `crawler_source`. Grant the update permission
+before deploying this change. Disable registration to stop new submissions and priority
+promotion while keeping lookup and exports working. No schema migration or bulk backfill
+is required; existing sources are promoted on request.
 
 Deploy the `classical_bot` analysis-priority changes first, then the web application, verify
 DB grants and proxy settings, and enable registration explicitly. Both analysis queues use

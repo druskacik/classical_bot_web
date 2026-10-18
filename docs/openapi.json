@@ -215,7 +215,7 @@
             }
           }
         },
-        "description": "When registration is enabled, unknown public websites are DNS-validated and queued at priority 100. This GET can create a source. Repeat the same request to poll registry status; active does not imply completed concert enrichment."
+        "description": "When registration is enabled, unknown public websites are DNS-validated and queued at priority 100. When enabled, this GET can create a source or raise an existing pending, processing, pr_open, retry_wait, or active source to at least priority 100, preserving higher priorities and retry timing. Aliases and duplicates promote the resolved primary source. Disabled registration keeps lookup read-only. Repeat the same request to poll registry status; active does not imply completed concert enrichment."
       },
       "options": {
         "summary": "Public CORS preflight",

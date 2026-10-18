@@ -105,6 +105,54 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
   assert.equal((await onboard({url:'https://alias.example/'},'a')).id,'1')
   const disabled=createSourceOnboarding(db,{env:{},validate:async()=>assert.fail('disabled registration validated')})
   await assert.rejects(disabled({url:'https://disabled.org/'},'a'),{statusCode:404})
+  const existing={url:'https://example.com/'}
+  const promote=createSourceOnboarding(db,{
+    env:{BUSINESS_API_REGISTRATION_ENABLED:'true',BUSINESS_API_SUBMISSIONS_PER_DAY:'1'},
+    validate:async()=>assert.fail('existing source validated'),
+    limiter:()=>assert.fail('existing source consumed submission quota'),
+  })
+  const nextAttempt=new Date('2030-01-01T00:00:00Z')
+  for (const status of ['pending','processing','pr_open','retry_wait','active','blocked','disabled','needs_attention']) {
+    for (const priority of [12,100,150]) {
+      await db('crawler_source').where('id',1).update({status,priority,next_attempt_at:nextAttempt})
+      const original=await db('crawler_source').where('id',1).first()
+      await disabled(existing,'a')
+      assert.deepEqual(await db('crawler_source').where('id',1).first(),original)
+      await Promise.all([promote(existing,'a'),promote(existing,'b')])
+      const eligible=['pending','processing','pr_open','retry_wait','active'].includes(status)
+      const expected={...original,priority:eligible?Math.max(priority,100):priority}
+      assert.deepEqual(await db('crawler_source').where('id',1).first(),expected)
+      const {rows:[version]}=await db.raw('SELECT xmin::text AS version FROM crawler_source WHERE id = 1')
+      await promote(existing,'a')
+      assert.deepEqual((await db.raw('SELECT xmin::text AS version FROM crawler_source WHERE id = 1')).rows[0],version)
+    }
+  }
+  for (const url of ['https://alias.example/','https://old.example/']) {
+    await db('crawler_source').where('id',1).update({status:'pending',priority:0})
+    const duplicate=await db('crawler_source').where('id',3).first()
+    assert.equal((await promote({url},'a')).id,'1')
+    assert.equal((await db('crawler_source').where('id',1).first()).priority,100)
+    assert.deepEqual(await db('crawler_source').where('id',3).first(),duplicate)
+  }
+  // Registration rechecks an existing source even when the daily allowance is exhausted.
+  await db('crawler_source').where('id',1).update({priority:0})
+  await registerSource(db,existing,1)
+  assert.equal((await db('crawler_source').where('id',1).first()).priority,100)
+  // Force the unique-conflict recovery branch, retaining real PostgreSQL lookup/update.
+  await db('crawler_source').where('id',1).update({priority:0})
+  const conflictDb=new Proxy(db,{get(target,key){
+    if(key==='transaction')return async()=>{throw Object.assign(new Error('concurrent registration'),{code:'23505'})}
+    return Reflect.get(target,key)
+  }})
+  await registerSource(conflictDb,existing,1)
+  assert.equal((await db('crawler_source').where('id',1).first()).priority,100)
+  // A failed promotion must not silently return a successful lookup.
+  await db.raw(`CREATE FUNCTION reject_priority_update() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN RAISE EXCEPTION 'promotion failed'; END $$;
+    CREATE TRIGGER reject_priority_update BEFORE UPDATE OF priority ON crawler_source
+    FOR EACH ROW EXECUTE FUNCTION reject_priority_update();`)
+  await assert.rejects(promote({url:'https://other.example/'},'a'),/promotion failed/)
+  await db.raw('DROP TRIGGER reject_priority_update ON crawler_source; DROP FUNCTION reject_priority_update()')
   const rejects=createSourceOnboarding(db,{env:{BUSINESS_API_REGISTRATION_ENABLED:'true'},validate:async()=>{throw Object.assign(new Error(),{statusCode:422})}})
   await assert.rejects(rejects({url:'https://invalid.org/'},'a'),{statusCode:422})
   assert.equal((await db('crawler_source').where('canonical_url','https://invalid.org/')).length,0)

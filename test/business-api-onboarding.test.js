@@ -53,9 +53,9 @@ test('failed website validation does not consume the submission quota', async ()
 })
 
 test('HTTP polling reads live registry state while sharing cached concerts', async t => {
-  let state='pending', total=0, calls=0
+  let state='pending', total=0, calls=0, preparations=0
   const handler=createConcertApiHandler({
-    prepare:async()=>({status:state,next_attempt_at:null}),log:()=>{},env:{},
+    prepare:async()=>{preparations++;return {status:state,next_attempt_at:null}},log:()=>{},env:{},
     cache:createDataCache({enabled:()=>true}),
     load:async()=>{calls++;return {source:{id:'1',name:'Website',url:'http://example.com'},concerts:[],pagination:{total,total_pages:0,page:1,page_size:50,all:false},generated_at:new Date().toISOString()}},
   })
@@ -74,6 +74,7 @@ test('HTTP polling reads live registry state while sharing cached concerts', asy
     assert.equal(body.pagination.next,null)
   }
   assert.equal(calls,1)
+  assert.equal(preparations,7) // Live lookup/promotion runs even when concerts are cached.
   state='active'
   const response=await fetch(base)
   assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/text\/csv/)
