@@ -10,7 +10,7 @@
         <!-- CityRadius owns a small form; keep the filters outside the save form. -->
         <fieldset :disabled="busy" class="min-w-0">
           <legend class="sr-only">Alert criteria</legend>
-          <ConcertFilters :country="draft.country || null" :city="draft.city || null" :radius="Number(draft.radius) || 0" :area-query="draft"
+          <ConcertFilters include-unavailable :country="draft.country || null" :city="draft.city || null" :radius="Number(draft.radius) || 0" :area-query="draft"
             :date-from="draft.dateFrom || null" :date-to="draft.dateTo || null" :date-preset="draft.datePreset || null"
             :composers="composerSelections(draft.composers)" :works="selections(draft.works)"
             :countries="countries" :countries-loading="countriesLoading" :countries-error="countriesError"
@@ -74,7 +74,7 @@ async function loadCountries() {
   countriesLoading.value = true; countriesError.value = false
   try {
     const { country, city, datePreset, ...context } = draft.value
-    const result = await $fetch('/api/get-concert-filter-options', { params: { ...context, ...(Number(context.radius) > 0 ? { city } : {}), type: 'country', selected: country } })
+    const result = await $fetch('/api/get-concert-filter-options', { params: { ...context, ...(Number(context.radius) > 0 ? { city } : {}), type: 'country', includeUnavailable: 'true', selected: country } })
     if (current === countryVersion) countries.value = result.items.map(item => ({ code: item.value, name: item.label, count: item.count }))
   } catch { if (current === countryVersion) countriesError.value = true }
   finally { if (current === countryVersion) countriesLoading.value = false }

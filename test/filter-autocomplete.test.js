@@ -179,7 +179,7 @@ test('zero-match suggestions expose availability and remain keyboard selectable'
   }, { inlineTemplate: true })
   const root = { children: [] }
   const app = renderer.createApp(component, {
-    type: 'composer', label: 'Composer', placeholder: 'Search', modelValue: [],
+    type: 'composer', label: 'Composer', placeholder: 'Search', modelValue: [], includeUnavailable: true,
     'onUpdate:modelValue': value => selections.push(value),
   })
   app.mount(root)
@@ -188,11 +188,42 @@ test('zero-match suggestions expose availability and remain keyboard selectable'
     input.props.onFocus()
     await settle()
     const allText = node => [node.text || '', ...(node.children || []).map(allText)].join(' ')
-    assert.match(allText(root), /No upcoming matches/)
-    assert.match(allText(root), /2 concerts/)
+    assert.match(allText(root), /No upcoming concerts/)
+    assert.match(allText(root), /2/)
     input.props.onKeydown({ key: 'ArrowDown', preventDefault() {}, isComposing: false })
     input.props.onKeydown({ key: 'Enter', preventDefault() {}, isComposing: false })
     await Vue.nextTick()
     assert.deepEqual(selections, [['Philip Glass']])
+  } finally { app.unmount() }
+})
+
+test('availability mode is sent to the shared endpoint and invalidates stale requests', async () => {
+  const requests = []
+  const mode = Vue.ref(false)
+  const component = compileComponent('../layers/concerts/app/components/filter-autocomplete.vue', {
+    serializeComposerSelections,
+    $fetch: (_url, { params }) => new Promise(resolve => requests.push({ params, resolve })),
+    document: { addEventListener() {}, removeEventListener() {}, getElementById() {} },
+  }, { inlineTemplate: true })
+  const root = { children: [] }
+  const app = renderer.createApp({
+    setup: () => () => Vue.h(component, {
+      type: 'composer', label: 'Composer', placeholder: 'Search',
+      modelValue: ['Mozart'], includeUnavailable: mode.value,
+    }),
+  })
+  app.mount(root)
+  try {
+    assert.equal(requests[0].params.includeUnavailable, undefined)
+    mode.value = true
+    await Vue.nextTick()
+    assert.equal(requests[1].params.includeUnavailable, 'true')
+    requests[1].resolve({ items: [{ value: 'Mozart', label: 'Current Mozart', count: 0 }] })
+    await settle()
+    requests[0].resolve({ items: [{ value: 'Mozart', label: 'Stale Mozart', count: 1 }] })
+    await settle()
+    const text = node => [node.text || '', ...(node.children || []).map(text)].join(' ')
+    assert.match(text(root), /Current Mozart/)
+    assert.doesNotMatch(text(root), /Stale Mozart/)
   } finally { app.unmount() }
 })

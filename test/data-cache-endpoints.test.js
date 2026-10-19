@@ -64,7 +64,7 @@ test('real endpoints preserve uncached output, skip DB on hits, and isolate both
   for (const local of [false, true]) {
     Object.assign(site, local ? { country: 'SK', locale: 'sk-SK', cityRoutes: 'local' } : { country: null, locale: 'en-GB', cityRoutes: 'global' })
     city.path = local ? '/Bratislava' : '/slovakia/bratislava'
-    const handlers = [[concerts, {}], [facets, { type: 'country' }], [countries, {}], [sources, {}], [composers, {}]]
+    const handlers = [[concerts, {}], [facets, { type: 'country' }], [facets, { type: 'country', includeUnavailable: 'true' }], [countries, {}], [sources, {}], [composers, {}]]
     if (local) handlers.push([cities, {}])
     for (const [handler, query] of handlers) {
       process.env.SERVER_DATA_CACHE_ENABLED = 'false'

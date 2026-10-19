@@ -24,6 +24,7 @@ export default defineEventHandler(async (event) => {
   try {
     const query = getQuery(event)
     const type = first(query.type)
+    const includeUnavailable = first(query.includeUnavailable) === 'true'
     if (!['country', 'city', 'composer', 'work'].includes(type)) {
       throw createError({ statusCode: 400, statusMessage: 'Type must be country, city, composer, or work' })
     }
@@ -51,7 +52,7 @@ export default defineEventHandler(async (event) => {
     const selectedText = String(first(query.selected) || '').trim()
     const selected = type === 'city' ? (selectedText ? [selectedText] : []) : type === 'composer' ? composerSelections(selectedText) : querySelections(selectedText)
     if (type === 'city') selected.forEach(value => parseCity(value))
-    return await cachedConcertData('filter-options', { type, filters: concertFilterCacheInput(context), search, selected }, async () => {
+    return await cachedConcertData('filter-options', { type, filters: concertFilterCacheInput(context), search, selected, includeUnavailable }, async () => {
       const base = () => applyFilters(knex('classical_concert as cc')
         .leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), context)
       // Catalogue locations include past public records, independent of availability.
@@ -131,6 +132,7 @@ export default defineEventHandler(async (event) => {
             searchRank: Math.min(options.get(identity)?.searchRank ?? 2, searchRank([city.english_name, city.local_name, city.display_name], search)) })
         }
         suggestions = [...options.values()]
+          .filter(option => includeUnavailable || option.count > 0)
           .sort((a, b) => a.searchRank - b.searchRank || b.count - a.count || a.label.localeCompare(b.label, concertSite.locale) || a.value.localeCompare(b.value))
           .slice(0, OPTION_LIMIT).map(({ searchRank, ...option }) => ({ ...option, radiusAvailable: radiusAvailable(option.value) }))
         for (const value of selected) {
@@ -170,6 +172,7 @@ export default defineEventHandler(async (event) => {
           // zero-match catalogue suggestions to the selected composers.
           matching.where(inner => inner.whereIn('c.name', context.composers).orWhere('availability.count', '>', 0))
         }
+        if (!includeUnavailable) matching.where('availability.count', '>', 0)
         const searchFields = type === 'composer' ? ['c.normalized_name'] : ['w.normalized_title', 'c.normalized_name']
         if (search) {
           matching.where(inner => {
@@ -188,7 +191,7 @@ export default defineEventHandler(async (event) => {
           labels = identitiesRows.map(row => ({ ...row, count: Number(counts.find(item => item.value === row.value)?.count || 0) }))
         }
       }
-      const items = new Map(suggestions.map(item => [String(item.value), { ...item, value: String(item.value), count: Number(item.count) }]))
+      const items = new Map(suggestions.filter(item => includeUnavailable || Number(item.count) > 0).map(item => [String(item.value), { ...item, value: String(item.value), count: Number(item.count) }]))
       for (const label of labels) if (!items.has(String(label.value))) items.set(String(label.value), { ...label, value: String(label.value), count: label.count || 0 })
       const result = [...items.values()].map(item => ({ ...item,
         ...(type === 'city' && !context.country ? { secondaryLabel: getCountryName(item.country_code) } : {}),

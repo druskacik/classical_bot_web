@@ -18,7 +18,7 @@
         <span v-if="countriesError" class="mt-2 block text-xs text-gray-600">{{ t('Countries could not be loaded.') }} <button type="button" class="cursor-pointer text-primary underline" @click="$emit('retry-countries')">{{ t('Try again') }}</button></span>
       </label>
 
-      <CityRadius ref="cityControl" :city="fixedCity || city" :radius="radius" :country="effectiveCountry" :context="cityContext" @change="$emit('city-radius', $event)" />
+      <CityRadius :include-unavailable="includeUnavailable" ref="cityControl" :city="fixedCity || city" :radius="radius" :country="effectiveCountry" :context="cityContext" @change="$emit('city-radius', $event)" />
 
       <div>
         <label class="block">
@@ -50,6 +50,7 @@
     <div :id="musicId" class="music-fields md:grid md:grid-cols-2" :class="musicExpanded ? 'grid' : 'hidden'">
       <FilterAutocomplete
         type="composer"
+        :include-unavailable="includeUnavailable"
         :context="optionContext"
         :city-id="radius ? null : fixedCityId"
         :label="t('Composer')"
@@ -60,6 +61,7 @@
       />
       <FilterAutocomplete
         type="work"
+        :include-unavailable="includeUnavailable"
         :context="optionContext"
         :city-id="radius ? null : fixedCityId"
         :label="t('Work')"
@@ -84,6 +86,7 @@ import { clearAreaQuery } from '../../shared/utils/concert-area.js'
 
 import { serializeComposerSelections, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
 const props = defineProps({
+  includeUnavailable: Boolean,
   radius: { type: Number, default: 0 },
   bounds: { type: String, default: null },
   areaQuery: { type: Object, default: () => ({}) },

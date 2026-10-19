@@ -1,5 +1,5 @@
 <template>
-  <FilterAutocomplete compact type="city" :context="context" :country="country" :label="t('City')" :placeholder="t('Any city')" :model-value="city ? [city] : []" @update:model-value="changeCity">
+  <FilterAutocomplete :include-unavailable="includeUnavailable" compact type="city" :context="context" :country="country" :label="t('City')" :placeholder="t('Any city')" :model-value="city ? [city] : []" @update:model-value="changeCity">
     <template #trailing="{ selectedOptions, loading, error }">
       <div class="shrink-0" :title="available(selectedOptions, loading, error) ? help : city ? t('Radius unavailable') : help">
         <form v-if="custom && available(selectedOptions, loading, error)" class="flex h-8 items-center gap-1 rounded-full bg-primary/10 pl-2.5 pr-1 text-xs text-primary" @submit.prevent="apply(available(selectedOptions, loading, error))" @keydown.esc.stop.prevent="cancel">
@@ -26,7 +26,7 @@
   </FilterAutocomplete>
 </template>
 <script setup>
-const props = defineProps({ city: { type: String, default: null }, radius: { type: Number, default: 0 }, country: { type: String, default: null }, context: { type: Object, default: () => ({}) } })
+const props = defineProps({ includeUnavailable: Boolean, city: { type: String, default: null }, radius: { type: Number, default: 0 }, country: { type: String, default: null }, context: { type: Object, default: () => ({}) } })
 const emit = defineEmits(['change'])
 const { t } = useConcertText()
 const { concertSite } = useAppConfig()

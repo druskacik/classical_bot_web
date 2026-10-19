@@ -1,4 +1,5 @@
 const slovak = {
+  "No upcoming concerts": "Žiadne nadchádzajúce koncerty",
   "No upcoming matches": "Žiadne nadchádzajúce zhody",
   "Filters": "Filtre",
   "About the map": "O mape",

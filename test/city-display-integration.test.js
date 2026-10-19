@@ -146,7 +146,7 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
       assert.equal(result.items[0].city_id, city)
       assert.equal((await concerts({ query: { country, city } })).total, 1)
       for (const type of ['composer', 'work']) {
-        const items = (await facets({ query: { country, type } })).items
+        const items = (await facets({ query: { country, type, includeUnavailable: 'true' } })).items
         assert.equal(items.length, 2)
         assert.equal(items[0].count, 1)
         assert.equal(items[1].count, 0)
@@ -203,11 +203,12 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
     assert.equal((await options({ q: 'nove', country: 'CZ' }))[0].count, 1, 'existing resolved-country scope remains unchanged')
     for (const query of [{ q: 'no country' }, { q: 'invalid country' }]) assert.deepEqual(await options(query), [])
     for (const query of [{ q: 'hidden' }, { q: 'nove', composers: 'Austria Composer' }, { q: 'nove', works: '1' }, { q: 'nove', dateFrom: '2099-01-01' }]) {
-      const items = await options(query)
+      assert.deepEqual(await options(query), [])
+      const items = await options({ ...query, includeUnavailable: 'true' })
       assert.ok(items.length)
       assert.ok(items.every(item => item.count === 0))
     }
-    assert.deepEqual((await options({ q: 'hidden' })).map(item => item.label), ['Hidden past'])
+    assert.deepEqual((await options({ q: 'hidden', includeUnavailable: 'true' })).map(item => item.label), ['Hidden past'])
     const selected = (await options({ q: 'Vienna', selected: czech.value, dateFrom: '2099-01-01' })).find(item => item.value === czech.value)
     assert.equal(selected.count, 0)
     assert.equal(selected.radiusAvailable, false)
@@ -318,7 +319,7 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
       { id: 550, name: 'Émpty_Name', normalized_name: 'empty_name' },
     ])
     await db('work').insert([{ id: 500, composer_id: 500, title: 'Glassworks', normalized_title: 'glassworks' }])
-    const query = async input => (await facets({ query: input })).items
+    const query = async input => (await facets({ query: { includeUnavailable: 'true', ...input } })).items
     for (const country of [null, 'SK']) {
       site.country = country
       const found = await query({ type: 'composer', country: 'SK', q: 'Philip Glass' })
@@ -341,9 +342,24 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
       assert.equal(radius[0].count, 0)
     }
     site.country = null
+    for (const type of ['country', 'city', 'composer', 'work']) {
+      const params = { type, composers: 'Philip Glass' }
+      if (type === 'composer') params.q = 'Philip Glass'
+      const available = await query({ ...params, includeUnavailable: 'false' })
+      assert.ok(available.every(item => item.count > 0), type)
+      assert.ok((await query(params)).some(item => item.count === 0), type)
+    }
+    assert.deepEqual(await query({ type: 'composer', q: 'Philip Glass', includeUnavailable: undefined }), [])
+    assert.deepEqual(await query({ type: 'composer', q: 'Philip Glass', includeUnavailable: '1' }), [])
+    const restored = await query({ type: 'composer', q: 'unmatched', selected: 'Philip Glass', includeUnavailable: 'false' })
+    assert.deepEqual(restored.map(item => [item.value, item.count]), [['Philip Glass', 0]])
     const concert = await db('classical_concert').where({ city_id: 4 }).first()
     await db('classical_concert_composer').insert(Array.from({ length: 22 }, (_, i) => ({ classical_concert_id: concert.id, composer_id: 501 + i })))
     assert.equal((await query({ type: 'composer', q: 'Philip Glass' }))[0].value, 'Philip Glass', 'exact zero-match result outranks 22 available partial matches')
+    const browsing = await query({ type: 'composer', q: 'Philip Glass', includeUnavailable: 'false' })
+    assert.equal(browsing.length, 20, 'availability filtering happens before the limit')
+    assert.ok(browsing.every(item => item.count > 0))
+
     await db('classical_concert_composer').insert({ classical_concert_id: concert.id, composer_id: 500 })
     await db('classical_concert_work').insert({ classical_concert_id: concert.id, work_id: 500 })
     assert.equal((await query({ type: 'composer', q: 'Philip Glass', country: 'AT' }))[0].count, 1)
@@ -367,7 +383,7 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
       await db('classical_concert_composer').insert([700, 701].map(composer_id => ({ classical_concert_id: concert.id, composer_id })))
       await db('classical_concert_work').insert({ classical_concert_id: concert.id, work_id: work })
     }
-    const works = async query => (await facets({ query: { type: 'work', composers: 'Mozart', ...query } })).items
+    const works = async query => (await facets({ query: { type: 'work', composers: 'Mozart', includeUnavailable: 'true', ...query } })).items
     for (const country of [null, 'SK']) {
       site.country = country
       const available = await works({})

@@ -88,7 +88,7 @@
             {{ option.secondaryLabel }}
           </span>
         </span>
-        <span v-if="showCount" class="max-w-32 shrink-0 pt-0.5 text-right text-xs tabular-nums text-gray-500">{{ option.count ?? 0 }}</span>
+        <span v-if="showCount" class="max-w-32 shrink-0 pt-0.5 text-right text-xs tabular-nums text-gray-500">{{ includeUnavailable && option.count === 0 ? t('No upcoming concerts') : option.count ?? 0 }}</span>
       </button>
       <p v-if="loading" class="px-3 py-3 text-sm text-gray-500">{{ t('Searching…') }}</p>
       <p v-else-if="!availableOptions.length" class="px-3 py-3 text-sm text-gray-500">
@@ -107,6 +107,7 @@ import { serializeComposerSelections } from '../../shared/utils/concert-query.js
 const { t, availableOptions: describeOptions } = useConcertText()
 const props = defineProps({
   compact: Boolean,
+  includeUnavailable: Boolean,
   type: { type: String, required: true },
   label: { type: String, required: true },
   placeholder: { type: String, required: true },
@@ -162,6 +163,7 @@ const loadOptions = async () => {
       params: {
         ...props.context,
         type: props.type,
+        ...(props.type !== 'area-city' && props.includeUnavailable ? { includeUnavailable: 'true' } : {}),
         country: props.country || undefined,
         cityId: props.cityId || undefined,
         q: search.value || undefined,
@@ -279,7 +281,7 @@ const invalidateOptions = () => {
   loadError.value = false
 }
 
-watch(() => JSON.stringify([props.context, props.country, props.cityId, props.modelValue]), () => {
+watch(() => JSON.stringify([props.context, props.country, props.cityId, props.modelValue, props.includeUnavailable]), () => {
   invalidateOptions()
   const selectedValues = new Set(props.modelValue.map(value => String(value)))
   selectedOptions.value = selectedOptions.value.filter(option => selectedValues.has(String(option.value)))
