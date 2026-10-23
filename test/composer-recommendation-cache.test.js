@@ -1,84 +1,133 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { registerHooks } from 'node:module'
-import { createStorage } from 'unstorage'
 import { createRecommendationCache, recommendationCacheOptions, selectRelatedComposers } from '../server/utils/composer-recommendation-cache.js'
-
-// Exercise the installed Nitro cache implementation, substituting only its
-// application/storage boundaries (which normally come from the Nitro bundle).
-const storage = createStorage()
-globalThis.__recommendationTestStorage = storage
-const hooks = registerHooks({
-  resolve(specifier, context, nextResolve) {
-    if (context.parentURL?.endsWith('/runtime/internal/cache.mjs')) {
-      const code = specifier === './storage.mjs'
-        ? 'export const useStorage = () => globalThis.__recommendationTestStorage'
-        : specifier === './app.mjs' ? 'export const useNitroApp = () => ({ captureError() {} })' : null
-      if (code) return { url: `data:text/javascript,${encodeURIComponent(code)}`, shortCircuit: true }
-    }
-    return nextResolve(specifier, context)
-  },
-})
-const { defineCachedFunction } = await import('nitropack/runtime/internal/cache')
-hooks.deregister()
 
 const tick = () => new Promise(resolve => setImmediate(resolve))
 const silent = { info() {}, error() {} }
+const first = '2026-10-22T12:00:00.000Z'
+const next = '2026-10-22T13:00:00.000Z'
+const rankings = { 1: [{ id: 2, score: 0.5 }] }
+const updated = { 1: [{ id: 3, score: 0.75 }] }
+const deferred = () => {
+  let resolve, reject
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no })
+  return { promise, resolve, reject }
+}
 
-test('publication-keyed Nitro cache shares loads and never mixes generations', async t => {
-  await storage.clear()
-  let now = Date.now()
-  t.mock.method(Date, 'now', () => now)
-  t.mock.method(console, 'error', () => {})
-  let loads = 0, finish, fail
-  const get = createRecommendationCache(defineCachedFunction, () => {
-    loads++
-    return new Promise((resolve, reject) => { finish = resolve; fail = reject })
-  }, silent)
-  const first = get('publication-1'), concurrent = get('publication-1')
+test('cold reads return fallback immediately and share the startup/background load', async () => {
+  const load = deferred()
+  let calls = 0
+  const cache = createRecommendationCache(() => { calls++; return load.promise }, { logger: silent })
+  const warm = cache.warm()
+  for (let i = 0; i < 50; i++) assert.deepEqual(cache.get(first), {})
+  assert.equal(cache.warm(), warm, 'startup and requests share one in-flight operation')
   await tick()
-  assert.equal(loads, 1)
-  const original = { 1: [{ id: 2, score: 0.5 }] }
-  finish(original)
-  assert.deepEqual(await first, original)
-  assert.deepEqual(await concurrent, original)
-  await tick()
-  now += 3600 * 1000
-  assert.deepEqual(await get('publication-1'), original, 'failed publisher retains the same cache key')
-  assert.equal(loads, 1)
-  const next = get('publication-2')
-  const rejected = assert.rejects(next, /Composer recommendations unavailable/)
-  await tick()
-  assert.equal(loads, 2)
-  fail(new Error('private database details'))
-  await rejected
-  assert.deepEqual(await get('publication-1'), original)
-  const retry = get('publication-2')
-  await tick()
-  const updated = { 1: [{ id: 3, score: 0.75 }] }
-  finish(updated)
-  assert.deepEqual(await retry, updated)
-  assert.deepEqual(await get('publication-2'), updated)
-  assert.equal(loads, 3)
+  assert.equal(calls, 1)
+  load.resolve({ publishedAt: first, rankings })
+  await warm
+  assert.equal(cache.get(first), rankings)
+  assert.equal(calls, 1)
+  assert.equal(recommendationCacheOptions.maxAgeMs, 86400_000)
+  assert.equal(recommendationCacheOptions.retryDelayMs, 60_000)
 })
 
-test('a failed cold load rejects safely and can be retried', async () => {
-  await storage.clear()
-  let attempts = 0
-  const get = createRecommendationCache(defineCachedFunction, async () => {
-    if (++attempts === 1) throw new Error('private connection details')
-    return {}
-  }, silent)
-  await assert.rejects(get(), { message: 'Composer recommendations unavailable' })
-  assert.deepEqual(await get(), {})
-  assert.equal(attempts, 2)
-  assert.equal(recommendationCacheOptions.maxAge, 86400)
+test('failed background loads are caught, sanitized and retried only after backoff', async () => {
+  let now = 0, calls = 0
+  const errors = []
+  const cache = createRecommendationCache(() => {
+    if (++calls === 1) throw new Error('private connection details and SQL')
+    return { publishedAt: first, rankings }
+  }, { now: () => now, logger: { info() {}, error(message) { errors.push(message) } } })
+  assert.deepEqual(cache.get(first), {})
+  await cache.warm() // The failure must not reject or become an unhandled promise.
+  assert.equal(calls, 1)
+  assert.equal(errors.length, 1)
+  assert.doesNotMatch(errors[0], /private connection|SQL/)
+  for (let i = 0; i < 50; i++) assert.deepEqual(cache.get(first), {})
+  await cache.warm()
+  assert.equal(calls, 1, 'failed attempts are not repeated for each visitor')
+  now = 59_999
+  assert.deepEqual(cache.get(next), {})
+  await tick()
+  assert.equal(calls, 1, 'publication changes do not bypass failure backoff')
+  now = 60_000
+  assert.deepEqual(cache.get(first), {})
+  await cache.warm()
+  assert.equal(calls, 2)
+  assert.equal(cache.get(first), rankings)
+})
+
+test('expired same-publication rankings remain usable while refresh fails or succeeds', async () => {
+  let now = 0, calls = 0
+  const refresh = deferred()
+  const cache = createRecommendationCache(() => {
+    calls++
+    if (calls === 1) return { publishedAt: first, rankings }
+    if (calls === 2) throw new Error('database unavailable')
+    return refresh.promise
+  }, { now: () => now, maxAgeMs: 1000, retryDelayMs: 500, logger: silent })
+  await cache.warm()
+  now = 1000
+  assert.equal(cache.get(first), rankings)
+  await cache.warm()
+  assert.equal(cache.get(first), rankings, 'failure must not replace a successful snapshot with emptiness')
+  assert.equal(calls, 2)
+  now = 1500
+  assert.equal(cache.get(first), rankings)
+  await tick()
+  assert.equal(calls, 3)
+  const pending = cache.warm()
+  refresh.resolve({ publishedAt: first, rankings: updated })
+  await pending
+  assert.equal(cache.get(first), updated)
+})
+
+test('new publications use fallback until ready and never expose another generation', async () => {
+  let calls = 0
+  const load = deferred()
+  const cache = createRecommendationCache(() => ++calls === 1
+    ? { publishedAt: first, rankings } : load.promise, { logger: silent })
+  await cache.warm()
+  assert.deepEqual(cache.get(next), {})
+  assert.equal(cache.get(first), rankings)
+  const pending = cache.warm()
+  await tick()
+  assert.equal(calls, 2)
+  load.resolve({ publishedAt: next, rankings: updated })
+  await pending
+  assert.equal(cache.get(next), updated)
+  assert.deepEqual(cache.get(first), {}, 'an older request uses directory fallback, not newer rankings')
+  await tick()
+  assert.equal(calls, 2, 'older requests do not cause backwards refreshes')
+})
+
+test('failed new-publication loads preserve the previous successful snapshot', async () => {
+  let calls = 0
+  const cache = createRecommendationCache(() => {
+    if (++calls === 1) return { publishedAt: first, rankings }
+    throw new Error('failed refresh')
+  }, { logger: silent })
+  await cache.warm()
+  assert.deepEqual(cache.get(next), {})
+  await cache.warm()
+  assert.equal(cache.get(first), rankings)
+  assert.deepEqual(cache.get(next), {})
+  assert.equal(calls, 2)
+})
+
+test('the background snapshot supplies the actual publication key, not the triggering request', async () => {
+  const cache = createRecommendationCache(() => ({ publishedAt: next, rankings: updated }), { logger: silent })
+  assert.deepEqual(cache.get(first), {})
+  await cache.warm()
+  assert.deepEqual(cache.get(first), {})
+  assert.equal(cache.get(next), updated)
+  assert.deepEqual(cache.get(undefined), {})
 })
 
 test('recommendations use current directory objects and fill only missing slots', () => {
   const directory = [1, 2, 3, 4, 5].map(id => ({ id, name: `Current ${id}`, concertCount: id }))
-  const rankings = { 1: [{ id: 1 }, { id: 99 }, { id: 4 }, { id: 4 }, { id: 3 }] }
-  const related = selectRelatedComposers(1, directory, rankings)
+  const ranks = { 1: [{ id: 1 }, { id: 99 }, { id: 4 }, { id: 4 }, { id: 3 }] }
+  const related = selectRelatedComposers(1, directory, ranks)
   assert.deepEqual(related.map(c => c.id), [4, 3, 2])
   assert.equal(related[0], directory[3])
   assert.deepEqual(selectRelatedComposers(1, directory, {}).map(c => c.id), [2, 3, 4])

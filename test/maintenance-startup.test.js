@@ -5,7 +5,7 @@ import { createServer } from 'node:net'
 import { once } from 'node:events'
 import { readdir } from 'node:fs/promises'
 
-test('production maintenance works without PostgreSQL; normal startup still requires it', {
+test('maintenance skips PostgreSQL; normal HTTP starts even when PostgreSQL is unavailable', {
   skip: process.env.TEST_MAINTENANCE_STARTUP !== '1', timeout: 20_000,
 }, async t => {
   let databaseConnections = 0
@@ -81,8 +81,20 @@ test('production maintenance works without PostgreSQL; normal startup still requ
   assert.doesNotMatch(maintenance.output(), /startup warm-up|\[composer-recommendations\] refreshed/)
 
   const normal = await launch('false')
-  await once(normal.child, 'exit')
-  assert.equal(normal.child.exitCode, 1, normal.output())
-  assert.match(normal.output(), /startup warm-up failed/)
-  assert.ok(databaseConnections > 0, 'Normal startup still performs database warm-up')
+  const normalDeadline = Date.now() + 8_000
+  let normalReady = false
+  while (Date.now() < normalDeadline) {
+    assert.equal(normal.child.exitCode, null, normal.output())
+    try {
+      const response = await fetch(normal.origin + '/favicon.svg', { signal: AbortSignal.timeout(1000) })
+      assert.equal(response.status, 200)
+      normalReady = true
+      break
+    } catch { await new Promise(resolve => setTimeout(resolve, 50)) }
+  }
+  assert.ok(normalReady, `Normal listener did not start: ${normal.output()}`)
+  const profile = await fetch(normal.origin + '/api/composers/1', { signal: AbortSignal.timeout(3000) })
+  assert.equal(profile.status, 503, 'HTTP is available, but unavailable essential data still returns 503')
+  assert.equal(normal.child.exitCode, null, normal.output())
+  assert.ok(databaseConnections > 0, 'Normal startup attempts optional background warm-up')
 })

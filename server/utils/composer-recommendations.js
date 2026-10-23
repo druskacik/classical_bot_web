@@ -3,9 +3,12 @@ import { withResolvedSnapshot } from '#layers/concerts/server/utils/resolved-con
 import { queryComposerRecommendationSnapshot } from './composer-recommendation-query.js'
 import { createRecommendationCache } from './composer-recommendation-cache.js'
 
-const cachedRecommendations = createRecommendationCache(
-  defineCachedFunction, (_publishedAt, trx) => queryComposerRecommendationSnapshot(trx),
-)
-export const getComposerRecommendations = (db, publication) => db
-  ? cachedRecommendations(publication.publishedAt, db)
-  : withResolvedSnapshot(knex, (trx, publication) => cachedRecommendations(publication.publishedAt, trx))
+// Background work always owns its snapshot. Never borrow a request transaction:
+// the request should finish while this aggregation is still running.
+const recommendations = createRecommendationCache(() => withResolvedSnapshot(knex, async (trx, publication) => ({
+  publishedAt: publication.publishedAt,
+  rankings: await queryComposerRecommendationSnapshot(trx),
+})))
+
+export const getComposerRecommendations = publishedAt => recommendations.get(publishedAt)
+export const warmComposerRecommendations = () => recommendations.warm()

@@ -42,13 +42,14 @@ monitoring remains responsible for operational failure/staleness diagnostics.
   read-only REPEATABLE READ transaction. Helpers receive that transaction.
   Shared data caches check readiness even on hits and use successful
   `published_at`, never attempt/failure times, in their keys.
-- Initial unavailability produces a safe 503, not an empty catalogue or a raw
-  fallback. The global production server's existing recommendation warm-up also
-  fails closed before opening its listener if no dataset is ready. Maintenance
-  startup continues to work without PostgreSQL.
-- Resolved cache namespaces replace the previous list/business/recommendation
-  namespaces. Recommendations cannot refresh in the background using a closed
-  transaction. Registry-only city caches remain independent. Sitemap inventory
+- Initial data unavailability produces a safe 503, not an empty catalogue or a raw
+  fallback. HTTP starts independently of optional composer recommendations; their
+  warm-up runs in the background and cannot terminate the server on failure.
+  Maintenance startup continues to work without PostgreSQL or recommendation warm-up.
+- Resolved publication keys isolate list/business caches and the in-process
+  recommendation snapshot. Recommendation background work owns a separate
+  read-only transaction, never a request transaction that may already be closed.
+  Registry-only city caches remain independent. Sitemap inventory
   and the configured default sitemap storage are process-local; no persistent
   raw sitemap cache is configured in this repository.
 - `resolved-concerts.js` adapts JSON snapshots to the existing response fields.
@@ -96,8 +97,9 @@ and verifies the name change after successful publication on both site scopes.
   these fixtures. They cover both discovery sites, donor-only programme data,
   source matching, location resolution, excluded/broken groups, exports, decimal
   serialization, and publication changes within a REPEATABLE READ response.
-- The separate production startup/maintenance checks passed (2 tests), including
-  startup failure/timeout behavior and recommendation warm-up.
+- The production startup/maintenance checks were subsequently updated to enforce
+  non-fatal recommendation loading (see below), replacing the original fatal-startup
+  expectations.
 - `npm run build`, `npm run build:sk`, `npm run typecheck`, and
   `npm run typecheck:sk` passed.
 - Built servers were exercised over localhost against fictional isolated data:
@@ -111,6 +113,40 @@ and verifies the name change after successful publication on both site scopes.
 `test-support/resolved-policy-v1.sql` is a verbatim frozen backend policy fixture,
 not an application aggregation policy. PostgreSQL integration fixtures install it
 only in disposable databases and explicitly publish after synthetic writes.
+
+### Non-blocking recommendation startup
+
+A deployment exposed an availability bug: recommendation SQL timeouts caused the
+process to exit before opening HTTP. Optional rankings are no longer a startup or
+composer-profile dependency:
+
+- Start the listener first, then attempt background warm-up outside maintenance.
+- Keep at most one in-flight aggregation per process. Failures are caught and
+  logged without SQL/connection details. Later composer requests can retry only
+  after a 60-second failure backoff; there is no continuous retry timer.
+- Keep one successful publication's rankings in memory with a 24-hour refresh age.
+  Same-publication rankings remain usable during refresh/failure. A different
+  publication uses directory-based fallback until its own rankings are ready;
+  older request snapshots never consume newer rankings or trigger backwards loads.
+- Cache essential profile data separately from related-composer selection. A warm
+  profile immediately benefits from completed rankings on its next request, rather
+  than caching fallback suggestions for the entire profile TTL.
+- Preserve the existing 15-second SQL timeout and ranking policy. Core data
+  endpoints still check publication readiness and return 503 when essential data
+  is unavailable. Opening HTTP is not a claim that all data dependencies are ready.
+
+Validation: built-server tests use disposable PostgreSQL and deliberately lock
+`crawler_source` to block only recommendations. Listings and composer profiles
+remain available while warm-up waits and after its actual SQL timeout; profiles
+use fallback, and successful background completion improves a cached profile.
+Missing database sockets, unpublished data, and a stalled database handshake no
+longer prevent HTTP from opening. Maintenance still makes zero DB connections.
+Unit tests cover single-flight loading, failure backoff/recovery, stale rankings,
+publication changes, and sanitized errors. The full run with isolated discovery
+fixtures and both startup flags passed 231 tests, with one opt-in alert suite
+skipped. Both site builds/typechecks pass.
+Deployment readiness/healthchecks and recommendation SQL optimization are separate
+follow-ups; this change does not implement them.
 
 ### Query plans and remaining performance gate
 

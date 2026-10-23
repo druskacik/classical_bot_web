@@ -59,6 +59,8 @@ test('source recommendations and production startup with isolated PostgreSQL', {
   await db.raw(`
     CREATE TABLE crawler_source(id bigint primary key, canonical_url text, duplicate_of_id bigint);
     CREATE TABLE crawler_source_url(crawler_source_id bigint, url text);
+    CREATE TABLE city(id bigint primary key, english_name text, local_name text, display_name text,
+      country_code text, latitude double precision, longitude double precision);
     CREATE TABLE composer(id int primary key, name text);
     CREATE TABLE composer_spotify_playlist(id int primary key, composer_id int, status text, is_public boolean,
       spotify_playlist_id text, season_start date, season_end date, last_synced_at timestamptz);
@@ -130,22 +132,35 @@ test('source recommendations and production startup with isolated PostgreSQL', {
     child.stderr.on('data', chunk => { output += chunk })
     return { child, port, output: () => output }
   }
+  const request = (server, path) => fetch(`http://127.0.0.1:${server.port}${path}`, { signal: AbortSignal.timeout(3000) })
+  const listening = server => until(() => {
+    assert.equal(server.child.exitCode, null, server.output())
+    return portOpen(server.port)
+  })
   const blocker = await db.transaction()
   try {
-    await blocker.raw('LOCK composer_spotify_playlist IN ACCESS EXCLUSIVE MODE')
+    // Block only recommendations, not the directory/works needed by profiles.
+    await blocker.raw('LOCK crawler_source IN ACCESS EXCLUSIVE MODE')
     const server = await launch()
+    await listening(server)
     await until(async () => {
-      assert.equal(server.child.exitCode, null, server.output())
       const { rows } = await db.raw("SELECT 1 FROM pg_stat_activity WHERE application_name='classical-bot-web' AND wait_event_type='Lock'")
       return rows.length > 0
     })
-    assert.equal(await portOpen(server.port), false, 'listener must remain closed during warm-up')
+    assert.equal((await request(server, '/favicon.svg')).status, 200)
+    const concerts = await request(server, '/api/get-concerts')
+    assert.equal(concerts.status, 200, server.output())
+    assert.ok((await concerts.json()).total > 0)
+    const fallback = await request(server, '/api/composers/1')
+    assert.equal(fallback.status, 200, server.output())
+    assert.deepEqual((await fallback.json()).related.map(c => c.id), [2, 4, 6])
+    const missing = await request(server, '/api/composers/9999')
+    assert.equal(missing.status, 404)
+
     await blocker.rollback()
-    await until(() => {
-      assert.equal(server.child.exitCode, null, server.output())
-      return portOpen(server.port)
-    })
-    const response = await fetch(`http://127.0.0.1:${server.port}/api/composers/1`)
+    await until(() => server.output().includes('[composer-recommendations] refreshed'))
+    // The base profile is now a cache hit. It must not retain cached fallback.
+    const response = await request(server, '/api/composers/1')
     assert.equal(response.status, 200, server.output())
     const body = await response.json()
     assert.deepEqual(body.related.map(c => c.id), [6, 3, 4])
@@ -154,36 +169,55 @@ test('source recommendations and production startup with isolated PostgreSQL', {
   } finally {
     if (!blocker.isCompleted()) await blocker.rollback()
   }
+
   const failed = await launch({ NUXT_DB_HOST: join(dir, 'missing-socket') })
-  await until(() => failed.child.exitCode !== null)
-  assert.equal(failed.child.exitCode, 1)
-  assert.equal(await portOpen(failed.port), false)
-  assert.match(failed.output(), /startup warm-up failed/)
+  await listening(failed)
+  await until(() => failed.output().includes('[composer-recommendations] refresh failed'))
+  assert.equal((await request(failed, '/favicon.svg')).status, 200)
+  assert.equal((await request(failed, '/api/composers/1')).status, 503, 'essential data still fails closed')
+  assert.equal(failed.child.exitCode, null)
 
   const timeoutBlocker = await db.transaction()
   try {
-    await timeoutBlocker.raw('LOCK composer_spotify_playlist IN ACCESS EXCLUSIVE MODE')
+    await timeoutBlocker.raw('LOCK crawler_source IN ACCESS EXCLUSIVE MODE')
     const timedOut = await launch()
-    await until(() => timedOut.child.exitCode !== null, 20_000)
-    assert.equal(timedOut.child.exitCode, 1, timedOut.output())
-    assert.equal(await portOpen(timedOut.port), false)
-    assert.match(timedOut.output(), /startup warm-up failed/)
+    await listening(timedOut)
+    const loading = await request(timedOut, '/api/composers/1')
+    assert.equal(loading.status, 200)
+    assert.deepEqual((await loading.json()).related.map(c => c.id), [2, 4, 6])
+    await until(() => timedOut.output().includes('[composer-recommendations] refresh failed'), 20_000)
+    assert.equal(timedOut.child.exitCode, null, timedOut.output())
+    for (let i = 0; i < 3; i++) {
+      const response = await request(timedOut, '/api/composers/1')
+      assert.equal(response.status, 200)
+      assert.deepEqual((await response.json()).related.map(c => c.id), [2, 4, 6])
+    }
+    assert.equal((timedOut.output().match(/\[composer-recommendations\] refresh failed/g) || []).length, 1)
+    const { rows } = await db.raw("SELECT 1 FROM pg_stat_activity WHERE application_name='classical-bot-web' AND wait_event_type='Lock'")
+    assert.equal(rows.length, 0, 'fallback requests do not launch more queries during backoff')
   } finally {
     await timeoutBlocker.rollback()
   }
 
-  // A connection that never completes must not bypass the overall startup
-  // deadline (the SQL statement timeout has not started in this case).
+  await db('resolved_concert_refresh_state').update({ published_at: null })
+  const unpublished = await launch()
+  await listening(unpublished)
+  assert.equal((await request(unpublished, '/favicon.svg')).status, 200)
+  assert.equal((await request(unpublished, '/api/composers/1')).status, 503)
+  assert.equal(unpublished.child.exitCode, null)
+  await publishResolvedFixture(db)
+
+  // Even a database connection that never completes cannot block HTTP startup.
   const sockets = new Set()
   const stalledDatabase = createServer(socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)) })
   stalledDatabase.listen(0, '127.0.0.1')
   await once(stalledDatabase, 'listening')
   try {
     const stalled = await launch({ NUXT_DB_HOST: '127.0.0.1', NUXT_DB_PORT: String(stalledDatabase.address().port) })
-    await until(() => stalled.child.exitCode !== null, 33_000)
-    assert.equal(stalled.child.exitCode, 1)
-    assert.equal(await portOpen(stalled.port), false)
-    assert.match(stalled.output(), /startup warm-up timed out after 30000ms/)
+    await listening(stalled)
+    await until(() => sockets.size > 0)
+    assert.equal((await request(stalled, '/favicon.svg')).status, 200)
+    assert.equal(stalled.child.exitCode, null)
   } finally {
     for (const socket of sockets) socket.destroy()
     await new Promise(resolve => stalledDatabase.close(resolve))
