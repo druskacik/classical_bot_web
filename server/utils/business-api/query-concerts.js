@@ -15,8 +15,7 @@ export async function queryConcertSnapshot(trx, input) {
     const aliases = await trx('crawler_source_url').select('crawler_source_id', 'url')
     const resolved = resolveSource(input.url, sources, aliases)
     // Preserve legacy URL spelling normalization separately from concert grouping.
-    const storedUrls = await trx('resolved_concert_member').where('eligible', true)
-      .distinct(trx.raw("data->>'source_url' as source_url")).whereRaw("data->>'source_url' IS NOT NULL")
+    const storedUrls = await trx('resolved_concert_source_url').select('source_url')
     const accepted = new Set(resolved.aliases)
     const urls = storedUrls.filter(row => accepted.has(normalizedSourceUrl(row.source_url))).map(row => row.source_url)
     const members = () => trx('resolved_concert_member').where('eligible', true)

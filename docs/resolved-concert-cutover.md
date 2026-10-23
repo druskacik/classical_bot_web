@@ -19,15 +19,15 @@ change neither triggers refreshes nor modifies the deployed migration.
 Repeat these read-only checks immediately before deployment, in order:
 
 ```sh
-npm run db:query -- --format table --query "SELECT name, to_regclass(name) AS relation FROM unnest(ARRAY['resolved_concert_refresh_state','resolved_concert','resolved_concert_member','resolved_concert_performer','resolved_concert_work','resolved_concert_composer','resolved_concert_ticket_price']) names(name)"
+npm run db:query -- --format table --query "SELECT name, to_regclass(name) AS relation FROM unnest(ARRAY['resolved_concert_refresh_state','resolved_concert','resolved_concert_member','resolved_concert_source_url','resolved_concert_performer','resolved_concert_work','resolved_concert_composer','resolved_concert_ticket_price']) names(name)"
 
 # Only after every relation exists:
 npm run db:query -- --format table --query "SELECT policy_version, snapshot_at, published_at, duration_seconds, row_counts, integrity_count, conflict_count, last_attempt_at, last_failure_at, last_error, published_at < now() - interval '45 minutes' AS stale FROM resolved_concert_refresh_state"
 
-npm run db:query -- --format table --query "SELECT names.name, m.ispopulated, has_table_privilege(current_user,to_regclass(names.name),'SELECT') AS can_select FROM unnest(ARRAY['resolved_concert','resolved_concert_member','resolved_concert_performer','resolved_concert_work','resolved_concert_composer','resolved_concert_ticket_price','resolved_concert_refresh_state']) names(name) LEFT JOIN pg_matviews m ON m.schemaname='public' AND m.matviewname=names.name"
+npm run db:query -- --format table --query "SELECT names.name, m.ispopulated, has_table_privilege(current_user,to_regclass(names.name),'SELECT') AS can_select FROM unnest(ARRAY['resolved_concert','resolved_concert_member','resolved_concert_source_url','resolved_concert_performer','resolved_concert_work','resolved_concert_composer','resolved_concert_ticket_price','resolved_concert_refresh_state']) names(name) LEFT JOIN pg_matviews m ON m.schemaname='public' AND m.matviewname=names.name"
 ```
 
-Require a successful publication, all six populated views, SELECT access, and
+Require a successful publication, all seven populated views, SELECT access, and
 reviewed row/integrity/conflict counts. A later failed refresh is **not** grounds
 to discard an existing publication. Publications older than 45 minutes are stale;
 `resolvedPublication()` reports this separately from readiness. Backend refresh
@@ -217,3 +217,24 @@ request still took 5.5 seconds. These include database/network work but not brow
 rendering or the UI debounce; shared load and database buffers vary. This removes
 the pathological music plans, not every cold-read cost. Browser/human validation
 remains outstanding. No production writes, schema changes, or refreshes were made.
+
+## Source directory upgrade (2026-10-23)
+
+This version additionally requires the backend source index and source-directory
+migrations through `20261023000200`. Deploy the backend first and wait for a
+successful publication with the populated `resolved_concert_source_url` view
+before deploying this frontend. Readiness checks include that seventh view.
+The backend keeps its hourly schedule; this upgrade does not trigger a refresh.
+
+The API reads exact stored spellings from the small published directory, applies
+the existing JavaScript normalization and source-alias rules, and performs the
+same eligible-member lookup using those accepted spellings. This removes the
+catalogue-wide JSON discovery scan from every cache miss. Keep both reads in the
+existing repeatable-read transaction. Historical naming, donor matches, source
+provenance, pagination, export serialization and caching are unchanged.
+
+The new fixture SQL is copied verbatim from the backend migration; do not edit
+the frozen policy-v1 fixture to add the new directory. Roll back this frontend
+before removing the backend directory. Source-lookup work is isolated on branch
+`perf/resolved-source-lookup`; unrelated composer work remains in the original
+checkout.

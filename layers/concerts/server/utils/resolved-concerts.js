@@ -1,6 +1,6 @@
 import { createError } from 'h3'
 
-export const resolvedViews = ['resolved_concert', 'resolved_concert_member', 'resolved_concert_performer', 'resolved_concert_work', 'resolved_concert_composer', 'resolved_concert_ticket_price']
+export const resolvedViews = ['resolved_concert', 'resolved_concert_member', 'resolved_concert_source_url', 'resolved_concert_performer', 'resolved_concert_work', 'resolved_concert_composer', 'resolved_concert_ticket_price']
 const unavailable = () => createError({ statusCode: 503, statusMessage: 'Concert catalogue temporarily unavailable' })
 
 // Check before touching a materialization: an installed view may still be unpopulated.
@@ -10,7 +10,7 @@ export async function resolvedPublication(db) {
     has_table_privilege(c.oid, 'SELECT') AS readable
     FROM unnest(?::text[]) names(name) LEFT JOIN pg_class c ON c.oid = to_regclass(name)`,
   [[...resolvedViews, 'resolved_concert_refresh_state']])
-  if (rows.length !== 7 || rows.some(row => !row.readable || (resolvedViews.includes(row.name) && !row.populated))) throw unavailable()
+  if (rows.length !== resolvedViews.length + 1 || rows.some(row => !row.readable || (resolvedViews.includes(row.name) && !row.populated))) throw unavailable()
   const state = await db('resolved_concert_refresh_state').first('published_at')
   if (!state?.published_at) throw unavailable()
   const publishedAt = new Date(state.published_at).toISOString()

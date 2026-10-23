@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 
 // Isolated fixtures only. Frozen backend policy SQL is copied verbatim, not a
 // second application aggregation implementation. Never use an application DSN.
-export const publicationOrder = ['resolved_concert_member', 'resolved_concert', 'resolved_concert_performer', 'resolved_concert_work', 'resolved_concert_composer', 'resolved_concert_ticket_price']
+export const publicationOrder = ['resolved_concert_member', 'resolved_concert_source_url', 'resolved_concert', 'resolved_concert_performer', 'resolved_concert_work', 'resolved_concert_composer', 'resolved_concert_ticket_price']
 export async function installResolvedFixture(db, { populate = true } = {}) {
   const definitions = {
     classical_concert: { id: 'integer', date: 'date', title: 'text', description: 'text', type: 'text', url: 'text', source: 'text', source_url: 'text', time_from: 'time', time_to: 'time', venue: 'text', venue_id: 'bigint', city_id: 'bigint', city_raw: 'text', country_code_resolved: 'text', country_code_raw: 'text', inclusion_status: "text DEFAULT 'included'", duplicate_of_id: 'integer', buy_url: 'text', event_status: 'text', event_status_updated_at: 'timestamptz', last_verified_at: 'timestamptz', admission_type: 'text', booking_kind: 'text', booking_status: 'text', on_sale_at: 'timestamptz' },
@@ -23,6 +23,8 @@ export async function installResolvedFixture(db, { populate = true } = {}) {
     }
   }
   await db.raw(await readFile(new URL('./resolved-policy-v1.sql', import.meta.url), 'utf8'))
+  await db.raw(await readFile(new URL('./resolved-source-directory.sql', import.meta.url), 'utf8'))
+  await db.raw("CREATE INDEX resolved_member_eligible_source_url ON resolved_concert_member ((data->>'source_url')) INCLUDE (concert_id, member_id) WHERE eligible")
   if (populate) await publishResolvedFixture(db)
 }
 export async function publishResolvedFixture(db, { concurrent = false } = {}) {
