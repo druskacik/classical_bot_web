@@ -25,7 +25,7 @@ hooks.deregister()
 const tick = () => new Promise(resolve => setImmediate(resolve))
 const silent = { info() {}, error() {} }
 
-test('one daily Nitro cache shares loads, serves stale data, and preserves it after failure', async t => {
+test('publication-keyed Nitro cache shares loads and never mixes generations', async t => {
   await storage.clear()
   let now = Date.now()
   t.mock.method(Date, 'now', () => now)
@@ -35,7 +35,7 @@ test('one daily Nitro cache shares loads, serves stale data, and preserves it af
     loads++
     return new Promise((resolve, reject) => { finish = resolve; fail = reject })
   }, silent)
-  const first = get(), concurrent = get()
+  const first = get('publication-1'), concurrent = get('publication-1')
   await tick()
   assert.equal(loads, 1)
   const original = { 1: [{ id: 2, score: 0.5 }] }
@@ -43,21 +43,22 @@ test('one daily Nitro cache shares loads, serves stale data, and preserves it af
   assert.deepEqual(await first, original)
   assert.deepEqual(await concurrent, original)
   await tick()
-  now += 86400 * 1000 - 1
-  assert.deepEqual(await get(), original)
+  now += 3600 * 1000
+  assert.deepEqual(await get('publication-1'), original, 'failed publisher retains the same cache key')
   assert.equal(loads, 1)
-  now += 2
-  assert.deepEqual(await get(), original)
-  assert.deepEqual(await get(), original)
+  const next = get('publication-2')
+  const rejected = assert.rejects(next, /Composer recommendations unavailable/)
+  await tick()
   assert.equal(loads, 2)
   fail(new Error('private database details'))
+  await rejected
+  assert.deepEqual(await get('publication-1'), original)
+  const retry = get('publication-2')
   await tick()
-  assert.deepEqual(await get(), original)
-  assert.equal(loads, 3)
   const updated = { 1: [{ id: 3, score: 0.75 }] }
   finish(updated)
-  await tick()
-  assert.deepEqual(await get(), updated)
+  assert.deepEqual(await retry, updated)
+  assert.deepEqual(await get('publication-2'), updated)
   assert.equal(loads, 3)
 })
 

@@ -34,16 +34,16 @@ test('playlist eligibility selects one public published season deterministically
   assert.deepEqual(query.bindings, ['published', true])
 })
 
-test('live rankings and directory counts exclude hidden and duplicate concerts and count each concert once', () => {
+test('rankings and directory counts use resolved relationships and count each concert once', () => {
   const db = knex({ client: 'pg' })
   for (const query of [rankedWorks(db, 3).toSQL(), composerCounts(db, [3, 2]).toSQL()]) {
     assert.match(query.sql, /count\(distinct "cc"\."id"\)/)
     assert.match(query.sql, /cc.date >= CURRENT_DATE/)
-    assert.match(query.sql, /"cc"\."duplicate_of_id" is null/)
-    assert.ok(query.bindings.includes('included'))
+    assert.match(query.sql, /resolved_concert/)
+    assert.doesNotMatch(query.sql, /duplicate_of_id|inclusion_status/)
     assert.doesNotMatch(query.sql, /season_start|spotify_playlist_item|country_code_resolved/)
   }
   const ranking = rankedWorks(db, 3).toSQL()
   assert.match(ranking.sql, /order by "count" desc, "w"\."title" asc, "w"\."id" asc limit \?/)
-  assert.deepEqual(ranking.bindings, ['included', 3, 20])
+  assert.deepEqual(ranking.bindings, [3, 20])
 })

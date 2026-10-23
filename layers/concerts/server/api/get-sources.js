@@ -1,6 +1,5 @@
 import { cachedConcertData } from '../utils/concert-data-cache.js'
 import { concertSite } from '#concert-site'
-import knex from '../utils/connection.js'
 import { getCountryName } from '../utils/countries.js'
 
 const normalizeUrl = url => url.trim().replace(/\/+$/, '').toLowerCase()
@@ -20,14 +19,17 @@ const preferredCandidate = (current, candidate) => {
 
 export default defineEventHandler(async () => {
   try {
-    return await cachedConcertData('sources', {}, async () => {
+    return await cachedConcertData('sources', {}, async (knex) => {
       const registryId = 'COALESCE(direct_source.id, alias_source.id)'
       const registryUrl = 'COALESCE(direct_source.canonical_url, alias_source.canonical_url)'
       const countryCode = 'COALESCE(direct_source.country_code, alias_source.country_code)'
       const geographicScope = 'COALESCE(direct_source.geographic_scope, alias_source.geographic_scope)'
 
-      const rows = await knex('classical_concert')
-        .from('classical_concert as cc')
+      const rows = await knex.from(knex('resolved_concert as concert')
+        .join('resolved_concert_member as member', 'member.concert_id', 'concert.id')
+        .where('member.eligible', true)
+        .select('concert.id', 'concert.date', 'concert.country_code_resolved',
+          knex.raw("member.data->>'source' as source"), knex.raw("member.data->>'source_url' as source_url")).as('cc'))
         .leftJoin('crawler_source as direct_source', function joinDirectSource() {
           this.on(
             knex.raw("LOWER(RTRIM(direct_source.canonical_url, '/'))"),
@@ -51,11 +53,9 @@ export default defineEventHandler(async () => {
           'cc.source',
           'cc.source_url',
         )
-        .count('* as concert_count')
+        .countDistinct('cc.id as concert_count')
         .whereRaw('cc.date >= CURRENT_DATE')
         .modify(query => { if (concertSite.country) query.where('cc.country_code_resolved', concertSite.country) })
-        .where('cc.inclusion_status', 'included')
-        .whereNull('cc.duplicate_of_id')
         .whereNotNull('cc.source')
         .whereNotNull('cc.source_url')
         .groupBy([
@@ -114,6 +114,7 @@ export default defineEventHandler(async () => {
       return { internationalSources, otherSources, countryGroups }
     })
   } catch (error) {
+    if (error.statusCode) throw error
     console.error('Error fetching sources:', error)
     throw createError({
       statusCode: 500,

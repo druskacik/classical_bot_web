@@ -18,11 +18,11 @@ test('Slovak scope survives every facet exclusion and cannot be widened by a que
   for (const type of ['country', 'city', 'composer', 'work']) {
     const context = facetFilters(filters, type)
     assert.equal(context.siteCountry, 'SK')
-    const sql = applyFilters(db('classical_concert as cc'), context).toSQL()
+    const sql = applyFilters(db('resolved_concert as cc'), context).toSQL()
     assert.match(sql.sql, /"cc"\."country_code_resolved" = \?/)
     assert.ok(sql.bindings.includes('SK'))
-    assert.match(sql.sql, /"cc"\."duplicate_of_id" is null/)
-    assert.ok(sql.bindings.includes('included'))
+    assert.doesNotMatch(sql.sql, /duplicate_of_id|inclusion_status/)
+    assert.match(sql.sql, /resolved_concert/)
   }
   assert.equal(parseConcertFilters({}).country, null)
   assert.equal(parseConcertFilters({ country: 'CZ' }).country, 'CZ')

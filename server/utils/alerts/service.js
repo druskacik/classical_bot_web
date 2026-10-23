@@ -1,3 +1,4 @@
+import { resolvedPublication } from '../../../layers/concerts/server/utils/resolved-concerts.js'
 import { createError } from 'h3'
 import { criteria, matching } from './criteria.js'
 import { hash, token, tokenHash, normalizeEmail, subscriberToken, confirmationMail } from './core.js'
@@ -60,6 +61,7 @@ async function duplicate(trx, subscriber, selected, except, includeInactive = fa
   }
 }
 async function baseline(trx, alertId, selected) {
+  await resolvedPublication(trx)
   await trx('concert_alert_seen').where('alert_id', alertId).delete()
   await trx('concert_alert_seen').insert(matching(trx, selected.filters).select(trx.raw('?::bigint as alert_id', [alertId]), 'cc.id as concert_id'))
 }

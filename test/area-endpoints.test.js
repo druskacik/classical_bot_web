@@ -1,3 +1,4 @@
+import { mockResolvedSnapshot } from '../test-support/resolved-mock.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { registerHooks } from 'node:module'
@@ -20,6 +21,7 @@ db.client.runner = builder => ({ run: async () => {
   if (query.sql.includes('"cc"."title"')) return [{ id: 5, city_id: '2', city: 'Bratislava', country_code: 'SK', title: 'Concert', date: '2026-12-01' }]
   return []
 } })
+mockResolvedSnapshot(db)
 globalThis.areaFixtures = { db, site }
 globalThis.defineEventHandler = fn => fn
 globalThis.createError = fields => Object.assign(new Error(fields.statusMessage), fields)
@@ -52,7 +54,7 @@ test('real area endpoints resolve coordinates, constrain all SQL, cache repeats 
     assert.equal(result.area.latitude, 48.14816)
     assert.equal(result.area.cityIds, undefined)
     assert.equal(result.area.unresolvedCity, undefined)
-    const listing = statements.filter(statement => statement.sql.includes('from "classical_concert" as "cc"'))
+    const listing = statements.filter(statement => statement.sql.includes('from "resolved_concert" as "cc"'))
     assert.equal(listing.length, 2, 'count and page queries share the area filter')
     for (const statement of listing) {
       assert.match(statement.sql, /"cc"\."city_id" in \(\?, \?\)/)

@@ -106,6 +106,8 @@ export const applyFilters = (builder, filters) => {
   else if (filters.city?.name) {
     if (filters.city.country) {
       builder.whereRaw(
+        // Country-qualified registry names disambiguate homonyms; this is a
+        // name lookup restriction, not an override of the response geography.
         'COALESCE(canonical_city.country_code, cc.country_code_resolved, cc.country_code_raw) = ?',
         [filters.city.country],
       )
@@ -129,18 +131,17 @@ export const applyFilters = (builder, filters) => {
   if (filters.composers.length) {
     builder.whereExists(function composerFilter() {
       this.select(1)
-        .from('classical_concert_composer as ccc')
-        .join('composer as composer_filter', 'composer_filter.id', 'ccc.composer_id')
-        .whereRaw('ccc.classical_concert_id = cc.id')
-        .whereIn('composer_filter.name', filters.composers)
+        .from('resolved_concert_composer as ccc')
+        .whereRaw('ccc.concert_id = cc.id')
+        .whereIn(builder.client.raw("ccc.composer->>'name'"), filters.composers)
     })
   }
 
   if (filters.works.length) {
     builder.whereExists(function workFilter() {
       this.select(1)
-        .from('classical_concert_work as ccw')
-        .whereRaw('ccw.classical_concert_id = cc.id')
+        .from('resolved_concert_work as ccw')
+        .whereRaw('ccw.concert_id = cc.id')
         .whereIn('ccw.work_id', filters.works)
     })
   }

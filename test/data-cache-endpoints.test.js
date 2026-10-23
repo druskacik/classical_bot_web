@@ -1,3 +1,4 @@
+import { mockResolvedSnapshot } from '../test-support/resolved-mock.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { registerHooks } from 'node:module'
@@ -19,19 +20,20 @@ db.client.runner = builder => ({
     if (sql.includes('"cc"."time_from"') && sql.includes('"cc"."title"')) {
       assert.ok(sql.includes("to_char(cc.date, 'YYYY-MM-DD') || 'T00:00:00.000Z' as date"), 'calendar dates must reach JSON as text, bypassing pg server-local Date conversion')
     }
-    if (sql.includes('"classical_concert_composer" as "ccc"')) {
+    if (sql.includes('"resolved_concert_composer" as "rc"')) {
       return [{ classical_concert_id: 7, id: 3, name: 'Mozart' }]
     }
     if (sql.includes('as registry_id')) {
       return [{ registry_id: 1, registry_url: 'https://example.com', country_code: 'SK', geographic_scope: 'country', source: ' Orchestra ', source_url: 'https://example.com', concert_count: '1' }]
     }
-    if (sql.includes('"composer"."name"')) return [{ name: 'Mozart', count: '1' }]
+    if (sql.includes("composer.composer->>'name'")) return [{ name: 'Mozart', count: '1' }]
     if (sql.includes('count(distinct')) return [{ value: 'SK', count: '1' }]
     if (sql.includes('group by "cc"."city_id"')) return [{ city_id: 1, city_raw: 'Bratislava', count: '1' }]
     if (sql.includes('group by "country_code_resolved"')) return [{ country_code_resolved: 'SK', count: '1' }]
     return [{ id: 7, title: ' Mozart   concert ', date: '2026-12-01', city_id: 1, city: 'Bratislava', country_code: 'SK' }]
   },
 })
+mockResolvedSnapshot(db)
 globalThis.cacheEndpointFixtures = { site, db, catalogue }
 globalThis.defineEventHandler = handler => handler
 globalThis.getQuery = event => event.query || {}
@@ -55,7 +57,7 @@ const composers = await endpoint('layers/concerts/server/api/get-composers.js')
 const cities = await endpoint('apps/classical-sk/server/api/get-cities.js')
 hooks.deregister()
 
-test('real endpoints preserve uncached output, skip DB on hits, and isolate both site configurations', async t => {
+test('real endpoints preserve output, skip catalogue queries on hits, and isolate both sites', async t => {
   const original = process.env.SERVER_DATA_CACHE_ENABLED
   t.after(() => {
     if (original === undefined) delete process.env.SERVER_DATA_CACHE_ENABLED
@@ -75,7 +77,7 @@ test('real endpoints preserve uncached output, skip DB on hits, and isolate both
       assert.ok(queries > before, 'A cold endpoint must execute database work')
       const after = queries
       const hit = await handler({ query: { ...query, utm_source: 'ignored' } })
-      assert.equal(queries, after, 'A warm endpoint must skip database work')
+      assert.equal(queries, after, 'A warm endpoint must skip catalogue work (readiness is checked separately)')
       assert.deepEqual(first, expected)
       assert.deepEqual(hit, expected)
     }

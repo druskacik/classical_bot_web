@@ -1,3 +1,4 @@
+import { installResolvedFixture, publishResolvedFixture } from '../test-support/resolved-fixture.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
@@ -89,14 +90,18 @@ test('source recommendations and production startup with isolated PostgreSQL', {
       (4,2),(5,2),(6,4),
       (7,1),(7,4),(8,1),(8,4),(9,1),(9,4),(10,1),(10,4),(11,1),(11,4);
   `)
+  await installResolvedFixture(db, { populate: false })
+  await db('classical_concert').update({ title: 'Programme' })
+  await publishResolvedFixture(db)
   const before = await db.raw('SHOW jit')
   const rankings = await queryComposerRecommendations(db)
   assert.deepEqual(rankings[1], [
-    { id: 6, sharedSources: 1, totalSources: 1, score: 1 },
-    { id: 3, sharedSources: 1, totalSources: 1, score: 1 },
-    { id: 2, sharedSources: 1, totalSources: 2, score: 0.5 },
+    { id: 6, sharedSources: 2, totalSources: 2, score: 1 },
+    { id: 3, sharedSources: 2, totalSources: 2, score: 1 },
+    { id: 4, sharedSources: 2, totalSources: 2, score: 1 },
+    { id: 2, sharedSources: 2, totalSources: 3, score: 2/3 },
   ])
-  assert.equal(rankings[4], undefined, 'same source on different concerts does not create a pair')
+  assert.ok(rankings[4].some(row => row.id === 1), 'donor composers and sources contribute to the group')
   assert.equal(rankings[5], undefined, 'unpublished composers are ineligible')
   assert.deepEqual((await db.raw('SHOW jit')).rows, before.rows, 'JIT setting does not escape the transaction')
   const tie = await db.transaction()
@@ -104,7 +109,8 @@ test('source recommendations and production startup with isolated PostgreSQL', {
     await tie('composer').insert({ id: 7, name: 'Alpha' })
     await tie('composer_spotify_playlist').insert({ id: 7, composer_id: 7, status: 'published', is_public: true, spotify_playlist_id: '1234567890123456789012' })
     await tie('classical_concert_composer').insert({ classical_concert_id: 1, composer_id: 7 })
-    assert.deepEqual((await queryComposerRecommendations(tie))[1].map(c => c.id), [6, 7, 3, 2])
+    await publishResolvedFixture(tie)
+    assert.deepEqual((await queryComposerRecommendations(tie))[1].map(c => c.id), [6, 7, 3, 4, 2])
   } finally {
     await tie.rollback()
   }
@@ -142,7 +148,7 @@ test('source recommendations and production startup with isolated PostgreSQL', {
     const response = await fetch(`http://127.0.0.1:${server.port}/api/composers/1`)
     assert.equal(response.status, 200, server.output())
     const body = await response.json()
-    assert.deepEqual(body.related.map(c => c.id), [6, 3, 2])
+    assert.deepEqual(body.related.map(c => c.id), [6, 3, 4])
     assert.equal(body.related[0].name, 'Alpha')
     assert.equal((server.output().match(/\[composer-recommendations\] refreshed/g) || []).length, 1)
   } finally {

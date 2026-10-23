@@ -1,10 +1,12 @@
-import knex from '#layers/concerts/server/utils/connection.js'
+import { cachedConcertData } from '#layers/concerts/server/utils/concert-data-cache.js'
 import { composerPath, seasonLabel, catalogueLabel } from '#shared/utils/composers.js'
 import { publishedPlaylists, composerCounts, rankedWorks } from './composer-queries.js'
 
 const coverComposers = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 17, 18, 20, 21, 22, 25, 26, 29, 32, 33, 34, 39, 40, 41, 42, 44, 46, 49, 51, 53, 57, 59, 63, 65, 67, 70, 78, 88, 89, 93, 111, 138, 234, 365, 531])
 
-export const getComposerDirectory = defineCachedFunction(async () => {
+export const getComposerDirectory = (db) => db ? loadComposerDirectory(db) : cachedConcertData('composer-directory', {}, loadComposerDirectory)
+
+async function loadComposerDirectory(knex) {
   const playlists = await publishedPlaylists(knex)
   if (!playlists.length) return []
   const [counts, tracks] = await Promise.all([
@@ -26,10 +28,12 @@ export const getComposerDirectory = defineCachedFunction(async () => {
       trackCount: trackMap.get(String(p.playlist_id)) || 0,
     },
   })).sort((a, b) => b.concertCount - a.concertCount || a.name.localeCompare(b.name, 'en') || a.id - b.id)
-}, { name: 'composer-directory', maxAge: 300, swr: false })
+}
 
-export const getComposerWorks = defineCachedFunction(async (id) => {
+export const getComposerWorks = (id, db) => db ? loadComposerWorks(db, id) : cachedConcertData('composer-works', { id }, knex => loadComposerWorks(knex, id))
+
+async function loadComposerWorks(knex, id) {
   const works = await rankedWorks(knex, id)
   return works.map(work => ({ id: work.id, title: work.title,
     catalogue: catalogueLabel(work.title, work.catalogue_number), concertCount: Number(work.count) }))
-}, { name: 'composer-works', maxAge: 300, swr: false, getKey: id => String(id) })
+}

@@ -4,7 +4,7 @@ import { resolveArea, publicArea } from '../utils/concert-area.js'
 import { concertFilterCacheInput } from '../utils/data-cache-keys.js'
 import { cachedConcertData } from '../utils/concert-data-cache.js'
 import { concertSite } from '#concert-site'
-import knex from '../utils/connection.js'
+import { displaySource, concertComposers, concertWorks } from '../utils/resolved-concerts.js'
 import { applyFilters, parseConcertFilters, parsePage } from '../utils/concert-filters.js'
 import { getCityCatalogue } from '../utils/city-catalogue.js'
 import { groupConcertWorks } from '../utils/concert-works.js'
@@ -20,16 +20,16 @@ export default defineEventHandler(async (event) => {
     if (filters.city) filters.city = resolveCitySelection(filters.city, buildCityIdentities(await getIdentityCities()))
     if (filters.area) filters.area = resolveArea(filters.area, await getAreaCities(), concertSite.locale)
 
-    return await cachedConcertData('concerts', { filters: concertFilterCacheInput(filters), page }, async () => {
+    return await cachedConcertData('concerts', { filters: concertFilterCacheInput(filters), page }, async (knex) => {
       const countQuery = applyFilters(
-        knex('classical_concert as cc')
+        knex('resolved_concert as cc')
           .leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id')
           .count('* as total')
           .first(),
         filters,
       )
       const itemQuery = applyFilters(
-        knex('classical_concert as cc')
+        knex('resolved_concert as cc')
           .leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id')
           .select(
             'cc.id',
@@ -43,8 +43,8 @@ export default defineEventHandler(async (event) => {
             'cc.city_id',
             knex.raw('COALESCE(canonical_city.english_name, canonical_city.local_name, cc.city_raw) as city'),
             knex.raw('COALESCE(cc.country_code_resolved, cc.country_code_raw) as country_code'),
-            'cc.source',
-            'cc.source_url',
+            displaySource(knex, 'source'),
+            displaySource(knex, 'source_url'),
             'cc.venue',
           ),
         filters,
@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
         .offset((page - 1) * PAGE_SIZE)
 
       const [countRow, concerts, catalogue, discovery, displayCity] = await Promise.all([
-        countQuery, itemQuery, getCityCatalogue(),
+        countQuery, itemQuery, getCityCatalogue(knex),
         concertSite.subjectDiscovery ? resolveDiscoverySubject(knex, filters) : null,
         concertSite.subjectDiscovery ? resolveConcertDisplayCity(knex, filters.city
           ? { ...filters.city, country: filters.city.country || filters.country } : null, concertSite.locale) : null,
@@ -68,18 +68,10 @@ export default defineEventHandler(async (event) => {
       const concertIds = concerts.map(concert => concert.id)
       const [composerRows, workRows] = await Promise.all([
         concertIds.length
-        ? knex('classical_concert_composer as ccc')
-            .join('composer as c', 'c.id', 'ccc.composer_id')
-            .whereIn('ccc.classical_concert_id', concertIds)
-            .select('ccc.classical_concert_id', 'c.id', 'c.name')
-            .orderBy('c.name', 'asc')
+        ? concertComposers(knex, concertIds)
         : [],
         concertIds.length
-        ? knex('classical_concert_work as ccw')
-            .join('work as w', 'w.id', 'ccw.work_id')
-            .leftJoin('composer as c', 'c.id', 'w.composer_id')
-            .whereIn('ccw.classical_concert_id', concertIds)
-            .select('ccw.classical_concert_id', 'w.id', 'w.title', 'c.id as composer_id', 'c.name as composer_name')
+        ? concertWorks(knex, concertIds)
         : [],
       ])
       const worksByConcert = groupConcertWorks(workRows)
@@ -98,7 +90,7 @@ export default defineEventHandler(async (event) => {
           ...concert,
           city_path: (catalogue.byId.get(String(concert.city_id)) || (concertSite.cityRoutes === 'local' ? catalogue.byPath.get(`/${concert.city}`) : null))?.path || null,
           ...(concertSite.cityRoutes === 'local' ? { city: catalogue.byId.get(String(concert.city_id))?.name || concert.city } : {}),
-          title: concert.title.replace(/\s+/g, ' '),
+          title: concert.title?.replace(/\s+/g, ' ') ?? null,
           composers: composersByConcert[concert.id] || [],
           works: worksByConcert.get(String(concert.id)) || [],
         })),

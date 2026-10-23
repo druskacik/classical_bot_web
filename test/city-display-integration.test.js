@@ -1,3 +1,5 @@
+import { installResolvedFixture, publishResolvedFixture } from '../test-support/resolved-fixture.js'
+import { composerPath, composerConcertLocation } from '../shared/utils/composers.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { registerHooks } from 'node:module'
@@ -25,7 +27,10 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
     CREATE TABLE composer (id integer PRIMARY KEY, name text, normalized_name text);
     CREATE TABLE work (id integer PRIMARY KEY, composer_id integer, title text, normalized_title text);
     CREATE TABLE classical_concert_composer (classical_concert_id integer, composer_id integer);
-    CREATE TABLE classical_concert_work (classical_concert_id integer, work_id integer);`)
+    CREATE TABLE classical_concert_work (classical_concert_id integer, work_id integer);
+    CREATE TABLE composer_spotify_playlist (id integer PRIMARY KEY, composer_id integer, status text, is_public boolean,
+      spotify_playlist_id text, season_start date, season_end date, last_synced_at timestamptz);
+    CREATE TABLE composer_spotify_playlist_item (playlist_id integer);`)
   await db('city').insert([
     { id: 861, english_name: 'Athens', local_name: 'Athens', display_name: 'Athens (Georgia)', country_code: 'US', latitude: 33.96095, longitude: -83.37794 },
     { id: 3745, english_name: 'Athens', local_name: 'Athens', display_name: 'Athens (Ohio)', country_code: 'US', latitude: 39.32924, longitude: -82.10126 },
@@ -43,6 +48,7 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
     { city_id: 861, country_code_resolved: 'US', inclusion_status: 'rejected' },
     { city_id: 861, country_code_resolved: 'US', duplicate_of_id: 1 },
   ])
+  await installResolvedFixture(db)
   const site = { country: null, locale: 'en-GB', cityRoutes: 'global' }
   globalThis.cityDisplayFixtures = { db, site }
   globalThis.defineEventHandler = handler => handler
@@ -52,16 +58,164 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
   const hooks = registerHooks({ resolve(specifier, context, next) {
     if (specifier === '#concert-site') return { shortCircuit: true, url: dataModule('export const concertSite = globalThis.cityDisplayFixtures.site') }
     if (specifier.endsWith('/connection.js')) return { shortCircuit: true, url: dataModule('export default globalThis.cityDisplayFixtures.db') }
+    if (specifier.startsWith('#layers/concerts/')) return next(new URL(`../layers/concerts/${specifier.slice('#layers/concerts/'.length)}`, import.meta.url).href, context)
+    if (specifier.startsWith('#shared/')) return next(new URL(`../shared/${specifier.slice('#shared/'.length)}`, import.meta.url).href, context)
     return next(specifier, context)
   } })
-  let facets, origins, concerts, map
+  let facets, origins, concerts, map, getComposerDirectory, getSitemapInventory
   try {
     facets = (await import('../layers/concerts/server/api/get-concert-filter-options.js')).default
     origins = (await import('../layers/concerts/server/api/get-area-cities.js')).default
     concerts = (await import('../layers/concerts/server/api/get-concerts.js')).default
     map = (await import('../layers/concerts/server/api/get-concert-map.js')).default
+    ;({ getComposerDirectory } = await import('../server/utils/composers.js'))
+    ;({ getSitemapInventory } = await import('../server/utils/sitemap-inventory.js'))
   } finally { hooks.deregister() }
+  // Keep direct handlers for tests that deliberately hold a publication fixed.
+  const snapshotHandlers = { facets, concerts, map }
+  const published = handler => async event => { await publishResolvedFixture(db); return handler(event) }
+  facets = published(facets); concerts = published(concerts); map = published(map)
   const options = async query => (await facets({ query: { type: 'city', ...query } })).items
+
+  await t.test('both sites list donor-only programme and filter it without multiplying pages', async () => {
+    await db('composer').insert({ id: 900, name: 'Snapshot Composer', normalized_name: 'snapshot composer' })
+    await db('work').insert([{ id: 900, composer_id: 900, title: 'Donated Sonata', normalized_title: 'donated sonata' }, { id: 901, composer_id: 900, title: 'Donated Symphony', normalized_title: 'donated symphony' }])
+    const [primary] = await db('classical_concert').insert({ title: 'Resolved listing', city_id: 7, country_code_resolved: 'SK' }).returning('id')
+    const [donor] = await db('classical_concert').insert({ duplicate_of_id: primary.id, city_id: 7, country_code_resolved: 'SK' }).returning('id')
+    await db('classical_concert_work').insert([900, 901].map(work_id => ({ classical_concert_id: donor.id, work_id })))
+    for (const country of [null, 'SK']) {
+      site.country = country
+      const query = { composers: 'Snapshot Composer', works: '900,901' }
+      const result = await concerts({ query })
+      assert.equal(result.total, 1)
+      assert.equal(result.items[0].id, primary.id)
+      assert.equal(result.items[0].works.length, 2)
+      assert.deepEqual(result.items[0].composers, [{ id: 900, name: 'Snapshot Composer' }])
+      const suggestions = await facets({ query: { ...query, type: 'work' } })
+      assert.ok(suggestions.items.filter(w => ['900','901'].includes(w.value)).every(w => w.count === 1))
+      assert.equal((await map({ query })).total, 1)
+    }
+    site.country = null
+    await db('classical_concert_work').where('classical_concert_id', donor.id).delete()
+    await db('classical_concert').whereIn('id', [primary.id, donor.id]).delete()
+    await db('work').whereIn('id', [900, 901]).delete()
+    await db('composer').where('id', 900).delete()
+  })
+
+  await t.test('composer identities align facets, navigation, sitemaps and subject resolution through publication changes', async t => {
+    site.subjectDiscovery = true
+    const oldName = 'Élodie Original', newName = 'Élodie Renamed'
+    await db('composer').insert([
+      { id: 910, name: oldName, normalized_name: 'elodie original' },
+      { id: 911, name: 'Catalogue Original', normalized_name: 'catalogue original' },
+    ])
+    await db('composer_spotify_playlist').insert({ id: 910, composer_id: 910, status: 'published', is_public: true,
+      spotify_playlist_id: '1234567890123456789012', season_start: '2026-07-01', season_end: '2027-07-01' })
+    await db('work').insert({ id: 910, composer_id: 910, title: 'Published Sonata', normalized_title: 'published sonata' })
+    const rows = await db('classical_concert').insert(Array.from({ length: 2 }, () => ({ title: 'Published programme', city_id: 7, country_code_resolved: 'SK' }))).returning('id')
+    const ids = rows.map(row => row.id)
+    await db('classical_concert_work').insert(ids.map(classical_concert_id => ({ classical_concert_id, work_id: 910 })))
+    t.after(async () => {
+      site.country = null
+      delete site.subjectDiscovery
+      await db('composer_spotify_playlist').where('id', 910).delete()
+      await db('classical_concert_work').whereIn('classical_concert_id', ids).delete()
+      await db('classical_concert').whereIn('id', ids).delete()
+      await db('work').where('id', 910).delete()
+      await db('composer').whereIn('id', [910, 911, 912, 913]).delete()
+      await publishResolvedFixture(db)
+    })
+    await publishResolvedFixture(db)
+    const { published_at } = await db('resolved_concert_refresh_state').first()
+    await db('composer').where('id', 910).update({ name: newName, normalized_name: 'elodie renamed' })
+    await db('composer').where('id', 911).update({ name: 'Catalogue Renamed', normalized_name: 'catalogue renamed' })
+    const suggest = async query => (await snapshotHandlers.facets({ query: { type: 'composer', ...query } })).items
+    const total = async name => (await snapshotHandlers.concerts({ query: { composers: name } })).total
+    const navigation = async (name, absentName) => {
+      const directory = await getComposerDirectory()
+      const profile = directory.find(composer => composer.id === 910)
+      assert.equal(profile.name, name)
+      assert.equal(profile.concertCount, 2)
+      assert.equal(profile.path, composerPath(910, name))
+      const browse = new URL(composerConcertLocation(profile.name), 'https://example.test')
+      const listing = await snapshotHandlers.concerts({ query: Object.fromEntries(browse.searchParams) })
+      assert.equal(listing.total, profile.concertCount, 'the profile browse link matches its resolved count')
+      assert.equal(listing.discovery.status, 'resolved')
+      assert.equal(listing.discovery.subject.id, 910)
+      assert.equal(listing.discovery.subject.name, name)
+      assert.equal(listing.discovery.subject.profilePath, profile.path)
+      const work = await snapshotHandlers.concerts({ query: { works: '910' } })
+      assert.equal(work.discovery.subject.composerName, name)
+      const catalogueOnly = await snapshotHandlers.concerts({ query: { composers: 'Catalogue Renamed' } })
+      assert.equal(catalogueOnly.total, 0)
+      assert.equal(catalogueOnly.discovery.status, 'resolved')
+      assert.equal(catalogueOnly.discovery.subject.profilePath, null)
+      const sitemap = await getSitemapInventory()
+      assert.ok(sitemap.some(row => row.loc === profile.path))
+      const links = sitemap.map(row => new URL(row.loc, 'https://example.test'))
+      assert.ok(!links.some(url => url.searchParams.get('composers') === absentName))
+      const composerLinks = links.filter(url => url.searchParams.get('composers') === name)
+      assert.equal(composerLinks.length, 3, 'worldwide, country and city subject URLs')
+      for (const url of composerLinks) {
+        const result = await snapshotHandlers.concerts({ query: Object.fromEntries(url.searchParams) })
+        assert.equal(result.total, 2)
+        assert.equal(result.discovery.status, 'resolved')
+      }
+    }
+
+    for (const stale of [false, true]) {
+      if (stale) await db('resolved_concert_refresh_state').update({
+        published_at: db.raw("now() - interval '1 hour'"), last_failure_at: db.fn.now(), last_error: 'Fixture refresh failure',
+      })
+      else assert.equal(new Date((await db('resolved_concert_refresh_state').first()).published_at).valueOf(), new Date(published_at).valueOf())
+      for (const country of [null, 'SK']) {
+        site.country = country
+        for (const includeUnavailable of ['false', 'true']) {
+          const suggestions = await suggest({ q: 'elodie original', includeUnavailable })
+          assert.deepEqual(suggestions, [{ value: oldName, label: oldName, count: 2 }])
+          assert.deepEqual(await suggest({ q: 'elodie renamed', includeUnavailable }), [])
+        }
+        assert.deepEqual(await suggest({ q: 'no match', selected: oldName }), [{ value: oldName, label: oldName, count: 2 }])
+        assert.deepEqual(await suggest({ q: 'no match', selected: oldName, dateFrom: '2099-01-01' }), [{ value: oldName, label: oldName, count: 0 }])
+        assert.deepEqual(await suggest({ q: oldName, dateFrom: '2099-01-01', includeUnavailable: 'true' }), [{ value: oldName, label: oldName, count: 0 }])
+        assert.deepEqual(await suggest({ q: 'Catalogue Renamed', includeUnavailable: 'true' }), [{ value: 'Catalogue Renamed', label: 'Catalogue Renamed', count: 0 }])
+        assert.equal(await total(oldName), 2)
+        assert.equal(await total(newName), 0)
+        const works = (await snapshotHandlers.facets({ query: { type: 'work', composers: oldName, q: 'elodie original' } })).items
+        assert.deepEqual(works, [{ value: '910', label: 'Published Sonata', secondaryLabel: oldName, count: 2 }])
+        assert.equal((await snapshotHandlers.map({ query: { composers: oldName } })).total, 2)
+        await navigation(oldName, newName)
+      }
+    }
+    // Live-only collisions with published names must be ambiguous everywhere;
+    // the renamed registry row must neither hide that collision nor create a
+    // spurious collision under its new name before publication.
+    site.country = null
+    await db('composer').insert([
+      { id: 912, name: oldName, normalized_name: 'elodie original' },
+      { id: 913, name: newName, normalized_name: 'elodie renamed' },
+    ])
+    const ambiguous = await snapshotHandlers.concerts({ query: { composers: oldName } })
+    assert.equal(ambiguous.total, 2)
+    assert.equal(ambiguous.discovery.status, 'ambiguous')
+    const fallback = await snapshotHandlers.concerts({ query: { composers: newName } })
+    assert.equal(fallback.total, 0)
+    assert.equal(fallback.discovery.status, 'resolved')
+    assert.equal(fallback.discovery.subject.id, 913)
+    const ambiguousSitemap = await getSitemapInventory()
+    assert.ok(!ambiguousSitemap.some(row => new URL(row.loc, 'https://example.test').searchParams.get('composers') === oldName))
+    await db('composer').whereIn('id', [912, 913]).delete()
+    await publishResolvedFixture(db)
+    for (const country of [null, 'SK']) {
+      site.country = country
+      assert.deepEqual(await suggest({ q: 'elodie renamed' }), [{ value: newName, label: newName, count: 2 }])
+      assert.deepEqual(await suggest({ q: 'elodie original', includeUnavailable: 'true' }), [])
+      assert.deepEqual(await suggest({ q: 'no match', selected: newName }), [{ value: newName, label: newName, count: 2 }])
+      assert.equal(await total(newName), 2)
+      assert.equal(await total(oldName), 0)
+      await navigation(newName, oldName)
+    }
+  })
 
   await t.test('same-country homonyms have separate counts, IDs and searchable labels', async () => {
     const cities = await options({ q: 'athen' })
@@ -234,6 +388,85 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
     assert.equal(limited.length, 20)
     assert.equal(limited[0].count, 5)
     assert.equal(limited[0].value, 'Limit city 21,CZ')
+  })
+
+  await t.test('city facets share the raw-label scan without losing historical aliases or labels', async t => {
+    await db('city').insert([
+      { id: 29000, english_name: 'Archive East', local_name: 'Archive shared', country_code: 'SK' },
+      { id: 29001, english_name: 'Archive West', local_name: 'Archive shared', country_code: 'SK' },
+    ])
+    const rows = await db('classical_concert').insert([
+      { city_id: 29000, country_code_resolved: 'SK' },
+      { city_id: 29001, country_code_resolved: 'SK' },
+      { city_raw: 'Archive shared', country_code_resolved: 'SK', date: '2000-01-01' },
+      { city_raw: 'Archive raw', country_code_resolved: 'SK' },
+      { city_raw: 'ARCHIVE RAW', country_code_resolved: 'SK', date: '2000-01-01' },
+      { city_raw: 'Archive past only', country_code_resolved: 'SK', date: '2000-01-01' },
+    ]).returning('id')
+    t.after(async () => {
+      site.country = null
+      await db('classical_concert').whereIn('id', rows.map(row => row.id)).delete()
+      await db('city').whereIn('id', [29000, 29001]).delete()
+      await publishResolvedFixture(db)
+    })
+    await publishResolvedFixture(db)
+    const { label } = await db('resolved_concert').whereRaw("LOWER(city_raw) = 'archive raw'").min('city_raw as label').first()
+    for (const country of [null, 'SK']) {
+      site.country = country
+      for (const includeUnavailable of ['false', 'true']) {
+        const statements = []
+        const capture = query => statements.push(query.sql)
+        db.on('query', capture)
+        let items
+        try {
+          ;({ items } = await snapshotHandlers.facets({ query: { type: 'city', q: 'Archive', includeUnavailable } }))
+        } finally { db.off('query', capture) }
+        const rawScans = statements.filter(sql => sql.includes('group by LOWER(cc.city_raw)'))
+        assert.equal(rawScans.length, 1, 'raw counts and historical names use one grouped query')
+        assert.match(rawScans[0], /count\(distinct "available"\."id"\)/)
+        assert.equal(items.find(item => item.value === 'Archive shared,SK')?.count, 2,
+          'a past-only ambiguous alias still matches upcoming canonical concerts')
+        assert.equal(items.find(item => item.value === `${label},SK`)?.count, 1,
+          'historical casing still supplies the same label, but only upcoming concerts count')
+        assert.equal(items.some(item => item.value === 'Archive past only,SK'), includeUnavailable === 'true')
+        for (const item of items) {
+          assert.equal(item.count, (await snapshotHandlers.concerts({ query: { city: item.value } })).total)
+        }
+      }
+      const restored = await snapshotHandlers.facets({ query: {
+        type: 'city', q: 'unmatched', selected: 'Archive shared,SK', dateFrom: '2099-01-01',
+      } })
+      assert.deepEqual(restored.items.map(item => [item.value, item.count]), [['Archive shared,SK', 0]])
+    }
+  })
+
+  await t.test('music facets use scalar composer names and work keys for suggestions and selected counts', async () => {
+    await publishResolvedFixture(db)
+    const statements = []
+    const capture = query => statements.push(query.sql)
+    db.on('query', capture)
+    try {
+      for (const country of [null, 'SK']) {
+        site.country = country
+        for (const includeUnavailable of ['false', 'true']) {
+          for (const type of ['composer', 'work']) {
+            const selected = type === 'composer' ? 'Slovakia Composer' : '2'
+            const { items } = await snapshotHandlers.facets({ query: { type, q: 'Slovakia', selected, includeUnavailable } })
+            assert.equal(items.find(item => item.value === selected)?.count, 1)
+          }
+        }
+      }
+    } finally { db.off('query', capture); site.country = null }
+    const counts = statements.filter(sql => sql.includes('count(distinct "cc"."id")'))
+    assert.ok(counts.length >= 16, 'exercise both suggestions and selected-item counts')
+    assert.ok(counts.every(sql => !sql.includes('jsonb_to_record')), 'record functions hide group cardinality and trigger repeated catalogue scans')
+    assert.ok(counts.some(sql => sql.includes("composer->>'name' as name")))
+    const workCounts = counts.filter(sql => sql.includes('"resolved_concert_work" as "ccw"'))
+    assert.ok(workCounts.length)
+    assert.ok(workCounts.every(sql => sql.includes('group by "ccw"."work_id"')))
+    assert.ok(workCounts.some(sql => sql.includes('on "w"."id" = "availability"."value"')), 'join native IDs without losing key statistics to text casts')
+    assert.ok(workCounts.every(sql => !sql.includes('"resolved_concert_composer" as "rcc"')), 'publication already includes work composers; counting does not need a redundant join')
+    assert.ok(workCounts.every(sql => !sql.includes("work->>'title'")), 'work availability only needs indexed IDs, not snapshot labels')
   })
 
   await t.test('Slovak site retains localization and country scope', async () => {

@@ -1,27 +1,23 @@
 import { cachedConcertData } from '../utils/concert-data-cache.js'
 import { concertSite } from '#concert-site'
 import { parseConcertFilters } from '../utils/concert-filters.js'
-import knex from '../utils/connection.js'
 
 export default defineEventHandler(async (event) => {
   try {
     const query = getQuery(event)
     const { country } = parseConcertFilters({ country: query.country }, concertSite.country)
 
-    return await cachedConcertData('composers', { country }, async () => {
-      const composerQuery = knex('composer')
-        .select('composer.name')
-        .join('classical_concert_composer', 'composer.id', '=', 'classical_concert_composer.composer_id')
-        .join('classical_concert', 'classical_concert.id', '=', 'classical_concert_composer.classical_concert_id')
-        .whereRaw('classical_concert.date >= CURRENT_DATE')
-        .where('classical_concert.inclusion_status', 'included')
-        .whereNull('classical_concert.duplicate_of_id')
-        .count('classical_concert_composer.composer_id as count')
-        .groupBy('composer.name')
+    return await cachedConcertData('composers', { country }, async (knex) => {
+      const composerQuery = knex('resolved_concert_composer as composer')
+        .select(knex.raw("composer.composer->>'name' as name"))
+        .join('resolved_concert as cc', 'cc.id', 'composer.concert_id')
+        .whereRaw('cc.date >= CURRENT_DATE')
+        .countDistinct('cc.id as count')
+        .groupByRaw("composer.composer->>'name'")
         .orderBy('count', 'desc')
 
       if (country) {
-        composerQuery.where('classical_concert.country_code_resolved', country)
+        composerQuery.where('cc.country_code_resolved', country)
       }
 
       const composers = await composerQuery

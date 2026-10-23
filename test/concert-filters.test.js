@@ -26,11 +26,13 @@ test('shared parser preserves canonical IDs and validates dates and geography', 
 })
 
 test('music constraints use EXISTS so multiple matching works cannot multiply concerts', () => {
-  const sql = applyFilters(db('classical_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), parseConcertFilters(input)).toSQL()
+  const sql = applyFilters(db('resolved_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), parseConcertFilters(input)).toSQL()
   assert.equal((sql.sql.match(/exists \(/g) || []).length, 2)
   assert.match(sql.sql, /"cc"\."date" >= \?/)
   assert.match(sql.sql, /"cc"\."date" <= \?/)
-  assert.match(sql.sql, /"cc"\."duplicate_of_id" is null/)
+  assert.doesNotMatch(sql.sql, /duplicate_of_id|inclusion_status/)
+  assert.match(sql.sql, /resolved_concert_composer/)
+  assert.match(sql.sql, /resolved_concert_work/)
   assert.ok(sql.bindings.includes('2026-09-05'))
   assert.ok(sql.bindings.includes('2026-09-06'))
   assert.ok(sql.bindings.includes('Beethoven'))

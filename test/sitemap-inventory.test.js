@@ -29,13 +29,12 @@ test('composer sitemap paths come from the eligible directory and are deduplicat
   assert.equal(paths.filter(path => path === '/composers/3-ludwig-van-beethoven').length, 1)
 })
 
-test('shared scope uses current date, inclusion, deduplication, canonical city and resolved country', () => {
+test('shared scope trusts resolved eligibility and keeps upcoming, city and country restrictions', () => {
   const db = knex({ client: 'pg' })
-  const query = applyPublicConcertScope(db('classical_concert as cc'), 'CZ', '123').toSQL()
+  const query = applyPublicConcertScope(db('resolved_concert as cc'), 'CZ', '123').toSQL()
   assert.match(query.sql, /"cc"\."date" >= CURRENT_DATE|cc.date >= CURRENT_DATE/)
-  assert.match(query.sql, /"cc"\."duplicate_of_id" is null/)
-  assert.match(query.sql, /"cc"\."inclusion_status" = \?/)
+  assert.doesNotMatch(query.sql, /duplicate_of_id|inclusion_status/)
   assert.match(query.sql, /"cc"\."country_code_resolved" = \?/)
   assert.match(query.sql, /"cc"\."city_id" = \?/)
-  assert.deepEqual(query.bindings, ['included', 'CZ', '123'])
+  assert.deepEqual(query.bindings, ['CZ', '123'])
 })

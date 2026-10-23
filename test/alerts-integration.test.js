@@ -1,3 +1,4 @@
+import { installResolvedFixture, publishResolvedFixture } from '../test-support/resolved-fixture.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
@@ -19,13 +20,18 @@ test('multiple alerts and combined delivery against disposable PostgreSQL', {ski
     CREATE TABLE work (id serial primary key, title text, composer_id integer);
     CREATE TABLE classical_concert_work (classical_concert_id integer, work_id integer);
     CREATE TABLE classical_concert_composer (classical_concert_id integer, composer_id integer);`)
+  await installResolvedFixture(db)
   await db('city').insert({id:1,english_name:'Prague',local_name:'Praha',country_code:'CZ',latitude:50.0755,longitude:14.4378})
   await db('composer').insert({id:1,name:'Beethoven'})
   const origin='https://classicalbot.com', messages=[]
   const send=async m=>messages.push(m)
   const now=new Date(); now.setUTCHours(12,0,0,0)
-  const run=options=>runAlerts(db,{send,origin,now,...options})
-  const add=async (patch={})=>(await db('classical_concert').insert({city_id:1,country_code_resolved:'CZ',...patch}).returning('id'))[0].id
+  const run=async options=>{ await publishResolvedFixture(db); return runAlerts(db,{send,origin,now,...options}) }
+  const add=async (patch={})=>{
+    const id=(await db('classical_concert').insert({city_id:1,country_code_resolved:'CZ',...patch}).returning('id'))[0].id
+    await publishResolvedFixture(db)
+    return id
+  }
   let seq=0
   const activate=async (query={country:'CZ'},email=`user${++seq}@example.org`)=>{
     await requestAlert(db,{email,criteria:query},send,origin)
@@ -320,6 +326,24 @@ test('multiple alerts and combined delivery against disposable PostgreSQL', {ski
     const selected=await criteria(db,{city:'1',radius:'50'})
     assert.deepEqual(selected.query,{city:'1',radius:'50'})
     await assert.rejects(()=>criteria(db,{bounds:'1,2,3,4'}))
+  })
+  await reset()
+  await t.test('donor-only programme matches once and survives representative switches and metadata additions', async () => {
+    await db('composer').insert({ id: 99, name: 'Donor composer' })
+    await db('work').insert({ id: 99, composer_id: 99, title: 'Donated work' })
+    const first = await activate({ composers: 'Donor composer' })
+    const primary = await add({ title: 'Resolved programme' })
+    const donor = await add({ duplicate_of_id: primary })
+    await db('classical_concert_work').insert({ classical_concert_id: donor, work_id: 99 })
+    assert.equal((await run()).accepted, 1)
+    assert.match(messages.at(-1).text, /Donor composer: Donated work/)
+    const nextDay = new Date(now.valueOf() + 86400_000)
+    await db('classical_concert').where('id', donor).update({ duplicate_of_id: null })
+    await db('classical_concert').where('id', primary).update({ duplicate_of_id: donor })
+    await db('classical_concert').where('id', donor).update({ description: 'New metadata is not a new event' })
+    assert.equal((await run({ now: nextDay })).accepted, 0)
+    const subscriber = await getSubscriber(db, first.token)
+    assert.equal(Number((await db('concert_alert_delivered').where('subscriber_id', subscriber.id).count('* as count').first()).count), 1)
   })
   await reset()
   await t.test('quoted composer alerts survive save, reload, duplicate detection and mocked delivery', async () => {

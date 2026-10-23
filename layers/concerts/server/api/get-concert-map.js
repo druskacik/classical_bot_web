@@ -1,5 +1,4 @@
 import { concertSite } from '#concert-site'
-import knex from '../utils/connection.js'
 import { applyFilters, parseConcertFilters } from '../utils/concert-filters.js'
 import { buildCityIdentities, resolveCitySelection } from '../../shared/utils/city-identity.js'
 import { getAreaCities, getIdentityCities } from '../utils/area-cities.js'
@@ -13,8 +12,8 @@ export default defineEventHandler(async event => {
   if (filters.city) filters.city = resolveCitySelection(filters.city, buildCityIdentities(await getIdentityCities()))
   const cities = await getAreaCities()
   if (filters.area) filters.area = resolveArea(filters.area, cities, concertSite.locale)
-  return cachedConcertData('map-cities', concertFilterCacheInput(filters), async () => {
-    const rows = await applyFilters(knex('classical_concert as cc')
+  return cachedConcertData('map-cities', concertFilterCacheInput(filters), async (knex) => {
+    const rows = await applyFilters(knex('resolved_concert as cc')
       .leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), filters)
       .select('cc.city_id').count('* as count').groupBy('cc.city_id')
     const counts = new Map(rows.map(row => [String(row.city_id), Number(row.count)]))

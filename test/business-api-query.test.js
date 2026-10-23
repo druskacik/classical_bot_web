@@ -1,3 +1,7 @@
+import { installResolvedFixture, publishResolvedFixture } from '../test-support/resolved-fixture.js'
+import { resolvedPublication, withResolvedSnapshot, concertWorks, concertPerformers } from '../layers/concerts/server/utils/resolved-concerts.js'
+import { matching, concertDetails } from '../server/utils/alerts/criteria.js'
+import { parseConcertFilters } from '../layers/concerts/server/utils/concert-filters.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
@@ -60,6 +64,22 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
     INSERT INTO classical_concert_ticket_price VALUES(1,1,'from','admission',10,NULL,'EUR',NULL,NULL,NULL,NULL),(2,1,'exact','fee',2,NULL,'EUR',NULL,NULL,NULL,NULL);
   `)
   const input={url:'https://example.com/',page:1,pageSize:1,all:false}
+  await assert.rejects(queryConcerts(db,input), { statusCode: 503 })
+  // All relationships and the selected venue are supplied only by a duplicate.
+  await db.raw(`UPDATE classical_concert SET country_code_resolved='CZ';
+    UPDATE classical_concert SET venue_id=NULL,last_verified_at='2026-01-02T03:04:05Z' WHERE id=1;
+    UPDATE classical_concert SET venue_id=1 WHERE id=2;
+    UPDATE classical_concert_performer SET classical_concert_id=2;
+    UPDATE classical_concert_work SET classical_concert_id=2;
+    UPDATE classical_concert_composer SET classical_concert_id=2;
+    UPDATE classical_concert_ticket_price SET classical_concert_id=2;`)
+  await installResolvedFixture(db, { populate: false })
+  await assert.rejects(queryConcerts(db,input), { statusCode: 503 })
+  await db('concert_extraction_state').insert({ classical_concert_id:2,field_group:'venue',status:'succeeded',accepted_at:new Date(),accepted_model:'fixture',accepted_result:JSON.stringify({status:'complete',place:{existing_id:1},source_url:'https://hall.test',evidence:'Hall address'}) })
+  await publishResolvedFixture(db)
+  // Ineligible provenance is retained internally, never returned for source matching.
+  await db('classical_concert').insert({id:10,title:'Ineligible member',url:'https://example.com/private',source_url:'https://example.com/',date:new Date(),inclusion_status:'quarantined',duplicate_of_id:1})
+  await publishResolvedFixture(db, { concurrent: true })
   const first=await queryConcerts(db,input)
   assert.equal(first.pagination.total,2)
   assert.equal(first.concerts.length,1)
@@ -67,10 +87,34 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
   assert.equal(c.id,'1')
   assert.deepEqual(c.source_event_urls,['https://alias.example/3','https://example.com/2'])
   assert.equal(c.performers.length,2);assert.equal(c.programme_items.length,2);assert.equal(c.price_items.length,2);assert.equal(c.composers.length,2)
+  assert.equal(c.last_verified_at,'2026-01-02T03:04:05.000Z')
   assert.equal(c.performers[0].ensemble.name,'Orchestra')
   assert.equal(c.parent_venue_name,'Building');assert.equal(c.venue_address,'Street 1')
   assert.equal(c.price_items[0].amount,'10.0000')
   assert.match(c.date,/^\d{4}-\d{2}-\d{2}$/)
+  await db('classical_concert_ticket_price').insert({ id:3,classical_concert_id:3,kind:'from',price_type:'admission',amount:'10.0000',currency:'EUR',source_url:'https://another-vendor.test/' })
+  await publishResolvedFixture(db)
+  const offers=(await queryConcerts(db,input)).concerts[0].price_items
+  assert.equal(offers.length,3, 'equal displayed prices from different offers are not merged by the adapter')
+  assert.equal(offers.find(p=>p.id==='3').amount,'10.0000')
+  assert.equal(offers.find(p=>p.id==='3').amount_max,null)
+  await withResolvedSnapshot(db, async trx => {
+    const filters=parseConcertFilters({composers:'Composer without work',works:'1,2',country:'CZ'})
+    const count=await matching(trx,filters).count('* as total').first()
+    assert.equal(Number(count.total),1, 'donor music filters do not multiply pages')
+    assert.equal((await concertPerformers(trx,[1])).length,2)
+    assert.match((await concertDetails(trx,filters,[1]))[0].programme,/Composer: Concerto/)
+    assert.equal((await trx('resolved_concert as cc').whereExists(trx('resolved_concert_performer as p').select(1).whereRaw('p.concert_id=cc.id').where('p.performer_id',1))).length,1)
+    await db('classical_concert').where('id',1).update({title:'Next generation'})
+    await db('work').where('id',1).update({title:'New programme'})
+    await publishResolvedFixture(db, { concurrent:true })
+    assert.equal((await trx('resolved_concert').where('id',1).first()).title,'Primary')
+    assert.equal((await concertWorks(trx,[1])).find(w=>w.id===1).title,'Symphony')
+  })
+  assert.equal((await queryConcerts(db,input)).concerts[0].title,'Next generation')
+  await db('resolved_concert_refresh_state').update({published_at:db.raw("now()-interval '1 hour'"),last_failure_at:db.fn.now(),last_error:'fixture failure'})
+  assert.equal((await resolvedPublication(db)).stale,true)
+  assert.equal((await queryConcerts(db,input)).pagination.total,2, 'later failures retain the publication')
   const second=await queryConcerts(db,{...input,page:2})
   assert.equal(second.concerts[0].id,'4');assert.equal(second.concerts[0].event_status,'cancelled')
   assert.deepEqual(second.concerts[0].performers,[])
@@ -78,7 +122,35 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
   assert.deepEqual(all.concerts.map(row=>row.id),['1','4'])
   assert.equal((await queryConcerts(db,{...input,url:'https://empty.example/'})).pagination.total,0)
   assert.equal((await queryConcerts(db,{...input,page:3})).concerts.length,0)
+  await t.test('published location bundles preserve country-only locations and donor compatibility', async () => {
+    await db('city').insert({ id: 2, english_name: 'Berlin', local_name: 'Berlin' })
+    await db('classical_concert').insert([
+      {id:30,title:'Location root',url:'https://other.example/30',source_url:'https://other.example/',date:new Date(),city_id:2,country_code_resolved:'DE',inclusion_status:'included'},
+      {id:31,title:'Location donor',url:'https://other.example/31',source_url:'https://other.example/',date:new Date(),city_id:1,country_code_resolved:'CZ',venue_id:1,inclusion_status:'included',duplicate_of_id:30},
+      {id:32,title:'Country only',url:'https://other.example/32',source_url:'https://other.example/',date:new Date(),country_code_raw:'US',inclusion_status:'included'},
+      {id:33,title:'Broken chain',url:'https://other.example/33',source_url:'https://other.example/',date:new Date(),inclusion_status:'included',duplicate_of_id:999999},
+    ])
+    await db('concert_extraction_state').insert([
+      {classical_concert_id:30,field_group:'location',status:'succeeded',requires_revalidation:true},
+      {classical_concert_id:31,field_group:'venue',status:'succeeded',accepted_at:new Date(),accepted_model:'fixture',accepted_result:JSON.stringify({status:'complete',place:{existing_id:1},source_url:'https://hall.test',evidence:'Hall address'})},
+    ])
+    await publishResolvedFixture(db)
+    const load=async()=> (await queryConcerts(db,{...input,url:'https://other.example/',all:true})).concerts
+    let concerts=await load()
+    assert.equal(concerts.find(c=>c.id==='30').venue_id,'1')
+    assert.equal(concerts.find(c=>c.id==='30').country_code,'CZ')
+    assert.equal(concerts.find(c=>c.id==='32').country_code,'US')
+    assert.equal(concerts.find(c=>c.id==='32').city,null)
+    assert.equal(concerts.find(c=>c.id==='32').venue_id,null)
+    assert.ok(!concerts.some(c=>c.id==='33'))
+    await db('concert_extraction_state').where({classical_concert_id:30,field_group:'location'}).update({requires_revalidation:false})
+    await publishResolvedFixture(db)
+    concerts=await load()
+    assert.equal(concerts.find(c=>c.id==='30').country_code,'DE')
+    assert.equal(concerts.find(c=>c.id==='30').venue_id,null)
+  })
   await db.raw(`INSERT INTO classical_concert(id,title,url,source_url,date,inclusion_status) SELECT 100+n,'Export','https://example.com/'||n,'https://example.com/',CURRENT_DATE,'included' FROM generate_series(1,10001) n`)
+  await publishResolvedFixture(db)
   await assert.rejects(queryConcerts(db,{...input,all:true}),{code:'export_too_large'})
   await db.raw(`
     CREATE SEQUENCE api_source_id START 100;

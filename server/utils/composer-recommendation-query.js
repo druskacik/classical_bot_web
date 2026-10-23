@@ -1,3 +1,5 @@
+import { withResolvedSnapshot } from '../../layers/concerts/server/utils/resolved-concerts.js'
+
 // One batch for the complete public directory. A source votes once per pair,
 // regardless of how many performances of that programme it advertises.
 export const recommendationSql = `
@@ -21,14 +23,14 @@ WITH RECURSIVE roots AS (
     AND spotify_playlist_id ~ '^[A-Za-z0-9]{22}$'
 ), links AS MATERIALIZED (
   SELECT cc.id AS concert_id, l.composer_id,
-    COALESCE('registry:' || (s.lookup ->> rtrim(trim(cc.source_url), '/')),
-      'url:' || NULLIF(rtrim(trim(cc.source_url), '/'), '')) AS source_key
-  FROM classical_concert cc
-  JOIN classical_concert_composer l ON l.classical_concert_id = cc.id
+    COALESCE('registry:' || (s.lookup ->> rtrim(trim(member.data->>'source_url'), '/')),
+      'url:' || NULLIF(rtrim(trim(member.data->>'source_url'), '/'), '')) AS source_key
+  FROM resolved_concert cc
+  JOIN resolved_concert_member member ON member.concert_id = cc.id AND member.eligible
+  JOIN resolved_concert_composer l ON l.concert_id = cc.id
   JOIN eligible e ON e.composer_id = l.composer_id CROSS JOIN source_lookup s
-  WHERE cc.date >= CURRENT_DATE AND cc.inclusion_status = 'included'
-    AND cc.duplicate_of_id IS NULL
-    AND NULLIF(rtrim(trim(cc.source_url), '/'), '') IS NOT NULL
+  WHERE cc.date >= CURRENT_DATE
+    AND NULLIF(rtrim(trim(member.data->>'source_url'), '/'), '') IS NOT NULL
 ), totals AS MATERIALIZED (
   SELECT composer_id, count(DISTINCT source_key) AS total
   FROM links GROUP BY composer_id
@@ -46,7 +48,10 @@ ORDER BY p.page_id, score DESC, p.shared DESC, c.name, c.id
 `
 
 export async function queryComposerRecommendations(db) {
-  return db.transaction(async trx => {
+  return withResolvedSnapshot(db, trx => queryComposerRecommendationSnapshot(trx))
+}
+
+export async function queryComposerRecommendationSnapshot(trx) {
     await trx.raw("SET LOCAL statement_timeout = '15s'")
     // This aggregation's estimated cost otherwise triggers expensive JIT
     // compilation. The setting is confined to this read-only transaction.
@@ -60,5 +65,4 @@ export async function queryComposerRecommendations(db) {
       })
     }
     return rankings
-  }, { readOnly: true })
 }

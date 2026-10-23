@@ -1,15 +1,15 @@
 export const recommendationCacheOptions = {
-  name: 'composer-recommendations-v1',
+  name: 'composer-recommendations-resolved-v1',
   maxAge: 86400,
-  swr: true,
-  getKey: () => 'all',
+  swr: false,
+  getKey: publishedAt => publishedAt || 'all',
 }
 
 export function createRecommendationCache(cache, load, logger = console) {
-  return cache(async () => {
+  return cache(async (...args) => {
     const started = performance.now()
     try {
-      const rankings = await load()
+      const rankings = await load(...args)
       logger.info(`[composer-recommendations] refreshed ${Object.keys(rankings).length} composers in ${Math.round(performance.now() - started)}ms`)
       return rankings
     } catch {

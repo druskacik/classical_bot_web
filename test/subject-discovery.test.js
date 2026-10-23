@@ -104,7 +104,11 @@ test('subject resolution preserves exact identity, does not require Spotify and 
     if (fail) throw new Error('Unavailable')
     const { sql, bindings } = builder.toSQL()
     if (sql.includes('composer_spotify_playlist')) return playlist
-    if (sql.includes('from "composer"')) { assert.ok(bindings.includes(composer.name)); return composerRows }
+    if (sql.includes('"c"."name" = ?')) {
+      assert.ok(sql.includes('published_composer_identities'))
+      assert.ok(bindings.includes(composer.name))
+      return composerRows
+    }
     return workRow
   } })
   const filters = { composers: [composer.name], works: [] }

@@ -4,7 +4,7 @@ import { contactClientIP } from '../contact.js'
 import { parseInput, serializeCsv, assertExportSize } from './contract.js'
 import { createLimiter } from './limiter.js'
 
-export function createConcertApiHandler({ load, prepare, cache = createDataCache(), limiter = createLimiter(), env = process.env, log = console.info }) {
+export function createConcertApiHandler({ load, prepare, snapshot = callback => callback(null, {}), cache = createDataCache(), limiter = createLimiter(), env = process.env, log = console.info }) {
   return defineEventHandler(async event => {
     const started = performance.now()
     let status = 200, count = 0, format = 'unknown'
@@ -20,11 +20,11 @@ export function createConcertApiHandler({ load, prepare, cache = createDataCache
       limiter.attempt(ip, input.all)
       const sourceState = prepare ? await prepare(input, ip) : null
       const key = JSON.stringify([input.url, sourceState?.id ?? null, input.all, input.page, input.pageSize, new Date().toISOString().slice(0, 10)])
-      const cached = await cache.get('business-api-concerts', key, 120000, async () => {
+      const cached = await snapshot((trx, publication) => cache.get('business-api-concerts-resolved-v1', `${key}:${publication.publishedAt || ''}`, 120000, async () => {
         if (input.all) limiter.reserve()
-        try { return await load(input) }
+        try { return await load(input, trx) }
         finally { if (input.all) limiter.release() }
-      })
+      }))
       const result = { ...cached, pagination: { ...cached.pagination, next: null }, source: { ...cached.source } }
       if (sourceState) {
         result.source.status = sourceState.status
@@ -59,6 +59,12 @@ export function createConcertApiHandler({ load, prepare, cache = createDataCache
       } else setHeader(event, 'Content-Type', 'application/json; charset=utf-8')
       return body
     } catch (error) {
+      if (error.statusCode === 503) {
+        status = 503
+        setResponseStatus(event, status)
+        setHeader(event, 'Retry-After', '60')
+        return { error: { code: 'catalogue_unavailable', message: 'Concert catalogue temporarily unavailable.' } }
+      }
       const expected = typeof error.code === 'string' && Number.isInteger(error.statusCode)
       status = expected ? error.statusCode : 500
       setResponseStatus(event, status)
