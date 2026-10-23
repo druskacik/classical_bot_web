@@ -1,5 +1,5 @@
 import knex from './connection.js'
-import { withResolvedSnapshot } from './resolved-concerts.js'
+import { withServingSnapshot } from './serving-catalogue.js'
 import { concertSite } from '#concert-site'
 import { createDataCache } from './data-cache.js'
 import { siteDataCacheKey } from './data-cache-keys.js'
@@ -25,8 +25,8 @@ export function cachedConcertData(namespace, input, loader) {
   if (['area-cities', 'city-identities'].includes(namespace)) {
     return concertDataCache.get(namespace, siteDataCacheKey(concertSite, input), lifetimes[namespace], loader)
   }
-  return withResolvedSnapshot(knex, (trx, publication) => concertDataCache.get(
-    `resolved-v1:${namespace}`, siteDataCacheKey(concertSite, { input, publishedAt: publication.publishedAt }),
+  return withServingSnapshot(knex, (trx, publication) => concertDataCache.get(
+    `serving-v1:${namespace}`, siteDataCacheKey(concertSite, { input, generation: publication.generation, currentDate: publication.currentDate }),
     lifetimes[namespace], () => loader(trx, publication),
   ))
 }

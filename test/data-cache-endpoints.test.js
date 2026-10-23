@@ -20,13 +20,13 @@ db.client.runner = builder => ({
     if (sql.includes('"cc"."time_from"') && sql.includes('"cc"."title"')) {
       assert.ok(sql.includes("to_char(cc.date, 'YYYY-MM-DD') || 'T00:00:00.000Z' as date"), 'calendar dates must reach JSON as text, bypassing pg server-local Date conversion')
     }
-    if (sql.includes('"resolved_concert_composer" as "rc"')) {
-      return [{ classical_concert_id: 7, id: 3, name: 'Mozart' }]
+    if (sql.includes('"serving"."current_document"')) {
+      return [{ composers:[{ classical_concert_id: 7, id: 3, name: 'Mozart' }],works:[],performers:[],prices:[] }]
     }
     if (sql.includes('as registry_id')) {
       return [{ registry_id: 1, registry_url: 'https://example.com', country_code: 'SK', geographic_scope: 'country', source: ' Orchestra ', source_url: 'https://example.com', concert_count: '1' }]
     }
-    if (sql.includes("composer.composer->>'name'")) return [{ name: 'Mozart', count: '1' }]
+    if (sql.includes("composer.name")) return [{ name: 'Mozart', count: '1' }]
     if (sql.includes('count(distinct')) return [{ value: 'SK', count: '1' }]
     if (sql.includes('group by "cc"."city_id"')) return [{ city_id: 1, city_raw: 'Bratislava', count: '1' }]
     if (sql.includes('group by "country_code_resolved"')) return [{ country_code_resolved: 'SK', count: '1' }]

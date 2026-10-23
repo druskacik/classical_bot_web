@@ -1,4 +1,4 @@
-import { concertWorks, concertComposers } from '../../../layers/concerts/server/utils/resolved-concerts.js'
+import { concertWorks, concertComposers } from '../../../layers/concerts/server/utils/serving-catalogue.js'
 import { buildCityIdentities, resolveCitySelection } from '../../../layers/concerts/shared/utils/city-identity.js'
 import { createError } from 'h3'
 import { parseConcertFilters, applyFilters } from '../../../layers/concerts/server/utils/concert-filters.js'
@@ -52,11 +52,11 @@ export async function criteria(db, input, { allowExpired = false, requireFilter 
   return { query, filters, summary: labels.join(' · ') }
 }
 export function matching(db, filters) {
-  return applyFilters(db('resolved_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), filters)
+  return applyFilters(db('serving.current_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), filters)
 }
 export async function concertDetails(db, filters, ids) {
   const rows = await matching(db, filters).whereIn('cc.id', ids).select('cc.id', 'cc.title', 'cc.url', 'cc.venue', 'cc.time_from', db.raw("to_char(cc.date, 'YYYY-MM-DD') as date"), db.raw('COALESCE(canonical_city.english_name, canonical_city.local_name, cc.city_raw) as city')).orderBy('cc.date').orderBy('cc.id')
-  const works = await concertWorks(db, ids).clearOrder().orderBy('title')
+  const works = (await concertWorks(db, ids)).sort((a, b) => (a.title || '').localeCompare(b.title || ''))
   const composers = await concertComposers(db, ids)
   return rows.map(row => ({ ...row, programme: works.filter(w => String(w.classical_concert_id) === String(row.id)).map(w => [w.composer_name, w.title].filter(Boolean).join(': ')).join('; ') || composers.filter(c => String(c.classical_concert_id) === String(row.id)).map(c => c.name).join(', ') }))
 }

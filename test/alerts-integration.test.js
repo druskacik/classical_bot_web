@@ -12,7 +12,7 @@ if (url) { assert.ok(['localhost','127.0.0.1'].includes(new URL(url).hostname));
 test('multiple alerts and combined delivery against disposable PostgreSQL', {skip:!url || !schema}, async t => {
   process.env.ALERTS_TOKEN_SECRET='local-test-only-'.repeat(4)
   const db=knex({client:'pg',connection:url}); t.after(()=>db.destroy())
-  await db.raw('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+  await db.raw('DROP SCHEMA IF EXISTS serving CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public')
   await db.raw(await readFile(schema,'utf8'))
   await db.raw(`CREATE TABLE city (id bigint primary key, english_name text, local_name text, country_code text, latitude double precision, longitude double precision);
     CREATE TABLE classical_concert (id serial primary key, title text default 'Concert', url text default 'https://example.org/event', date date default (CURRENT_DATE + 30), time_from time, venue text, city_id bigint, city_raw text, country_code_resolved text, country_code_raw text, inclusion_status text default 'included', duplicate_of_id integer);

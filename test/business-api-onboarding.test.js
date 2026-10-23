@@ -32,8 +32,9 @@ test('submission limits count attempts, isolate clients and expire', () => {
 
 test('failed website validation does not consume the submission quota', async () => {
   let registrations = 0
-  const db = () => ({ select: async () => [] })
-  db.transaction = async () => { registrations++; return { id: String(registrations) } }
+  const db = () => ({ where() { return this }, distinct: async () => [], first: async () => ({revision:1,published_at:new Date()}) })
+  db.raw = async () => ({rows:[{ready:true}]})
+  db.transaction = async (load, options) => { if(options?.readOnly) return load(db); registrations++; return { id: String(registrations) } }
   let validationError
   const onboard = createSourceOnboarding(db, {
     env: { BUSINESS_API_REGISTRATION_ENABLED: 'true', BUSINESS_API_SUBMISSIONS_PER_IP_HOUR: '1' },

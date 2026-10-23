@@ -1,4 +1,4 @@
-import { withResolvedSnapshot } from '#layers/concerts/server/utils/resolved-concerts.js'
+import { withServingSnapshot } from '#layers/concerts/server/utils/serving-catalogue.js'
 import knex from '#layers/concerts/server/utils/connection.js'
 import { getCityCatalogue } from '#layers/concerts/server/utils/city-catalogue.js'
 import { applyPublicConcertScope } from '#layers/concerts/server/utils/public-concerts.js'
@@ -6,10 +6,10 @@ import { buildSlovakSitemapInventory } from '#shared/utils/sitemap-inventory.js'
 export default defineNitroPlugin(nitroApp => {
   nitroApp.hooks.hook('sitemap:input', async ctx => {
     try {
-      ctx.urls = await withResolvedSnapshot(knex, async knex => {
+      ctx.urls = await withServingSnapshot(knex, async knex => {
       const [catalogue, counts] = await Promise.all([
         getCityCatalogue(knex),
-        applyPublicConcertScope(knex('resolved_concert as cc'), 'SK').select('cc.country_code_resolved', 'cc.city_id').count('* as count').groupBy('cc.country_code_resolved', 'cc.city_id'),
+        applyPublicConcertScope(knex('serving.current_concert as cc'), 'SK').select('cc.country_code_resolved', 'cc.city_id').count('* as count').groupBy('cc.country_code_resolved', 'cc.city_id'),
       ])
       return buildSlovakSitemapInventory(catalogue, counts)
       })

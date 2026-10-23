@@ -105,7 +105,7 @@ test('subject resolution preserves exact identity, does not require Spotify and 
     const { sql, bindings } = builder.toSQL()
     if (sql.includes('composer_spotify_playlist')) return playlist
     if (sql.includes('"c"."name" = ?')) {
-      assert.ok(sql.includes('published_composer_identities'))
+      assert.ok(sql.includes('current_composer'))
       assert.ok(bindings.includes(composer.name))
       return composerRows
     }

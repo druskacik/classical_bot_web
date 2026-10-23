@@ -4,7 +4,7 @@ import { resolveArea, publicArea } from '../utils/concert-area.js'
 import { concertFilterCacheInput } from '../utils/data-cache-keys.js'
 import { cachedConcertData } from '../utils/concert-data-cache.js'
 import { concertSite } from '#concert-site'
-import { displaySource, concertComposers, concertWorks } from '../utils/resolved-concerts.js'
+import { displaySource, concertComposers, concertWorks } from '../utils/serving-catalogue.js'
 import { applyFilters, parseConcertFilters, parsePage } from '../utils/concert-filters.js'
 import { getCityCatalogue } from '../utils/city-catalogue.js'
 import { groupConcertWorks } from '../utils/concert-works.js'
@@ -22,14 +22,14 @@ export default defineEventHandler(async (event) => {
 
     return await cachedConcertData('concerts', { filters: concertFilterCacheInput(filters), page }, async (knex) => {
       const countQuery = applyFilters(
-        knex('resolved_concert as cc')
+        knex('serving.current_concert as cc')
           .leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id')
           .count('* as total')
           .first(),
         filters,
       )
       const itemQuery = applyFilters(
-        knex('resolved_concert as cc')
+        knex('serving.current_concert as cc')
           .leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id')
           .select(
             'cc.id',

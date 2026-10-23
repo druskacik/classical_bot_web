@@ -8,12 +8,12 @@ export default defineEventHandler(async (event) => {
     const { country } = parseConcertFilters({ country: query.country }, concertSite.country)
 
     return await cachedConcertData('composers', { country }, async (knex) => {
-      const composerQuery = knex('resolved_concert_composer as composer')
-        .select(knex.raw("composer.composer->>'name' as name"))
-        .join('resolved_concert as cc', 'cc.id', 'composer.concert_id')
+      const composerQuery = knex('serving.current_concert_composer as composer')
+        .select(knex.raw("composer.name as name"))
+        .join('serving.current_concert as cc', 'cc.id', 'composer.concert_id')
         .whereRaw('cc.date >= CURRENT_DATE')
         .countDistinct('cc.id as count')
-        .groupByRaw("composer.composer->>'name'")
+        .groupByRaw("composer.name")
         .orderBy('count', 'desc')
 
       if (country) {

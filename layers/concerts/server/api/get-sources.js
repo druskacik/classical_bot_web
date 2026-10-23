@@ -25,11 +25,11 @@ export default defineEventHandler(async () => {
       const countryCode = 'COALESCE(direct_source.country_code, alias_source.country_code)'
       const geographicScope = 'COALESCE(direct_source.geographic_scope, alias_source.geographic_scope)'
 
-      const rows = await knex.from(knex('resolved_concert as concert')
-        .join('resolved_concert_member as member', 'member.concert_id', 'concert.id')
-        .where('member.eligible', true)
+      const rows = await knex.from(knex('serving.current_concert as concert')
+        .join('serving.current_occurrence as member', 'member.concert_id', 'concert.id')
+
         .select('concert.id', 'concert.date', 'concert.country_code_resolved',
-          knex.raw("member.data->>'source' as source"), knex.raw("member.data->>'source_url' as source_url")).as('cc'))
+          knex.raw("member.source as source"), knex.raw("member.source_url as source_url")).as('cc'))
         .leftJoin('crawler_source as direct_source', function joinDirectSource() {
           this.on(
             knex.raw("LOWER(RTRIM(direct_source.canonical_url, '/'))"),

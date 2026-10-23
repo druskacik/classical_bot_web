@@ -5,7 +5,7 @@ import { getCountryName } from '../utils/countries.js'
 export default defineEventHandler(async () => {
   try {
     return await cachedConcertData('countries', {}, async (knex) => {
-      const countries = await knex('resolved_concert')
+      const countries = await knex('serving.current_concert')
         .select('country_code_resolved')
         .whereRaw('date >= CURRENT_DATE')
         .modify(query => { if (concertSite.country) query.where('country_code_resolved', concertSite.country) })

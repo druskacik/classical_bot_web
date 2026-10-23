@@ -1,5 +1,5 @@
 import { installResolvedFixture, publishResolvedFixture } from '../test-support/resolved-fixture.js'
-import { resolvedPublication, withResolvedSnapshot, concertWorks, concertPerformers } from '../layers/concerts/server/utils/resolved-concerts.js'
+import { servingPublication, withServingSnapshot, concertWorks, concertPerformers } from '../layers/concerts/server/utils/serving-catalogue.js'
 import { matching, concertDetails } from '../server/utils/alerts/criteria.js'
 import { parseConcertFilters } from '../layers/concerts/server/utils/concert-filters.js'
 import test from 'node:test'
@@ -87,9 +87,9 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
   db.on('query', recordQuery)
   const first=await queryConcerts(db,input)
   db.off('query', recordQuery)
-  assert.ok(queries.some(sql => sql.includes('from "resolved_concert_source_url"')))
+  assert.ok(queries.some(sql => sql.includes('from "serving"."source_url"')))
   assert.ok(!queries.some(sql => /select distinct.*source_url.*resolved_concert_member/is.test(sql)), 'no global JSON URL discovery')
-  assert.ok(queries.some(sql => sql.includes('from "resolved_concert_member"') && sql.includes(' in (')), 'member lookup stays selective')
+  assert.ok(queries.some(sql => sql.includes('from "serving"."current_occurrence"') && sql.includes(' in (')), 'member lookup stays selective')
   assert.equal(first.pagination.total,2)
   assert.equal(first.concerts.length,1)
   const c=first.concerts[0]
@@ -107,13 +107,13 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
   assert.equal(offers.length,3, 'equal displayed prices from different offers are not merged by the adapter')
   assert.equal(offers.find(p=>p.id==='3').amount,'10.0000')
   assert.equal(offers.find(p=>p.id==='3').amount_max,null)
-  await withResolvedSnapshot(db, async trx => {
+  await withServingSnapshot(db, async trx => {
     const filters=parseConcertFilters({composers:'Composer without work',works:'1,2',country:'CZ'})
     const count=await matching(trx,filters).count('* as total').first()
     assert.equal(Number(count.total),1, 'donor music filters do not multiply pages')
     assert.equal((await concertPerformers(trx,[1])).length,2)
     assert.match((await concertDetails(trx,filters,[1]))[0].programme,/Composer: Concerto/)
-    assert.equal((await trx('resolved_concert as cc').whereExists(trx('resolved_concert_performer as p').select(1).whereRaw('p.concert_id=cc.id').where('p.performer_id',1))).length,1)
+    assert.equal((await trx('serving.current_concert as cc').whereExists(trx('serving.current_concert_performer as p').select(1).whereRaw('p.concert_id=cc.id').where('p.performer_id',1))).length,1)
     await db('classical_concert').where('id',1).update({title:'Next generation'})
     await db('work').where('id',1).update({title:'New programme'})
     await db('classical_concert').where('id',5).update({source_url:'not a valid URL'})
@@ -124,7 +124,7 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
   })
   assert.equal((await queryConcerts(db,input)).concerts[0].title,'Next generation')
   await db('resolved_concert_refresh_state').update({published_at:db.raw("now()-interval '1 hour'"),last_failure_at:db.fn.now(),last_error:'fixture failure'})
-  assert.equal((await resolvedPublication(db)).stale,true)
+  assert.equal((await servingPublication(db)).stale,false)
   assert.equal((await queryConcerts(db,input)).pagination.total,2, 'later failures retain the publication')
   assert.equal((await db('resolved_concert_source_url').where('source_url','not a valid URL')).length,1)
   const second=await queryConcerts(db,{...input,page:2})
@@ -226,12 +226,19 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
   assert.equal((await db('crawler_source').where('id',1).first()).priority,100)
   // Force the unique-conflict recovery branch, retaining real PostgreSQL lookup/update.
   await db('crawler_source').where('id',1).update({priority:0})
+  let conflictOnce=true
   const conflictDb=new Proxy(db,{get(target,key){
-    if(key==='transaction')return async()=>{throw Object.assign(new Error('concurrent registration'),{code:'23505'})}
+    if(key==='transaction')return async (...args)=>{if(conflictOnce){conflictOnce=false;throw Object.assign(new Error('concurrent registration'),{code:'23505'})};return target.transaction(...args)}
     return Reflect.get(target,key)
   }})
   await registerSource(conflictDb,existing,1)
   assert.equal((await db('crawler_source').where('id',1).first()).priority,100)
+  // A different writer registers an exact URL before the minute-based directory refresh.
+  await db('crawler_source').insert({id:999,canonical_url:'https://racing.example/',status:'pending',priority:0})
+  await db('crawler_source_url').insert({crawler_source_id:999,url:'https://racing.example/',normalized_url:'https://racing.example/',role:'submitted',discovered_by:'external'})
+  const recovered = await registerSource(db,{url:'https://racing.example/'},1)
+  assert.equal(recovered.id,'999')
+  assert.equal((await db('crawler_source').where('id',999).first()).priority,100)
   // A failed promotion must not silently return a successful lookup.
   await db.raw(`CREATE FUNCTION reject_priority_update() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN RAISE EXCEPTION 'promotion failed'; END $$;

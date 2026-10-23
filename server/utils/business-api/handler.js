@@ -19,10 +19,10 @@ export function createConcertApiHandler({ load, prepare, snapshot = callback => 
       const ip = contactClientIP(event.node.req.socket.remoteAddress, getHeader(event, 'x-forwarded-for'), env.BUSINESS_API_TRUST_PROXY_HOPS)
       limiter.attempt(ip, input.all)
       const sourceState = prepare ? await prepare(input, ip) : null
-      const key = JSON.stringify([input.url, sourceState?.id ?? null, input.all, input.page, input.pageSize, new Date().toISOString().slice(0, 10)])
-      const cached = await snapshot((trx, publication) => cache.get('business-api-concerts-resolved-v1', `${key}:${publication.publishedAt || ''}`, 120000, async () => {
+      const key = JSON.stringify([input.url, sourceState?.id ?? null, sourceState?.registryRevision ?? null, input.all, input.page, input.pageSize, new Date().toISOString().slice(0, 10)])
+      const cached = await snapshot((trx, publication) => cache.get('business-api-concerts-serving-v1', `${key}:${publication.publishedAt || ''}`, 120000, async () => {
         if (input.all) limiter.reserve()
-        try { return await load(input, trx) }
+        try { return await load(input, trx, sourceState) }
         finally { if (input.all) limiter.release() }
       }))
       const result = { ...cached, pagination: { ...cached.pagination, next: null }, source: { ...cached.source } }

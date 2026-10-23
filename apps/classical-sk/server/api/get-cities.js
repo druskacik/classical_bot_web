@@ -4,7 +4,7 @@ import { applyPublicConcertScope } from '#layers/concerts/server/utils/public-co
 export default defineEventHandler(() => cachedConcertData('cities', {}, async (knex) => {
   const [catalogue, counts] = await Promise.all([
     getCityCatalogue(knex),
-    applyPublicConcertScope(knex('resolved_concert as cc'), 'SK').select('cc.city_id', 'cc.city_raw').count('* as count').groupBy('cc.city_id', 'cc.city_raw'),
+    applyPublicConcertScope(knex('serving.current_concert as cc'), 'SK').select('cc.city_id', 'cc.city_raw').count('* as count').groupBy('cc.city_id', 'cc.city_raw'),
   ])
   const cities = new Map()
   for (const row of counts) {

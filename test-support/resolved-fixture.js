@@ -1,3 +1,4 @@
+import { installServingFixture, publishServingFixture } from './serving-fixture.js'
 import { readFile } from 'node:fs/promises'
 
 // Isolated fixtures only. Frozen backend policy SQL is copied verbatim, not a
@@ -25,6 +26,7 @@ export async function installResolvedFixture(db, { populate = true } = {}) {
   await db.raw(await readFile(new URL('./resolved-policy-v1.sql', import.meta.url), 'utf8'))
   await db.raw(await readFile(new URL('./resolved-source-directory.sql', import.meta.url), 'utf8'))
   await db.raw("CREATE INDEX resolved_member_eligible_source_url ON resolved_concert_member ((data->>'source_url')) INCLUDE (concert_id, member_id) WHERE eligible")
+  await installServingFixture(db)
   if (populate) await publishResolvedFixture(db)
 }
 export async function publishResolvedFixture(db, { concurrent = false } = {}) {
@@ -32,4 +34,5 @@ export async function publishResolvedFixture(db, { concurrent = false } = {}) {
     for (const view of publicationOrder) await trx.raw(`REFRESH MATERIALIZED VIEW ${concurrent ? 'CONCURRENTLY' : ''} ??`, [view])
     await trx('resolved_concert_refresh_state').update({ published_at: trx.fn.now(), last_failure_at: null, last_error: null })
   })
+  await publishServingFixture(db)
 }

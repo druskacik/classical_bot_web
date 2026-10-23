@@ -1,4 +1,4 @@
-import { withResolvedSnapshot } from '../../../layers/concerts/server/utils/resolved-concerts.js'
+import { withServingSnapshot } from '../../../layers/concerts/server/utils/serving-catalogue.js'
 import { criteria, matching, concertDetails } from './criteria.js'
 import { createError } from 'h3'
 import { alertDay, digestMail, failureKind, token } from './core.js'
@@ -27,7 +27,7 @@ async function newMatches(trx, subscriber) {
       UNION SELECT concert_id FROM concert_alert_delivered WHERE subscriber_id = ?
       UNION SELECT c.duplicate_of_id FROM classical_concert c JOIN history h ON c.id = h.id WHERE c.duplicate_of_id IS NOT NULL
     ) SELECT id FROM history
-      UNION SELECT m.concert_id FROM resolved_concert_member m JOIN history h ON h.id = m.member_id`, [alert.id, subscriber.id])).select('cc.id', 'cc.date').orderBy('cc.date').orderBy('cc.id').limit(50)
+      UNION SELECT m.concert_id FROM serving.current_member m JOIN history h ON h.id = m.member_id`, [alert.id, subscriber.id])).select('cc.id', 'cc.date').orderBy('cc.date').orderBy('cc.id').limit(50)
     selected.push({ alert, search, rows })
   }
   const unique = new Map()
@@ -73,12 +73,12 @@ export async function runAlerts(db, { send, origin, now = new Date(), hourlyLimi
             if (existing.attempts >= 3) { await trx('concert_alert_digest').where('id',existing.id).update({status:'held',failure_kind:'retry_exhausted'}); return null }
             if (existing.attempted_at && now-new Date(existing.attempted_at)<3600_000) return null
             // Definitely failed sends can be rebuilt after edits without discarding new matches.
-            const matches = await withResolvedSnapshot(db, snapshot => newMatches(snapshot, subscriber))
+            const matches = await withServingSnapshot(db, snapshot => newMatches(snapshot, subscriber))
             if (!matches.length) { await trx('concert_alert_digest').where('id',existing.id).update({status:'cancelled'}); return null }
             await trx('concert_alert_digest').where('id',existing.id).update({matches:JSON.stringify(matches)})
             return {...existing,matches}
           }
-          const matches = await withResolvedSnapshot(db, snapshot => newMatches(snapshot, subscriber))
+          const matches = await withServingSnapshot(db, snapshot => newMatches(snapshot, subscriber))
           if (!matches.length) return null
           const previous = await trx('concert_alert_digest').where({subscriber_id:id,day}).first()
           if (previous && previous.status !== 'cancelled') return null
@@ -93,7 +93,7 @@ export async function runAlerts(db, { send, origin, now = new Date(), hourlyLimi
         await db('concert_alert_digest').where('id',delivery.id).update({status:'sending',attempts:delivery.attempts+1,attempted_at:now})
         await db.transaction(async trx => {
           const subscriber = await trx('concert_alert_subscriber').where('id',id).forUpdate().first()
-          const concerts = await withResolvedSnapshot(db, snapshot => renderMatches(snapshot, subscriber, delivery.matches))
+          const concerts = await withServingSnapshot(db, snapshot => renderMatches(snapshot, subscriber, delivery.matches))
           if (!concerts.length) { await trx('concert_alert_digest').where('id',delivery.id).update({status:'cancelled'}); return }
           const management = await ensureManagement(trx,subscriber)
           try { await send(digestMail(subscriber,concerts,origin,management,delivery.id)) }

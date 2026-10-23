@@ -31,7 +31,7 @@ test('playlist eligibility selects one public published season deterministically
   const query = publishedPlaylists(knex({ client: 'pg' })).toSQL()
   assert.match(query.sql, /distinct on \("p"\."composer_id"\)/)
   assert.match(query.sql, /"p"\."season_start" desc, "p"\."last_synced_at" desc nulls last, "p"\."id" desc/)
-  assert.deepEqual(query.bindings, ['published', true])
+  assert.deepEqual(query.bindings, [true, true, 'published', true])
 })
 
 test('rankings and directory counts use resolved relationships and count each concert once', () => {
@@ -39,7 +39,7 @@ test('rankings and directory counts use resolved relationships and count each co
   for (const query of [rankedWorks(db, 3).toSQL(), composerCounts(db, [3, 2]).toSQL()]) {
     assert.match(query.sql, /count\(distinct "cc"\."id"\)/)
     assert.match(query.sql, /cc.date >= CURRENT_DATE/)
-    assert.match(query.sql, /resolved_concert/)
+    assert.match(query.sql, /current_concert/)
     assert.doesNotMatch(query.sql, /duplicate_of_id|inclusion_status/)
     assert.doesNotMatch(query.sql, /season_start|spotify_playlist_item|country_code_resolved/)
   }

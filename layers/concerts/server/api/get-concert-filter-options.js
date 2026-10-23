@@ -1,3 +1,4 @@
+import { summaryEligible, dailyCounts, rawCitySummary } from '../utils/serving-facets.js'
 import { firstQueryValue as first, composerSelections, querySelections } from '../../shared/utils/concert-query.js'
 import { buildCityIdentities, resolveCitySelection } from '../../shared/utils/city-identity.js'
 import { getAreaCities, getIdentityCities } from '../utils/area-cities.js'
@@ -53,16 +54,16 @@ export default defineEventHandler(async (event) => {
     const selected = type === 'city' ? (selectedText ? [selectedText] : []) : type === 'composer' ? composerSelections(selectedText) : querySelections(selectedText)
     if (type === 'city') selected.forEach(value => parseCity(value))
     return await cachedConcertData('filter-options', { type, filters: concertFilterCacheInput(context), search, selected, includeUnavailable }, async (knex) => {
-      const base = () => applyFilters(knex('resolved_concert as cc')
+      const base = () => applyFilters(knex('serving.current_concert as cc')
         .leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), context)
       // Catalogue locations include past public records, independent of availability.
-      const publicLocations = () => knex('resolved_concert as cc')
+      const publicLocations = () => knex('serving.current_concert as cc')
         .modify(builder => { if (concertSite.country) builder.where('cc.country_code_resolved', concertSite.country) })
       let suggestions
       let labels = []
       if (type === 'country') {
-        const rows = await base().select('cc.country_code_resolved as value')
-          .whereNotNull('cc.country_code_resolved').countDistinct('cc.id as count').groupBy('cc.country_code_resolved')
+        const rows = await (summaryEligible(context) ? dailyCounts(knex,'country',context) : base().select('cc.country_code_resolved as value')
+          .whereNotNull('cc.country_code_resolved').countDistinct('cc.id as count').groupBy('cc.country_code_resolved'))
         const catalogue = await knex('city').distinct('country_code as value')
           .modify(builder => { if (concertSite.country) builder.where('country_code', concertSite.country) })
           .union(publicLocations().distinct(knex.raw('COALESCE(cc.country_code_resolved, cc.country_code_raw) as value')))
@@ -78,9 +79,9 @@ export default defineEventHandler(async (event) => {
         // for counts instead of fetching the same wide concert rows twice.
         // Historical labels also preserve ambiguous aliases of available cities.
         const [counts, rawLocations, coordinateCities] = await Promise.all([
-          base().whereNotNull('canonical_city.id').select('canonical_city.id')
+          summaryEligible(context) ? knex.from(dailyCounts(knex,'city',context).as('counts')).select('value as id','count') : base().whereNotNull('canonical_city.id').select('canonical_city.id')
             .countDistinct('cc.id as count').groupBy('canonical_city.id'),
-          publicLocations().whereNull('cc.city_id').whereNotNull('cc.city_raw')
+          summaryEligible(context) ? rawCitySummary(knex,context) : publicLocations().whereNull('cc.city_id').whereNotNull('cc.city_raw')
             .leftJoin(base().whereNull('cc.city_id').select('cc.id').as('available'), 'available.id', 'cc.id')
             .modify(builder => { if (context.country) builder.whereRaw('COALESCE(cc.country_code_resolved, cc.country_code_raw) = ?', [context.country]) })
             .select(knex.raw('LOWER(cc.city_raw) as name'), knex.raw('MIN(cc.city_raw) as label'),
@@ -144,7 +145,7 @@ export default defineEventHandler(async (event) => {
             [city.english_name, city.local_name].some(name => name?.toLowerCase() === parsed?.name?.toLowerCase()))
           if (concertSite.country && parsed?.id && !matches.length) continue
           const city = matches.length === 1 ? matches[0] : null
-          const row = await applyFilters(knex('resolved_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), { ...context, city: parsed }).countDistinct('cc.id as count').first()
+          const row = await applyFilters(knex('serving.current_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), { ...context, city: parsed }).countDistinct('cc.id as count').first()
           const option = { value, label: city ? cityDisplayName(city, concertSite.locale) : parsed?.name || value,
             country_code: city?.country_code || parsed?.country || concertSite.country
               || (new Set(matches.map(city => city.country_code)).size === 1 ? matches[0].country_code : undefined),
@@ -159,18 +160,19 @@ export default defineEventHandler(async (event) => {
         // Scalar projections inline into the joins. jsonb_to_record hides the
         // grouping cardinality from PostgreSQL, which can estimate one composer
         // and repeatedly rescan the identity catalogue for thousands of groups.
-        const composerSnapshots = () => knex('resolved_concert_composer')
-          .select('concert_id', 'composer_id as id', knex.raw("composer->>'name' as name"))
+        const composerSnapshots = () => knex('serving.current_concert_composer')
+          .select('concert_id', 'composer_id as id', 'name')
         const fields = type === 'composer' ? ['c.name as value', 'c.name as label'] : [knex.raw('w.id::text as value'), 'w.title as label', 'c.name as secondaryLabel']
-        const grouped = () => type === 'composer'
+        const rawGrouped = () => type === 'composer'
           ? base().join(composerSnapshots().as('c'), 'c.concert_id', 'cc.id')
               .select(...fields).countDistinct('cc.id as count').groupBy('c.name')
           // Work suggestions join availability by ID, not title. Keep native
           // keys for planner statistics/indexes; only serialize IDs at the edge.
           // The publication already includes each work's composer, so counting
           // works needs neither JSON labels nor another relationship join.
-          : base().join('resolved_concert_work as ccw', 'ccw.concert_id', 'cc.id')
+          : base().join('serving.current_concert_work as ccw', 'ccw.concert_id', 'cc.id')
               .select('ccw.work_id as value').countDistinct('cc.id as count').groupBy('ccw.work_id')
+        const grouped = () => summaryEligible(context) ? dailyCounts(knex,type,context) : rawGrouped()
         // Published names/search keys stay aligned with availability and filtering.
         // Only composers absent from the publication use live catalogue identities.
         const identities = () => type === 'composer'
@@ -203,7 +205,7 @@ export default defineEventHandler(async (event) => {
           const values = type === 'composer' ? selected : selected.map(Number).filter(id => Number.isSafeInteger(id) && id > 0)
           const [identitiesRows, counts] = await Promise.all([
             identities().select(...fields).whereIn(key, values),
-            grouped().whereIn(type === 'composer' ? 'c.name' : 'ccw.work_id', values),
+            knex.from(grouped().as('counts')).select('value','count').whereIn('value',values),
           ])
           labels = identitiesRows.map(row => ({ ...row, count: Number(counts.find(item => String(item.value) === String(row.value))?.count || 0) }))
         }

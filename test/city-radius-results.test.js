@@ -29,7 +29,7 @@ test('Birmingham radius retains unlinked concerts without admitting unrelated or
     CREATE TABLE classical_concert_work (classical_concert_id INTEGER, work_id INTEGER);
     INSERT INTO composer VALUES (1, 'Mozart');
     CREATE VIEW resolved_concert AS SELECT * FROM classical_concert WHERE inclusion_status='included' AND duplicate_of_id IS NULL;
-    CREATE VIEW resolved_concert_composer AS SELECT classical_concert_id AS concert_id, composer_id, json_object('name', name) AS composer FROM classical_concert_composer JOIN composer ON composer.id=composer_id;
+    CREATE VIEW resolved_concert_composer AS SELECT classical_concert_id AS concert_id, composer_id, name FROM classical_concert_composer JOIN composer ON composer.id=composer_id;
     CREATE VIEW resolved_concert_work AS SELECT classical_concert_id AS concert_id, work_id FROM classical_concert_work;`)
   for (const city of cities) db.prepare('INSERT INTO city VALUES (?, ?, ?, ?, ?, ?)').run(...Object.values(city))
   const insert = db.prepare('INSERT INTO classical_concert VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
@@ -54,7 +54,7 @@ test('Birmingham radius retains unlinked concerts without admitting unrelated or
     const query = applyFilters(compiler('resolved_concert as cc').leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), filters)
       .select('cc.id').orderBy('cc.id').toSQL()
     // SQLite LIKE provides PostgreSQL ILIKE semantics for these ASCII fixtures.
-    return db.prepare(query.sql.replaceAll(' ilike ', ' like ')).all(...query.bindings).map(row => row.id)
+    return db.prepare(query.sql.replaceAll(' ilike ', ' like ').replaceAll('"serving"."current_concert_composer"', '"resolved_concert_composer"').replaceAll('"serving"."current_concert_work"', '"resolved_concert_work"')).all(...query.bindings).map(row => row.id)
   }
   const exact = select(filtersFor({ city: 'Birmingham,GB' }))
   assert.equal(exact.length, 290)

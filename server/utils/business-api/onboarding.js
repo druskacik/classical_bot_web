@@ -1,7 +1,7 @@
 import { Resolver } from 'node:dns/promises'
 import ipaddr from 'ipaddr.js'
 import { fail, normalizeUrl } from './contract.js'
-import { resolveSource } from './resolve-source.js'
+import { lookupSource, registerLookup, repairRegistrationLookup } from './source-lookup.js'
 
 export function submittedUrl(value) {
   normalizeUrl(value) // Apply the same syntax and credential checks as lookup.
@@ -65,14 +65,6 @@ export function createSubmissionLimiter({ limit = 10, now = Date.now } = {}) {
   }
 }
 
-export async function lookupSource(db, url) {
-  const sources = await db('crawler_source').select('id', 'canonical_url', 'duplicate_of_id', 'status', 'next_attempt_at')
-  const aliases = await db('crawler_source_url').select('crawler_source_id', 'url')
-  const resolved = resolveSource(url, sources, aliases)
-  const row = sources.find(source => String(source.id) === resolved.id)
-  return { ...resolved, status: row.status, next_attempt_at: row.next_attempt_at ? new Date(row.next_attempt_at).toISOString() : null }
-}
-
 async function lookupAndPromoteSource(db, url) {
   const source = await lookupSource(db, url)
   // Check eligibility in the UPDATE too: a worker may have changed the row since lookup.
@@ -90,6 +82,9 @@ export async function registerSource(db, input, dailyLimit = 50) {
       await trx.raw("SELECT pg_advisory_xact_lock(hashtext('business-api-source-registration'))")
       try { return await lookupAndPromoteSource(trx, input.url) }
       catch (error) { if (error.code !== 'source_not_found') throw error }
+      if (await repairRegistrationLookup(trx,input.url,submittedUrl(input.submittedUrl || input.url))) {
+        return lookupAndPromoteSource(trx,input.url)
+      }
       const { count } = await trx('crawler_source as s').whereRaw("s.created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'")
         .whereExists(trx('crawler_source_url as u').select(trx.raw('1')).whereRaw('u.crawler_source_id = s.id').where('u.discovered_by', 'business_api'))
         .count('* as count').first()
@@ -101,11 +96,14 @@ export async function registerSource(db, input, dailyLimit = 50) {
       const canonical = submittedUrl(input.submittedUrl || input.url)
       const [source] = await trx('crawler_source').insert({ canonical_url: canonical, status: 'pending', priority: 100, geographic_scope: 'unknown' }).returning('id')
       await trx('crawler_source_url').insert({ crawler_source_id: source.id, url: canonical, normalized_url: input.url, role: 'submitted', discovered_by: 'business_api', metadata_json: {} })
+      await registerLookup(trx,source,canonical,input.url)
       return { id: String(source.id), url: canonical, aliases: [input.url], status: 'pending', next_attempt_at: null }
     })
   } catch (error) {
     // Another registry writer may have won the unique normalized-URL constraint.
-    if (error.code === '23505') return lookupAndPromoteSource(db, input.url)
+    if (error.code === '23505' && await repairRegistrationLookup(db,input.url,submittedUrl(input.submittedUrl || input.url))) {
+      return lookupAndPromoteSource(db, input.url)
+    }
     throw error
   }
 }

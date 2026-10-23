@@ -1,3 +1,4 @@
+import { withServingSnapshot } from '../layers/concerts/server/utils/serving-catalogue.js'
 import { installResolvedFixture, publishResolvedFixture } from '../test-support/resolved-fixture.js'
 import { composerPath, composerConcertLocation } from '../shared/utils/composers.js'
 import test from 'node:test'
@@ -18,7 +19,7 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
   const admin = knex({ client: 'pg', connection: url })
   await admin.raw(`CREATE SCHEMA ${schema}`)
   const db = knex({ client: 'pg', connection: { connectionString: url, options: `-csearch_path=${schema}` } })
-  t.after(async () => { await db.destroy(); await admin.raw(`DROP SCHEMA ${schema} CASCADE`); await admin.destroy() })
+  t.after(async () => { await db.destroy(); await admin.raw('DROP SCHEMA IF EXISTS serving CASCADE'); await admin.raw(`DROP SCHEMA ${schema} CASCADE`); await admin.destroy() })
   const oldCache = process.env.SERVER_DATA_CACHE_ENABLED
   process.env.SERVER_DATA_CACHE_ENABLED = 'false'
   t.after(() => { if (oldCache === undefined) delete process.env.SERVER_DATA_CACHE_ENABLED; else process.env.SERVER_DATA_CACHE_ENABLED = oldCache })
@@ -421,9 +422,9 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
         try {
           ;({ items } = await snapshotHandlers.facets({ query: { type: 'city', q: 'Archive', includeUnavailable } }))
         } finally { db.off('query', capture) }
-        const rawScans = statements.filter(sql => sql.includes('group by LOWER(cc.city_raw)'))
+        const rawScans = statements.filter(sql => sql.includes('serving') && sql.includes('current_raw_city_daily'))
         assert.equal(rawScans.length, 1, 'raw counts and historical names use one grouped query')
-        assert.match(rawScans[0], /count\(distinct "available"\."id"\)/)
+        assert.match(rawScans[0], /sum/i)
         assert.equal(items.find(item => item.value === 'Archive shared,SK')?.count, 2,
           'a past-only ambiguous alias still matches upcoming canonical concerts')
         assert.equal(items.find(item => item.value === `${label},SK`)?.count, 1,
@@ -457,16 +458,11 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
         }
       }
     } finally { db.off('query', capture); site.country = null }
-    const counts = statements.filter(sql => sql.includes('count(distinct "cc"."id")'))
-    assert.ok(counts.length >= 16, 'exercise both suggestions and selected-item counts')
-    assert.ok(counts.every(sql => !sql.includes('jsonb_to_record')), 'record functions hide group cardinality and trigger repeated catalogue scans')
-    assert.ok(counts.some(sql => sql.includes("composer->>'name' as name")))
-    const workCounts = counts.filter(sql => sql.includes('"resolved_concert_work" as "ccw"'))
-    assert.ok(workCounts.length)
-    assert.ok(workCounts.every(sql => sql.includes('group by "ccw"."work_id"')))
-    assert.ok(workCounts.some(sql => sql.includes('on "w"."id" = "availability"."value"')), 'join native IDs without losing key statistics to text casts')
-    assert.ok(workCounts.every(sql => !sql.includes('"resolved_concert_composer" as "rcc"')), 'publication already includes work composers; counting does not need a redundant join')
-    assert.ok(workCounts.every(sql => !sql.includes("work->>'title'")), 'work availability only needs indexed IDs, not snapshot labels')
+    const counts = statements.filter(sql => sql.includes('current_facet_daily'))
+    assert.ok(counts.length >= 16, 'suggestions and selected counts use daily summaries')
+    assert.ok(counts.every(sql => !sql.includes('jsonb_to_record')))
+    assert.ok(counts.every(sql => !sql.includes('current_concert_work')))
+
   })
 
   await t.test('Slovak site retains localization and country scope', async () => {
@@ -516,7 +512,7 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
         const saved = await criteria(db, query)
         assert.deepEqual(saved.filters.composers, [name])
         assert.ok(saved.summary.includes(name))
-        assert.equal((await matching(db, saved.filters)).length, expected)
+        assert.equal((await withServingSnapshot(db, trx => matching(trx, saved.filters))).length, expected)
         const reloaded = await criteria(db, JSON.parse(JSON.stringify(saved.query)))
         assert.equal(criteriaIdentity(saved), criteriaIdentity(reloaded))
       }
@@ -675,7 +671,7 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
       const restored = (await options({ q: 'Praha', selected: city })).filter(row => row.country_code === 'CZ' && row.label === 'Prague')
       assert.deepEqual(restored.map(row => [row.value, row.count]), [[city, 4]])
       const alert = await criteria(db, { city })
-      assert.deepEqual((await matching(db, alert.filters).select('cc.id')).map(row => row.id).sort(), expectedIds)
+      assert.deepEqual((await withServingSnapshot(db, trx => matching(trx, alert.filters).select('cc.id'))).map(row => row.id).sort(), expectedIds)
       for (const context of [{ dateFrom: '2099-01-01' }, { composers: 'Missing composer' }, { works: '999999' }, { country: 'CZ' }]) {
         const selected = (await options({ ...context, selected: city })).find(row => row.value === city)
         assert.equal(selected.count, (await concerts({ query: { ...context, city } })).total)
@@ -694,7 +690,7 @@ test('city discovery labels and identities against disposable PostgreSQL', { ski
     assert.ok(ambiguous.some(row => row.value === 'Shared alias,CZ'))
     for (const row of ambiguous) assert.equal(row.count, (await concerts({ query: { city: row.value } })).total)
     const radiusAlert = await criteria(db, { city: '19001', radius: '1' })
-    assert.equal((await matching(db, radiusAlert.filters).count('* as total').first()).total, '2')
+    assert.equal((await withServingSnapshot(db, trx => matching(trx, radiusAlert.filters).count('* as total').first())).total, '2')
   })
 
 })

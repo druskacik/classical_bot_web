@@ -131,16 +131,16 @@ export const applyFilters = (builder, filters) => {
   if (filters.composers.length) {
     builder.whereExists(function composerFilter() {
       this.select(1)
-        .from('resolved_concert_composer as ccc')
+        .from('serving.current_concert_composer as ccc')
         .whereRaw('ccc.concert_id = cc.id')
-        .whereIn(builder.client.raw("ccc.composer->>'name'"), filters.composers)
+        .whereIn('ccc.name', filters.composers)
     })
   }
 
   if (filters.works.length) {
     builder.whereExists(function workFilter() {
       this.select(1)
-        .from('resolved_concert_work as ccw')
+        .from('serving.current_concert_work as ccw')
         .whereRaw('ccw.concert_id = cc.id')
         .whereIn('ccw.work_id', filters.works)
     })

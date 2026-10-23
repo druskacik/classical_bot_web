@@ -1,4 +1,5 @@
-import { fail, normalizeUrl } from './contract.js'
+// Historical in-memory behavior retained only as a contract-test reference.
+import { fail, normalizeUrl } from '../server/utils/business-api/contract.js'
 const safeUrl = value => { try { return normalizeUrl(value) } catch { return null } }
 // Root trailing slashes are normalized by URL; preserve meaningful path/query identity.
 export function resolveSource(input, sources, aliases) {

@@ -54,7 +54,7 @@ test('real area endpoints resolve coordinates, constrain all SQL, cache repeats 
     assert.equal(result.area.latitude, 48.14816)
     assert.equal(result.area.cityIds, undefined)
     assert.equal(result.area.unresolvedCity, undefined)
-    const listing = statements.filter(statement => statement.sql.includes('from "resolved_concert" as "cc"'))
+    const listing = statements.filter(statement => statement.sql.includes('from "serving"."current_concert" as "cc"'))
     assert.equal(listing.length, 2, 'count and page queries share the area filter')
     for (const statement of listing) {
       assert.match(statement.sql, /"cc"\."city_id" in \(\?, \?\)/)
