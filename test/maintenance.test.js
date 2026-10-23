@@ -23,8 +23,9 @@ test('maintenance middleware and alert task stop before database work', async t 
   globalThis.useRuntimeConfig = () => ({ maintenanceMode: enabled })
   globalThis.defineTask = task => task
   const { default: middleware } = await import('../server/middleware/00-maintenance.js')
+  const { default: health } = await import('../server/api/health.get.js')
   let pageRenders = 0, normalCalls = 0
-  const app = createApp().use(middleware).use(defineEventHandler(event => {
+  const app = createApp().use(middleware).use('/api/health', health).use(defineEventHandler(event => {
     if (event.context.maintenance) {
       pageRenders++
       return 'Vue maintenance page'
@@ -48,7 +49,7 @@ test('maintenance middleware and alert task stop before database work', async t 
     assert.match(await response.text(), /scheduled maintenance/)
   }
   assert.equal(pageRenders, 4, 'Dynamic endpoints must stop before page rendering')
-  for (const [path, method] of [['/api', 'GET'], ['/api/get-concerts', 'GET'], ['/api/contact', 'POST'], ['/api/v1/concerts', 'OPTIONS']]) {
+  for (const [path, method] of [['/api', 'GET'], ['/api/get-concerts', 'GET'], ['/api/contact', 'POST'], ['/api/v1/concerts', 'OPTIONS'], ['/api/health', 'POST'], ['/api/health/other', 'GET']]) {
     const response = await request(path, method)
     assert.equal(response.status, 503)
     assert.equal(response.headers.get('cache-control'), 'no-store')
@@ -68,6 +69,20 @@ test('maintenance middleware and alert task stop before database work', async t 
   t.after(async () => { db.client.runner = runner; await db.destroy() })
   const { default: alerts } = await import('../server/tasks/concert-alerts.js')
   assert.deepEqual(await alerts.run(), { result: { maintenance: true } })
+
+  for (const maintenance of [true, false]) {
+    enabled = maintenance
+    for (const path of ['/api/health', '/api/health?probe=1']) {
+      const response = await request(path)
+      assert.equal(response.status, 200)
+      assert.equal(response.headers.get('cache-control'), 'no-store')
+      assert.deepEqual(await response.json(), { status: 'ok' })
+    }
+    const head = await request('/api/health', 'HEAD')
+    assert.equal(head.status, 200)
+    assert.equal(await head.text(), '')
+  }
+  assert.equal(normalCalls, 0, 'health does not execute normal page handlers')
 
   enabled = false
   const response = await request('/')

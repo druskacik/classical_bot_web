@@ -145,8 +145,22 @@ Unit tests cover single-flight loading, failure backoff/recovery, stale rankings
 publication changes, and sanitized errors. The full run with isolated discovery
 fixtures and both startup flags passed 231 tests, with one opt-in alert suite
 skipped. Both site builds/typechecks pass.
-Deployment readiness/healthchecks and recommendation SQL optimization are separate
-follow-ups; this change does not implement them.
+Recommendation SQL optimization remains a separate follow-up.
+
+### Container health during deployment
+
+The runtime Docker image now probes `GET /api/health` every 5 seconds, with a
+2-second timeout, a 20-second startup grace period, and 3 retries. The inline Node
+probe follows `NITRO_PORT`, then `PORT`, defaulting to 3000; no curl dependency is
+needed. The endpoint returns `200 {"status":"ok"}` with `Cache-Control: no-store`.
+It checks HTTP availability only, never PostgreSQL or recommendations. Exact GET
+and HEAD requests remain allowed during maintenance so deliberate maintenance does
+not cause container restarts. Other maintenance restrictions are unchanged.
+
+After deployment, verify that CapRover/Swarm has enabled the image healthcheck and
+that its `start-first` rollout keeps the old container serving until the new one
+is healthy. This repository change does not alter or verify live service settings,
+and the probe does not certify database readiness or guarantee zero downtime.
 
 ### Query plans and remaining performance gate
 

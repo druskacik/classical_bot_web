@@ -53,6 +53,10 @@ test('maintenance skips PostgreSQL; normal HTTP starts even when PostgreSQL is u
     } catch { await new Promise(resolve => setTimeout(resolve, 50)) }
   }
   assert.ok(ready, `Maintenance listener did not start: ${maintenance.output()}`)
+  const health = await fetch(maintenance.origin + '/api/health')
+  assert.equal(health.status, 200)
+  assert.equal(health.headers.get('cache-control'), 'no-store')
+  assert.deepEqual(await health.json(), { status: 'ok' })
   for (const path of [
     '/?country=SK&city=Bratislava', '/about', '/unknown-page', '/composers/beethoven',
     '/countries/SK?city=Bratislava,SK&radius=50',
@@ -93,6 +97,9 @@ test('maintenance skips PostgreSQL; normal HTTP starts even when PostgreSQL is u
     } catch { await new Promise(resolve => setTimeout(resolve, 50)) }
   }
   assert.ok(normalReady, `Normal listener did not start: ${normal.output()}`)
+  const normalHealth = await fetch(normal.origin + '/api/health')
+  assert.equal(normalHealth.status, 200, 'health does not depend on database availability')
+  assert.deepEqual(await normalHealth.json(), { status: 'ok' })
   const profile = await fetch(normal.origin + '/api/composers/1', { signal: AbortSignal.timeout(3000) })
   assert.equal(profile.status, 503, 'HTTP is available, but unavailable essential data still returns 503')
   assert.equal(normal.child.exitCode, null, normal.output())
