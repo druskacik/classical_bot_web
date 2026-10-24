@@ -31,7 +31,7 @@ export function serializeConcert(row, source, relations) {
     id: id(row.id), title: row.title?.replace(/\s+/g, ' ').trim() || null,
     event_url: row.url, end_time: row.time_to, event_status: row.event_status,
     last_verified_at: timestamp(row.last_verified_at), country_code: row.country_code,
-    venue_id: id(row.venue_id), venue_url: row.venue_url, parent_venue_name: row.parent_venue_name,
+    city_id: id(row.city_id), venue_id: id(row.venue_id), venue_url: row.venue_url, parent_venue_name: row.parent_venue_name,
     latitude: row.latitude, longitude: row.longitude,
     programme: joined(programme.map(w => `${w.composer.name} — ${w.programme_label || w.title}`)),
     programme_items: programme, composers, performers,
@@ -41,7 +41,7 @@ export function serializeConcert(row, source, relations) {
     ].join(' — '))),
     price_items: prices, admission_type: row.admission_type, booking_kind: row.booking_kind,
     booking_status: row.booking_status, on_sale_at: timestamp(row.on_sale_at),
-    source_id: source.id, source_name: source.name, source_url: source.url,
+    source_id: source?.id, source_name: source?.name, source_url: source?.url,
     source_event_urls: relations.sourceUrls,
   }
   return Object.fromEntries(fields.map(field => [field, result[field] ?? null]))

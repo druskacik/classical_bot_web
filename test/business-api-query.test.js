@@ -11,6 +11,8 @@ import { join } from 'node:path'
 import knex from 'knex'
 import { createSourceOnboarding, registerSource } from '../server/utils/business-api/onboarding.js'
 import { queryConcerts } from '../server/utils/business-api/query-concerts.js'
+import { parseInput } from '../server/utils/business-api/contract.js'
+import { parseEntityInput, queryEntitySnapshot } from '../server/utils/business-api/query-entities.js'
 
 // An isolated PostgreSQL cluster, never the application database or .env.
 test('PostgreSQL query preserves source connections, primary visibility, dates and relation cardinality', async t => {
@@ -100,6 +102,32 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
   assert.equal(c.performers[0].ensemble.name,'Orchestra')
   assert.equal(c.parent_venue_name,'Building');assert.equal(c.venue_address,'Street 1')
   assert.equal(c.price_items[0].amount,'10.0000')
+  assert.equal(c.city_id, '1')
+  await t.test('composable filters use resolved identities and retain per-concert source attribution', async () => {
+    const search = query => queryConcerts(db, parseInput(query))
+    for (const filter of [{ city_id: '1' }, { country_code: 'cz' }]) {
+      const result = await search(filter)
+      assert.equal(result.source, null)
+      assert.deepEqual(result.concerts.map(c => c.id), ['1', '4'])
+      assert.equal(result.concerts[0].source_id, '2')
+      assert.equal(result.concerts[0].source_name, 'Other')
+      assert.equal(result.concerts[0].source_url, 'https://other.example/')
+      assert.equal(result.concerts[1].source_id, '1')
+      assert.deepEqual(result.concerts[0].source_event_urls, ['https://alias.example/3', 'https://example.com/2', 'https://other.example/1'])
+    }
+    for (const filter of [{ performer_id: '1' }, { performer_id: '2' }, { venue_id: '1' }, { country_code: 'CZ', city_id: '1', venue_id: '1', performer_id: '1' }]) {
+      assert.deepEqual((await search(filter)).concerts.map(c => c.id), ['1'])
+    }
+    const combined = await search({ url: 'example.com', performer_id: '1', venue_id: '1', city_id: '1', country_code: 'CZ' })
+    assert.equal(combined.source.id, '1')
+    assert.equal(combined.concerts[0].source_id, '1')
+    assert.deepEqual(combined.concerts[0].source_event_urls, c.source_event_urls)
+    for (const filter of [{ country_code: 'DE', city_id: '1' }, { venue_id: '2' }, { performer_id: '9223372036854775807' }, { url: 'empty.example', city_id: '1' }]) {
+      assert.equal((await search(filter)).pagination.total, 0)
+    }
+    assert.equal((await search({ city_id: '1', page: '2', page_size: '1' })).concerts[0].id, '4')
+    assert.equal((await search({ city_id: '1', all: 'true' })).concerts.length, 2)
+  })
   assert.match(c.date,/^\d{4}-\d{2}-\d{2}$/)
   await db('classical_concert_ticket_price').insert({ id:3,classical_concert_id:3,kind:'from',price_type:'admission',amount:'10.0000',currency:'EUR',source_url:'https://another-vendor.test/' })
   await publishResolvedFixture(db)
@@ -162,6 +190,70 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
     concerts=await load()
     assert.equal(concerts.find(c=>c.id==='30').country_code,'DE')
     assert.equal(concerts.find(c=>c.id==='30').venue_id,null)
+  })
+  await t.test('entity discovery matches aliases, accents and local names with bounded deterministic pages', async () => {
+    await db.raw(`
+      ALTER TABLE city ADD COLUMN country_code text, ADD COLUMN latitude float8, ADD COLUMN longitude float8,
+        ADD COLUMN external_source text, ADD COLUMN external_id text;
+      UPDATE city SET country_code='CZ', external_source='geonames', external_id='3067696' WHERE id=1;
+      UPDATE city SET country_code='DE' WHERE id=2;
+      INSERT INTO city(id,english_name,local_name,country_code) VALUES(3,'Munich','München','DE'),(4,'Prague','Prague','US');
+      ALTER TABLE performer ADD COLUMN normalized_name text, ADD COLUMN ensemble_type text;
+      ALTER TABLE venue ADD COLUMN normalized_name text;
+      CREATE TABLE performer_alias(performer_id bigint,alias text,normalized_alias text);
+      CREATE TABLE venue_alias(venue_id bigint,alias text,normalized_alias text);
+      UPDATE performer SET normalized_name=lower(name);
+      UPDATE venue SET normalized_name=lower(name);
+      INSERT INTO performer(id,name,normalized_name,kind) VALUES(3,'Éva Novák','eva novak','person'),(4,'Violinist','violinist','person'),(9007199254740993,'Large ID','large id','person');
+      INSERT INTO performer_alias VALUES(1,'Fiddler','fiddler'),(1,'Fiddler alias','fiddler alias'),(3,'Eva','eva');
+      INSERT INTO venue_alias VALUES(1,'Grand Hall','grand hall'),(1,'Great Hall','great hall');
+    `)
+    const search = (kind, query) => withServingSnapshot(db, trx => queryEntitySnapshot(trx, kind, parseEntityInput(kind, query)))
+    let result = await search('cities', { q: 'pra' })
+    assert.deepEqual(result.items.map(c => c.id), ['1', '4'])
+    assert.equal(result.items[0].external_id, '3067696')
+    assert.notEqual(result.items[0].id, result.items[0].external_id)
+    assert.deepEqual((await search('cities', { q: 'praha', country_code: 'cz' })).items.map(c => c.id), ['1'])
+    assert.deepEqual((await search('cities', { q: 'munchen' })).items.map(c => c.id), ['3'])
+    assert.deepEqual((await search('cities', { q: 'MÜNCHEN' })).items.map(c => c.id), ['3'])
+    assert.deepEqual((await search('cities', { q: 'pra', has_upcoming: 'true' })).items.map(c => c.id), ['1'])
+    assert.deepEqual((await search('performers', { q: 'Eva' })).items.map(p => p.id), ['3'])
+    assert.deepEqual((await search('performers', { q: 'Éva Novák' })).items.map(p => p.id), ['3'])
+    assert.deepEqual((await search('performers', { q: 'fiddler' })).items.map(p => p.id), ['1'], 'multiple matching aliases do not duplicate results')
+    assert.deepEqual((await search('performers', { q: 'violinist' })).items.map(p => p.id), ['1', '4'])
+    assert.deepEqual((await search('performers', { q: 'violinist', has_upcoming: 'true' })).items.map(p => p.id), ['1'])
+    assert.equal((await search('performers', { q: 'large id' })).items[0].id, '9007199254740993')
+    await db('performer_alias').insert([
+      { performer_id: 1, alias: 'A ranked prefix', normalized_alias: 'ranked prefix' },
+      { performer_id: 2, alias: 'An unranked substring', normalized_alias: 'unranked substring' },
+      { performer_id: 3, alias: 'Ranked', normalized_alias: 'ranked' },
+    ])
+    assert.deepEqual((await search('performers', { q: 'ranked' })).items.map(p => p.id), ['3', '1', '2'], 'alias relevance precedes alphabetical order')
+    result = await search('performers', { q: 'violinist', page_size: '1', page: '2' })
+    assert.equal(result.pagination.total, 2)
+    assert.equal(result.pagination.total_pages, 2)
+    assert.deepEqual(result.items.map(p => p.id), ['4'])
+    assert.deepEqual((await search('performers', { q: 'violinist', page: '10' })).items, [])
+    result = await search('venues', { q: 'hall', city_id: '1', country_code: 'CZ', has_upcoming: 'true' })
+    assert.equal(result.pagination.total, 1)
+    assert.equal(result.items[0].id, '1')
+    assert.deepEqual(result.items[0].city, { id: '1', name: 'Prague', country_code: 'CZ' })
+    assert.deepEqual(result.items[0].parent_venue, { id: '2', name: 'Building' })
+    assert.equal(result.items[0].address, 'Street 1')
+    assert.equal((await search('venues', { q: 'grand' })).items[0].id, '1')
+    assert.equal((await search('venues', { q: 'hall', country_code: 'DE' })).pagination.total, 0)
+    assert.equal((await search('venues', { q: 'building', has_upcoming: 'true' })).pagination.total, 0, 'parent venues do not implicitly include halls')
+    assert.equal((await search('cities', { q: 'Pra%' })).pagination.total, 0, 'LIKE metacharacters are literal')
+    assert.equal((await search('performers', { q: 'violin_st' })).pagination.total, 0)
+    // Non-URL retrieval must work for sources absent from the registry, too.
+    await db('classical_concert').insert({ id: 60, title: 'Unregistered', source: 'Unregistered source', source_url: 'https://unregistered.example/', url: 'https://unregistered.example/60', date: new Date(), city_id: 3, country_code_raw: 'DE', inclusion_status: 'included' })
+    await publishResolvedFixture(db)
+    result = await queryConcerts(db, parseInput({ city_id: '3' }))
+    assert.equal(result.concerts[0].source_id, null)
+    assert.equal(result.concerts[0].source_name, 'Unregistered source')
+    assert.equal(result.concerts[0].source_url, 'https://unregistered.example/')
+    assert.equal(result.concerts[0].country_code, 'DE')
+    assert.equal((await queryConcerts(db, parseInput({ country_code: 'US' }))).concerts[0].id, '32', 'raw country-only locations match')
   })
   await db.raw(`INSERT INTO classical_concert(id,title,url,source_url,date,inclusion_status) SELECT 100+n,'Export','https://example.com/'||n,'https://example.com/',CURRENT_DATE,'included' FROM generate_series(1,10001) n`)
   await publishResolvedFixture(db)

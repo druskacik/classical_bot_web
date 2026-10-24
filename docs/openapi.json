@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ClassicalBot Concert API",
-    "version": "1.0.0",
-    "description": "Unauthenticated organisation concert lookup. JSON and CSV use identical concert fields. CSV detail arrays are JSON text inside cells. Upcoming means today onward in UTC. State is currently unavailable."
+    "version": "1.1.0",
+    "description": "Unauthenticated concert discovery by organisation, country, city, performer and venue. Filters combine with AND. Entity lookup returns canonical ID strings. JSON and CSV use identical concert fields. CSV detail arrays are JSON text inside cells. Upcoming means today onward in UTC. State is currently unavailable."
   },
   "servers": [
     {
@@ -14,21 +14,81 @@
     }
   ],
   "paths": {
+    "/api/v1/cities": {
+      "get": {
+        "operationId": "searchCities", "summary": "Find canonical cities by English or local name", "security": [],
+        "description": "Read-only, case- and accent-insensitive substring search with literal punctuation. Known cities remain discoverable without upcoming concerts unless has_upcoming=true. IDs are internal canonical IDs, not external GeoNames IDs. Results are cached for up to 120 seconds. Unknown or repeated parameters are rejected. Limits are shared with the other v1 endpoints: 60 requests/minute/IP per process.",
+        "parameters": [
+          { "$ref": "#/components/parameters/SearchQuery" }, { "$ref": "#/components/parameters/CountryCode" },
+          { "$ref": "#/components/parameters/HasUpcoming" }, { "$ref": "#/components/parameters/LookupPage" }, { "$ref": "#/components/parameters/LookupPageSize" }
+        ],
+        "responses": {
+          "200": { "description": "Matched cities, or an empty collection.", "headers": { "X-Total-Count": { "schema": { "type": "integer" } }, "Link": { "schema": { "type": "string" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CityResponse" } } } },
+          "400": { "$ref": "#/components/responses/LookupError" }, "422": { "$ref": "#/components/responses/LookupError" },
+          "429": { "$ref": "#/components/responses/RetryError" }, "500": { "$ref": "#/components/responses/LookupError" }, "503": { "$ref": "#/components/responses/RetryError" }
+        }
+      },
+      "options": { "summary": "Public CORS preflight", "responses": { "204": { "description": "GET and OPTIONS allowed without credentials." } } }
+    },
+    "/api/v1/performers": {
+      "get": {
+        "operationId": "searchPerformers", "summary": "Find canonical performers by name or alias", "security": [],
+        "description": "Read-only normalized substring search of canonical names and stored aliases. Matches are case- and accent-insensitive. Includes people and ensembles without inferring membership; no nationality filter. Known performers remain discoverable without upcoming concerts unless has_upcoming=true. Results are cached for up to 120 seconds. Unknown or repeated parameters are rejected. Shares the v1 rate limit.",
+        "parameters": [
+          { "$ref": "#/components/parameters/SearchQuery" }, { "$ref": "#/components/parameters/HasUpcoming" },
+          { "$ref": "#/components/parameters/LookupPage" }, { "$ref": "#/components/parameters/LookupPageSize" }
+        ],
+        "responses": {
+          "200": { "description": "Matched performers, or an empty collection.", "headers": { "X-Total-Count": { "schema": { "type": "integer" } }, "Link": { "schema": { "type": "string" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PerformerResponse" } } } },
+          "400": { "$ref": "#/components/responses/LookupError" }, "422": { "$ref": "#/components/responses/LookupError" },
+          "429": { "$ref": "#/components/responses/RetryError" }, "500": { "$ref": "#/components/responses/LookupError" }, "503": { "$ref": "#/components/responses/RetryError" }
+        }
+      },
+      "options": { "summary": "Public CORS preflight", "responses": { "204": { "description": "GET and OPTIONS allowed without credentials." } } }
+    },
+    "/api/v1/venues": {
+      "get": {
+        "operationId": "searchVenues", "summary": "Find canonical venues by name or alias", "security": [],
+        "description": "Read-only normalized, case- and accent-insensitive substring search of canonical names and stored aliases. Optional city/country restrictions combine with AND. Known venues remain discoverable without upcoming concerts unless has_upcoming=true. Parent buildings do not implicitly include halls. Results are cached for up to 120 seconds. Unknown or repeated parameters are rejected. Shares the v1 rate limit.",
+        "parameters": [
+          { "$ref": "#/components/parameters/SearchQuery" }, { "$ref": "#/components/parameters/CountryCode" }, { "$ref": "#/components/parameters/CityId" },
+          { "$ref": "#/components/parameters/HasUpcoming" }, { "$ref": "#/components/parameters/LookupPage" }, { "$ref": "#/components/parameters/LookupPageSize" }
+        ],
+        "responses": {
+          "200": { "description": "Matched venues, or an empty collection.", "headers": { "X-Total-Count": { "schema": { "type": "integer" } }, "Link": { "schema": { "type": "string" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VenueResponse" } } } },
+          "400": { "$ref": "#/components/responses/LookupError" }, "422": { "$ref": "#/components/responses/LookupError" },
+          "429": { "$ref": "#/components/responses/RetryError" }, "500": { "$ref": "#/components/responses/LookupError" }, "503": { "$ref": "#/components/responses/RetryError" }
+        }
+      },
+      "options": { "summary": "Public CORS preflight", "responses": { "204": { "description": "GET and OPTIONS allowed without credentials." } } }
+    },
     "/api/v1/concerts": {
       "get": {
         "operationId": "listOrganisationConcerts",
-        "summary": "Upcoming concerts associated with an organisation website",
+        "summary": "Upcoming concerts matching composable organisation, location, performer and venue filters",
         "security": [],
         "parameters": [
           {
             "in": "query",
             "name": "url",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string",
               "maxLength": 4096
             },
-            "description": "Organisation HTTP(S) URL. Bare hostnames are accepted."
+            "description": "Organisation HTTP(S) URL. Bare hostnames are accepted. At least one of url, country_code, city_id, performer_id or venue_id is required."
+          },
+          { "$ref": "#/components/parameters/CountryCode" },
+          { "$ref": "#/components/parameters/CityId" },
+          {
+            "in": "query", "name": "performer_id", "required": false,
+            "schema": { "$ref": "#/components/schemas/EntityId" },
+            "description": "Exact credited performer ID; includes people and ensembles without inferred membership."
+          },
+          {
+            "in": "query", "name": "venue_id", "required": false,
+            "schema": { "$ref": "#/components/schemas/EntityId" },
+            "description": "Exact venue or hall ID. Parent buildings do not implicitly include their halls."
           },
           {
             "in": "query",
@@ -118,7 +178,7 @@
                 "schema": {
                   "type": "string"
                 },
-                "example": "\"artists\",\"date\",\"time\",\"venue_name\",\"city\",\"state\",\"country\",\"venue_address\",\"buy_url\",\"id\",\"title\",\"event_url\",\"end_time\",\"event_status\",\"last_verified_at\",\"country_code\",\"venue_id\",\"venue_url\",\"parent_venue_name\",\"latitude\",\"longitude\",\"programme\",\"programme_items\",\"composers\",\"performers\",\"prices\",\"price_items\",\"admission_type\",\"booking_kind\",\"booking_status\",\"on_sale_at\",\"source_id\",\"source_name\",\"source_url\",\"source_event_urls\"\r\n"
+                "example": "\"artists\",\"date\",\"time\",\"venue_name\",\"city\",\"state\",\"country\",\"venue_address\",\"buy_url\",\"id\",\"title\",\"event_url\",\"end_time\",\"event_status\",\"last_verified_at\",\"country_code\",\"city_id\",\"venue_id\",\"venue_url\",\"parent_venue_name\",\"latitude\",\"longitude\",\"programme\",\"programme_items\",\"composers\",\"performers\",\"prices\",\"price_items\",\"admission_type\",\"booking_kind\",\"booking_status\",\"on_sale_at\",\"source_id\",\"source_name\",\"source_url\",\"source_event_urls\"\r\n"
               }
             }
           },
@@ -205,7 +265,7 @@
             }
           },
           "503": {
-            "description": "DNS validation temporarily unavailable; no source registered.",
+            "description": "Concert catalogue or DNS validation temporarily unavailable. Retry later.",
             "content": {
               "application/json": {
                 "schema": {
@@ -215,7 +275,7 @@
             }
           }
         },
-        "description": "When registration is enabled, unknown public websites are DNS-validated and queued at priority 100. When enabled, this GET can create a source or raise an existing pending, processing, pr_open, retry_wait, or active source to at least priority 100, preserving higher priorities and retry timing. Aliases and duplicates promote the resolved primary source. Disabled registration keeps lookup read-only. Repeat the same request to poll registry status; active does not imply completed concert enrichment."
+        "description": "Supply at least one of url, country_code, city_id, performer_id or venue_id. All supplied filters combine with AND. Unknown IDs or contradictory filters return an empty collection. Requests without url are read-only and have source: null; every concert has its own attribution. Next links retain every filter. When url is supplied and registration is enabled, unknown public websites are DNS-validated and queued at priority 100. When enabled, this GET can create a source or raise an existing pending, processing, pr_open, retry_wait, or active source to at least priority 100, preserving higher priorities and retry timing. Aliases and duplicates promote the resolved primary source. Disabled registration keeps lookup read-only. Repeat the same request to poll registry status; active does not imply completed concert enrichment."
       },
       "options": {
         "summary": "Public CORS preflight",
@@ -228,7 +288,138 @@
     }
   },
   "components": {
+    "responses": {
+      "LookupError": {
+        "description": "JSON error: invalid_parameter (400), export_too_large if a serialized page exceeds 20 MiB (422), or internal_error (500).",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "RetryError": {
+        "description": "JSON error: rate_limited (429) or catalogue_unavailable (503).",
+        "headers": { "Retry-After": { "schema": { "type": "integer" }, "description": "Seconds before retrying" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+    "parameters": {
+      "CountryCode": {
+        "in": "query", "name": "country_code", "required": false,
+        "schema": { "type": "string", "pattern": "^[A-Za-z]{2}$" },
+        "description": "ISO alpha-2 concert/entity location code, normalized to uppercase; not performer nationality."
+      },
+      "CityId": {
+        "in": "query", "name": "city_id", "required": false,
+        "schema": { "$ref": "#/components/schemas/EntityId" },
+        "description": "Exact canonical city ID; not a GeoNames ID. No nearby-city expansion."
+      },
+      "SearchQuery": {
+        "in": "query", "name": "q", "required": true,
+        "schema": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "description": "Nonblank searchable text. Normalized substring search; no typo correction. Exact matches rank before prefixes and other substrings, then name and ID."
+      },
+      "HasUpcoming": {
+        "in": "query", "name": "has_upcoming", "required": false,
+        "schema": { "type": "boolean", "default": false },
+        "description": "Restrict to identities linked to a published upcoming concert. Exact city/venue/credited-performer semantics."
+      },
+      "LookupPage": {
+        "in": "query", "name": "page", "required": false,
+        "schema": { "type": "integer", "minimum": 1, "maximum": 1000000, "default": 1 }
+      },
+      "LookupPageSize": {
+        "in": "query", "name": "page_size", "required": false,
+        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+      }
+    },
     "schemas": {
+      "EntityId": {
+        "type": "string", "pattern": "^[1-9][0-9]{0,18}$", "maxLength": 19,
+        "description": "Positive PostgreSQL bigint ID, maximum 9223372036854775807. Preserve as a string."
+      },
+      "City": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "local_name", "country_code", "latitude", "longitude", "external_source", "external_id"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/EntityId" },
+          "name": { "type": ["string", "null"] },
+          "local_name": { "type": ["string", "null"] },
+          "country_code": { "type": ["string", "null"] },
+          "latitude": { "type": ["number", "null"] },
+          "longitude": { "type": ["number", "null"] },
+          "external_source": { "type": ["string", "null"] },
+          "external_id": { "type": ["string", "null"], "description": "External identity, e.g. GeoNames; do not substitute for city_id." }
+        }
+      },
+      "Performer": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "kind", "ensemble_type", "identity_url"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/EntityId" },
+          "name": { "type": ["string", "null"] },
+          "kind": { "type": ["string", "null"] },
+          "ensemble_type": { "type": ["string", "null"] },
+          "identity_url": { "type": ["string", "null"] }
+        }
+      },
+      "Venue": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "country_code", "city", "address", "identity_url", "latitude", "longitude", "parent_venue"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/EntityId" },
+          "name": { "type": ["string", "null"] },
+          "country_code": { "type": ["string", "null"] },
+          "city": {
+            "type": ["object", "null"], "additionalProperties": false, "required": ["id", "name", "country_code"],
+            "properties": {
+              "id": { "$ref": "#/components/schemas/EntityId" },
+              "name": { "type": ["string", "null"] },
+              "country_code": { "type": ["string", "null"] }
+            }
+          },
+          "address": { "type": ["string", "null"] },
+          "identity_url": { "type": ["string", "null"] },
+          "latitude": { "type": ["number", "null"] },
+          "longitude": { "type": ["number", "null"] },
+          "parent_venue": {
+            "type": ["object", "null"], "additionalProperties": false, "required": ["id", "name"],
+            "properties": {
+              "id": { "$ref": "#/components/schemas/EntityId" },
+              "name": { "type": ["string", "null"] }
+            }
+          }
+        }
+      },
+      "EntityPagination": {
+        "type": "object", "additionalProperties": false,
+        "required": ["page", "page_size", "total", "total_pages", "next"],
+        "properties": {
+          "page": { "type": "integer" }, "page_size": { "type": "integer" },
+          "total": { "type": "integer" }, "total_pages": { "type": "integer" },
+          "next": { "type": ["string", "null"] }
+        }
+      },
+      "CityResponse": {
+        "type": "object", "additionalProperties": false, "required": ["items", "pagination", "generated_at"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/City" } },
+          "pagination": { "$ref": "#/components/schemas/EntityPagination" },
+          "generated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PerformerResponse": {
+        "type": "object", "additionalProperties": false, "required": ["items", "pagination", "generated_at"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/Performer" } },
+          "pagination": { "$ref": "#/components/schemas/EntityPagination" },
+          "generated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "VenueResponse": {
+        "type": "object", "additionalProperties": false, "required": ["items", "pagination", "generated_at"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/Venue" } },
+          "pagination": { "$ref": "#/components/schemas/EntityPagination" },
+          "generated_at": { "type": "string", "format": "date-time" }
+        }
+      },
       "Concert": {
         "type": "object",
         "additionalProperties": false,
@@ -249,6 +440,7 @@
           "event_status",
           "last_verified_at",
           "country_code",
+          "city_id",
           "venue_id",
           "venue_url",
           "parent_venue_name",
@@ -371,6 +563,11 @@
               "null"
             ],
             "pattern": "^[A-Z]{2}$"
+          },
+          "city_id": {
+            "type": ["string", "null"],
+            "pattern": "^[0-9]+$",
+            "description": "Canonical city ID, distinct from any external GeoNames identifier."
           },
           "venue_id": {
             "type": [
@@ -700,7 +897,8 @@
             "format": "date-time"
           },
           "source_id": {
-            "type": "string",
+            "description": "Resolved registry ID; nullable for unregistered or ambiguous attribution on requests without url.",
+            "type": ["string", "null"],
             "pattern": "^[0-9]+$"
           },
           "source_name": {
@@ -720,7 +918,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Organisation event links retained through deduplication."
+            "description": "With url: matched organisation event links. Without url: links from all eligible occurrences of this deduplicated concert."
           }
         }
       },
@@ -735,7 +933,8 @@
         ],
         "properties": {
           "source": {
-            "type": "object",
+            "description": "Resolved requested organisation when filtering by url; null otherwise.",
+            "type": ["object", "null"],
             "additionalProperties": false,
             "required": [
               "id",

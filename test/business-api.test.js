@@ -138,4 +138,16 @@ test('OpenAPI field names and ordering match the shared concert contract', () =>
     assert.equal(spec.components.schemas.Concert.properties[name].type, 'array')
   }
   assert.ok(spec.paths['/api/v1/concerts'].get.responses['200'].content['text/csv'])
+  assert.equal(spec.paths['/api/v1/concerts'].get.parameters.find(p => p.name === 'url').required, false)
+  assert.deepEqual(spec.components.schemas.ConcertResponse.properties.source.type, ['object', 'null'])
+  for (const [path, schema] of [['cities', 'CityResponse'], ['performers', 'PerformerResponse'], ['venues', 'VenueResponse']]) {
+    assert.equal(spec.paths[`/api/v1/${path}`].get.responses['200'].content['application/json'].schema.$ref, `#/components/schemas/${schema}`)
+    assert.ok(spec.paths[`/api/v1/${path}`].options.responses['204'])
+  }
+  const checkReferences = value => {
+    if (!value || typeof value !== 'object') return
+    if (value.$ref) assert.ok(value.$ref.slice(2).split('/').reduce((node, key) => node?.[key], spec), `Missing reference ${value.$ref}`)
+    Object.values(value).forEach(checkReferences)
+  }
+  checkReferences(spec)
 })

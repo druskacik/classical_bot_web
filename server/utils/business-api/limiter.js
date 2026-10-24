@@ -1,4 +1,6 @@
 import { fail } from './contract.js'
+// Shared by the public v1 routes; handler factories can inject isolated test limiters.
+export const businessApiLimiter = createLimiter()
 export function createLimiter(now = Date.now) {
   const clients = new Map()
   let exports = 0
