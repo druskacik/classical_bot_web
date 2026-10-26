@@ -12,13 +12,52 @@ Use Node.js 24 LTS, install dependencies with `npm ci`, and run the application 
 npm run dev
 ```
 
-Validate the application and create a production build with:
+Validate both applications and all test coverage with:
 
 ```bash
-npm run typecheck
-npm test
-npm run build
+npm run check
 ```
+
+## Test workflow
+
+Use Node from `.nvmrc` and install dependencies with `npm ci`.
+
+| Command | Coverage and prerequisites |
+| --- | --- |
+| `npm test` | Tests without PostgreSQL or a production build; permits local HTTP listeners and subprocesses |
+| `npm run test:integration` | Business API queries, recommendation queries, city discovery, and alerts; requires PostgreSQL binaries |
+| `npm run test:startup` | Builds the root app, then checks maintenance and recommendation startup; requires PostgreSQL binaries |
+| `npm run check` | All groups, both typechecks, and both production builds; each app builds once |
+
+Install PostgreSQL as a normal local prerequisite and put `initdb` and `pg_ctl`
+on `PATH`. On Ubuntu 22.04, install `postgresql-14` and run
+`export PATH="/usr/lib/postgresql/14/bin:$PATH"`. Run checks as a non-root user.
+Local PostgreSQL and HTTP sockets, subprocess execution, and temporary-directory
+writes must be permitted; a restrictive sandbox may require running these checks
+outside it. Missing prerequisites fail with an explanation rather than skipping
+coverage. `npm test` remains usable without PostgreSQL.
+
+Each database suite creates its own temporary cluster with UTC timezone and a
+unique Unix socket directory; TCP listening is disabled. Tests never accept an
+application DSN or load `.env`; built servers run from private temporary working
+directories with complete synthetic database settings. Pools, spawned servers, and clusters
+are closed during teardown, including failed setup. Fixture schemas are test-only
+snapshots; migrations remain owned by `classical_bot`. The frozen alert fixture
+records its source migration in `test-support/alert-schema.sql` and must be
+regenerated from that migration when its schema contract changes. Runtime tests
+need neither the sibling checkout nor Python. Email delivery is mocked.
+
+`test-support/test-groups.json` assigns every test file to exactly one group.
+Add new tests there; unclassified, duplicate, or missing files fail validation.
+Skipped, TODO, cancelled, empty, and failed groups also fail. Direct `node --test`
+commands are useful for diagnosis but bypass these group-level coverage guards.
+There are no environment flags needed to enable database or startup coverage.
+
+`npm run check` writes command output to `logs/check/`. GitHub Actions runs the
+same command on pull requests and pushes to `master`, using Node from `.nvmrc`
+and PostgreSQL 14 without application secrets. Failed-run logs are retained for
+seven days. Making the Validate check mandatory requires configuring GitHub
+branch protection separately.
 
 ## Maintenance mode
 
@@ -46,10 +85,10 @@ that optional warm-up completes; data endpoints still require a ready database
 and published catalogue. There is no admin bypass or separate public maintenance
 route.
 
-After building, verify maintenance startup against an isolated fake database with:
+Verify maintenance startup against an isolated fake database with:
 
 ```bash
-TEST_MAINTENANCE_STARTUP=1 node --test test/maintenance.test.js test/maintenance-startup.test.js
+npm run test:startup
 ```
 
 ## Local Lighthouse audits
@@ -175,9 +214,8 @@ miss and a bypass. Counters reset after reporting; `retainedEntries` and
 `retainedBytes` report current gauges. Logs contain no keys, filters, result
 contents, or credentials. The reporting timer is stopped on application shutdown.
 
-Validate with `npm test`, both type checks, and both builds. For a production
-smoke test, start both preview servers and request the same concert, country,
-source, and filter API URLs twice, plus `/` on both sites and the Slovak city
+Validate with `npm run check`. For a production smoke test, start both preview
+servers and request the same concert, country, source, and filter API URLs twice, plus `/` on both sites and the Slovak city
 directory. Responses must retain their existing shape and geographic scope;
 the next metrics summary should show hits after initial misses. Repeat with the
 switch disabled to confirm bypasses. After deployment, compare load counts,
@@ -214,12 +252,10 @@ database requirement. Development loads recommendations on demand; the separate
 classical.sk server has no startup warm-up.
 
 `[composer-recommendations]` logs calculation duration, the number of composers
-with rankings, and failures. Validate query fixtures with
-`node --test test/composer-recommendations.test.js` (requires local PostgreSQL).
-After `npm run build`, also run
-`TEST_COMPOSER_STARTUP=1 node --test test/composer-recommendations.test.js` to test
-the real production listener against an isolated database, including failed and
-timed-out warm-ups. This test never connects to the application database.
+with rankings, and failures. Run `npm run test:integration` for query fixtures and
+`npm run test:startup` for production listener checks, including failed and
+timed-out warm-ups. The startup command builds the root application first. Both use isolated databases
+and never connect to the application database.
 
 ## Run both websites locally
 

@@ -1,0 +1,45 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install PostgreSQL 14 binaries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-14
+          echo /usr/lib/postgresql/14/bin >> "$GITHUB_PATH"
+      - name: Install dependencies
+        run: |
+          mkdir -p logs/check
+          npm ci 2>&1 | tee logs/check/install.log
+      - name: Validate both applications and all test groups
+        run: npm run check
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: validation-logs
+          path: logs/check/*.log
+          retention-days: 7
+          if-no-files-found: ignore

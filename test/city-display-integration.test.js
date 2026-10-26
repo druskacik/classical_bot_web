@@ -4,22 +4,10 @@ import { composerPath, composerConcertLocation } from '../shared/utils/composers
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { registerHooks } from 'node:module'
-import { randomUUID } from 'node:crypto'
-import knex from 'knex'
+import { createTestDatabase } from '../test-support/postgres.js'
 
-const url = process.env.CITY_DISPLAY_TEST_DATABASE_URL
-if (url) {
-  const parsed = new URL(url)
-  assert.ok(['localhost', '127.0.0.1'].includes(parsed.hostname))
-  assert.ok(parsed.pathname.startsWith('/test_city_display_names'))
-}
-
-test('city discovery labels and identities against disposable PostgreSQL', { skip: !url }, async t => {
-  const schema = `city_display_web_${randomUUID().replaceAll('-', '')}`
-  const admin = knex({ client: 'pg', connection: url })
-  await admin.raw(`CREATE SCHEMA ${schema}`)
-  const db = knex({ client: 'pg', connection: { connectionString: url, options: `-csearch_path=${schema}` } })
-  t.after(async () => { await db.destroy(); await admin.raw('DROP SCHEMA IF EXISTS serving CASCADE'); await admin.raw(`DROP SCHEMA ${schema} CASCADE`); await admin.destroy() })
+test('city discovery labels and identities against disposable PostgreSQL', async t => {
+  const { db } = await createTestDatabase(t)
   const oldCache = process.env.SERVER_DATA_CACHE_ENABLED
   process.env.SERVER_DATA_CACHE_ENABLED = 'false'
   t.after(() => { if (oldCache === undefined) delete process.env.SERVER_DATA_CACHE_ENABLED; else process.env.SERVER_DATA_CACHE_ENABLED = oldCache })

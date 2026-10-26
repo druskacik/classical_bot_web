@@ -53,12 +53,18 @@ Rollback is feature-disable plus a forward fix, not schema downgrade or old-code
 
 ## Validation
 
-`npm test` is database-free by default. Integration tests never load `.env` and require a localhost database named `concert_alert_test`; they delete/recreate its public schema. Generate `/tmp/alert-schema.sql` from current `db.alert_models.register_alert_tables` metadata, then run:
+Run the self-contained database suite with:
 
 ```sh
-ALERT_TEST_DATABASE_URL=postgresql://USER@127.0.0.1:PORT/concert_alert_test \
-ALERT_TEST_SCHEMA_SQL=/tmp/alert-schema.sql \
-node --test test/alerts.test.js test/alerts-integration.test.js
+npm run test:integration
 ```
+
+The runner requires `initdb` and `pg_ctl` on `PATH` and fails if they are missing.
+It provisions a private, temporary PostgreSQL cluster with no TCP listener and
+loads the frozen `test-support/alert-schema.sql` fixture. No `.env`, database URL,
+manual schema generation, sibling checkout, or email service is needed. The
+fixture's header records its source migration and regeneration procedure;
+production migrations remain owned by `classical_bot`. For the complete local
+and CI workflow, including startup checks, run `npm run check`.
 
 Coverage includes independent confirmation, duplicate/concurrent saves, ownership, stable and legacy links, combined delivery, overlap, baselines, late enrichment, subscriber history, pagination, overflow, canonical records, retry/held outcomes, expiry, and unsubscribe-all. The crawler schema test checks frozen migration/model consistency. The combined migration is validated through upgrade, downgrade, and re-upgrade on a separate disposable PostgreSQL database. UI verification uses Playwright MCP against synthetic local data.

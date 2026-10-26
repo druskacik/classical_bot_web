@@ -12,14 +12,17 @@
     "lighthouse": "node agent_utils/run_lighthouse.mjs",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "test": "node --test",
+    "test": "node agent_utils/run_tests.mjs default",
     "typecheck": "nuxt prepare && vue-tsc -b --noEmit",
     "db:query": "node agent_utils/search_db.js",
     "dev:sk": "nuxt dev apps/classical-sk --dotenv ../../.env --port 3001",
     "build:sk": "nuxt build apps/classical-sk --dotenv ../../.env",
     "preview:sk": "nuxt preview apps/classical-sk --dotenv ../../.env --port 3001",
     "typecheck:sk": "nuxt prepare apps/classical-sk && vue-tsc -b apps/classical-sk/tsconfig.json --noEmit",
-    "test:sites": "node agent_utils/check_sites.mjs"
+    "test:sites": "node agent_utils/check_sites.mjs",
+    "test:integration": "node agent_utils/run_tests.mjs integration",
+    "test:startup": "npm run build && node agent_utils/run_tests.mjs startup",
+    "check": "node agent_utils/check.mjs"
   },
   "dependencies": {
     "@nuxt/content": "^3.15.2",

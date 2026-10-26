@@ -3,11 +3,17 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 import { once } from 'node:events'
-import { readdir } from 'node:fs/promises'
+import { readdir, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 test('maintenance skips PostgreSQL; normal HTTP starts even when PostgreSQL is unavailable', {
-  skip: process.env.TEST_MAINTENANCE_STARTUP !== '1', timeout: 20_000,
+  timeout: 20_000,
 }, async t => {
+  // Run the built app outside the checkout so runtime dotenv cannot read .env.
+  const directory = await mkdtemp(join(tmpdir(), 'cb-startup-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
   let databaseConnections = 0
   const database = createServer(socket => { databaseConnections++; socket.destroy() })
   database.listen(0, '127.0.0.1')
@@ -20,9 +26,10 @@ test('maintenance skips PostgreSQL; normal HTTP starts even when PostgreSQL is u
     await once(reservation, 'listening')
     const port = reservation.address().port
     await new Promise(resolve => reservation.close(resolve))
-    const child = spawn(process.execPath, ['.output/server/index.mjs'], {
+    const child = spawn(process.execPath, [fileURLToPath(new URL('../.output/server/index.mjs', import.meta.url))], {
+      cwd: directory,
       env: { ...process.env, NODE_ENV: 'production', HOST: '127.0.0.1', PORT: String(port),
-        NUXT_MAINTENANCE_MODE: flag, NUXT_PUBLIC_ALERTS_ENABLED: 'true',
+        NITRO_PORT: '', NUXT_MAINTENANCE_MODE: flag, NUXT_PUBLIC_ALERTS_ENABLED: 'true',
         NUXT_DB_HOST: '127.0.0.1', NUXT_DB_PORT: String(database.address().port),
         NUXT_DB_NAME: 'maintenance_test', NUXT_DB_USER: 'maintenance_test', NUXT_DB_PASS: '',
       }, stdio: ['ignore', 'pipe', 'pipe'],

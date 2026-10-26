@@ -4,11 +4,7 @@ import { matching, concertDetails } from '../server/utils/alerts/criteria.js'
 import { parseConcertFilters } from '../layers/concerts/server/utils/concert-filters.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import knex from 'knex'
+import { createTestDatabase } from '../test-support/postgres.js'
 import { createSourceOnboarding, registerSource } from '../server/utils/business-api/onboarding.js'
 import { queryConcerts } from '../server/utils/business-api/query-concerts.js'
 import { parseInput } from '../server/utils/business-api/contract.js'
@@ -16,18 +12,7 @@ import { parseEntityInput, queryEntitySnapshot } from '../server/utils/business-
 
 // An isolated PostgreSQL cluster, never the application database or .env.
 test('PostgreSQL query preserves source connections, primary visibility, dates and relation cardinality', async t => {
-  try { execFileSync('initdb',['--version'],{stdio:'ignore'}) } catch { t.skip('PostgreSQL initdb is required for this integration test');return }
-  const dir=mkdtempSync(join(tmpdir(),'concert-api-pg-'))
-  let running=false,db
-  t.after(async()=>{
-    await db?.destroy()
-    if(running)execFileSync('pg_ctl',['-D',join(dir,'data'),'-m','immediate','-w','stop'],{stdio:'ignore'})
-    rmSync(dir,{recursive:true,force:true})
-  })
-  execFileSync('initdb',['-D',join(dir,'data'),'-A','trust','--no-locale','-E','UTF8'],{stdio:'ignore'})
-  execFileSync('pg_ctl',['-D',join(dir,'data'),'-l',join(dir,'postgres.log'),'-o',`-h '' -k ${dir} -p 55439 -F`,'-w','start'],{stdio:'ignore'})
-  running=true
-  db=knex({client:'pg',connection:{host:dir,port:55439,database:'postgres'},pool:{min:0,max:2}})
+  const { db } = await createTestDatabase(t)
   await db.raw(`
     SET TIME ZONE 'UTC';
     CREATE TABLE crawler_source(id bigint primary key,canonical_url text,duplicate_of_id bigint);

@@ -2,18 +2,17 @@ import { installResolvedFixture, publishResolvedFixture } from '../test-support/
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import knex from 'knex'
+import { createTestDatabase } from '../test-support/postgres.js'
 import { requestAlert, confirmAlert, saveAlert, listAlerts, getSubscriber, removeAlert, unsubscribe } from '../server/utils/alerts/service.js'
 import { criteria } from '../server/utils/alerts/criteria.js'
 import { runAlerts } from '../server/utils/alerts/worker.js'
 import { hash, managementToken } from '../server/utils/alerts/core.js'
-const url = process.env.ALERT_TEST_DATABASE_URL, schema = process.env.ALERT_TEST_SCHEMA_SQL
-if (url) { assert.ok(['localhost','127.0.0.1'].includes(new URL(url).hostname)); assert.equal(new URL(url).pathname,'/concert_alert_test') }
-test('multiple alerts and combined delivery against disposable PostgreSQL', {skip:!url || !schema}, async t => {
+test('multiple alerts and combined delivery against disposable PostgreSQL', async t => {
+  const oldSecret = process.env.ALERTS_TOKEN_SECRET
   process.env.ALERTS_TOKEN_SECRET='local-test-only-'.repeat(4)
-  const db=knex({client:'pg',connection:url}); t.after(()=>db.destroy())
-  await db.raw('DROP SCHEMA IF EXISTS serving CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public')
-  await db.raw(await readFile(schema,'utf8'))
+  t.after(() => { if (oldSecret === undefined) delete process.env.ALERTS_TOKEN_SECRET; else process.env.ALERTS_TOKEN_SECRET = oldSecret })
+  const { db } = await createTestDatabase(t)
+  await db.raw(await readFile(new URL('../test-support/alert-schema.sql', import.meta.url), 'utf8'))
   await db.raw(`CREATE TABLE city (id bigint primary key, english_name text, local_name text, country_code text, latitude double precision, longitude double precision);
     CREATE TABLE classical_concert (id serial primary key, title text default 'Concert', url text default 'https://example.org/event', date date default (CURRENT_DATE + 30), time_from time, venue text, city_id bigint, city_raw text, country_code_resolved text, country_code_raw text, inclusion_status text default 'included', duplicate_of_id integer);
     CREATE TABLE composer (id serial primary key, name text);
