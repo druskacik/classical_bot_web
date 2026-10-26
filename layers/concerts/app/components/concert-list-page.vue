@@ -10,7 +10,7 @@
         ref="filterControls"
         :radius="radius"
         :area-query="activeAreaQuery"
-        :bounds="firstValue(concertQuery.bounds) || null"
+        :bounds="concertQuery.bounds || null"
         @city-radius="changeCityRadius"
         :countries="filterCountries"
         :countries-loading="countryOptionsStatus === 'pending'"
@@ -119,9 +119,8 @@
 const { t, locale, plural } = useConcertText()
 import { concertMapLocation, cityRadiusLocation, updateConcertQuery } from '../utils/concert-discovery.js'
 import { concertListPresentation, concertLocationKey } from '../utils/concert-list-presentation.js'
-import { AREA_KEYS } from '../../shared/utils/concert-area.js'
 import { createConcertDateFormatting } from '../utils/concert-dates.js'
-import { composerSelections, serializeComposerSelections, firstQueryValue as firstValue, querySelections as listValue, hasCoordinateQuery } from '../../shared/utils/concert-query.js'
+import { useConcertListing } from '../composables/useConcertListing.js'
 import { useConcertQuery } from '../composables/useConcertQuery.js'
 import { isSubjectDiscoveryQuery, subjectMatchesQuery, subjectMetadata, subjectListingPath } from '../../shared/utils/subject-discovery.js'
 const props = defineProps({
@@ -140,72 +139,17 @@ const resultsHeading = ref(null)
 const filterControls = ref(null)
 const { query: concertQuery, update: updateQuery } = useConcertQuery(route, router)
 
-const activeAreaQuery = computed(() => Object.fromEntries(AREA_KEYS.filter(key => concertQuery.value[key] !== undefined).map(key => [key, concertQuery.value[key]])))
-const unresolvedArea = computed(() => hasCoordinateQuery(concertQuery.value))
-const radius = computed(() => Number(concertQuery.value.radius) || 0)
-const filters = computed(() => ({
-  country: props.countryCode || firstValue(concertQuery.value.country) || null,
-  city: props.cityPage?.id || props.cityPage?.filterValue || firstValue(concertQuery.value.city) || null,
-  dateFrom: firstValue(concertQuery.value.dateFrom) || null,
-  dateTo: firstValue(concertQuery.value.dateTo) || null,
-  datePreset: firstValue(concertQuery.value.datePreset) || null,
-  composers: composerSelections(concertQuery.value.composers),
-  works: listValue(concertQuery.value.works),
-}))
+const {
+  activeAreaQuery, unresolvedArea, radius, filters, requestParams, countries,
+  concertPage, concertStatus, concertError, refreshConcerts, countryOptionsStatus, refreshCountryOptions,
+  filterCountries, displayPage, ready,
+} = useConcertListing(props, concertQuery)
+await ready
 
 const hasRemovableFilters = computed(() => Boolean(
   unresolvedArea.value || filters.value.dateFrom || filters.value.dateTo || filters.value.composers.length || filters.value.works.length,
 ))
-
-const requestParams = computed(() => ({
-  ...activeAreaQuery.value,
-  bounds: concertQuery.value.bounds,
-  radius: concertQuery.value.radius,
-  country: unresolvedArea.value || radius.value ? undefined : filters.value.country || undefined,
-  city: unresolvedArea.value ? undefined : filters.value.city || undefined,
-  dateFrom: filters.value.dateFrom || undefined,
-  dateTo: filters.value.dateTo || undefined,
-  composers: filters.value.composers.length ? serializeComposerSelections(filters.value.composers) : undefined,
-  works: filters.value.works.length ? filters.value.works.join(',') : undefined,
-  // Preserve invalid page values for API validation instead of silently serving page one.
-  page: firstValue(concertQuery.value.page),
-}))
-
-const countriesRequest = useCountries()
-const concertsRequest = useAsyncData(
-  computed(() => `concerts:${JSON.stringify(requestParams.value)}`),
-  async () => {
-    const displayQuery = { ...requestParams.value }
-    const page = await $fetch('/api/get-concerts', { params: displayQuery })
-    return { ...page, displayQuery }
-  },
-)
-const [
-  { data: countries },
-  { data: concertPage, status: concertStatus, error: concertError, refresh: refreshConcerts },
-] = await Promise.all([countriesRequest, concertsRequest])
-
-const countryOptionParams = computed(() => ({
-  ...activeAreaQuery.value,
-  bounds: concertQuery.value.bounds,
-  ...(radius.value && !unresolvedArea.value ? { city: filters.value.city, radius: String(radius.value) } : {}),
-  type: 'country',
-  dateFrom: requestParams.value.dateFrom,
-  dateTo: requestParams.value.dateTo,
-  composers: requestParams.value.composers,
-  works: requestParams.value.works,
-  selected: filters.value.country || undefined,
-}))
-const { data: countryOptions, status: countryOptionsStatus, refresh: refreshCountryOptions } = await useAsyncData(
-  computed(() => `country-options:${JSON.stringify(countryOptionParams.value)}`),
-  () => props.countryCode ? Promise.resolve({ items: [] }) : $fetch('/api/get-concert-filter-options', { params: countryOptionParams.value }),
-)
 const emptyResults = computed(() => concertStatus.value === 'success' && concertPage.value?.total === 0)
-const filterCountries = computed(() => {
-  if (countryOptionsStatus.value === 'success') return (countryOptions.value?.items || []).map(item => ({ code: item.value, name: item.label, count: item.count }))
-  const selected = countries.value?.find(item => item.code === filters.value.country)
-  return selected ? [{ ...selected, count: null }] : []
-})
 
 const cityParentPath = computed(() => countries.value?.some(country => country.code === props.countryCode)
   ? props.cityPage?.countryPath || '/'
@@ -215,16 +159,10 @@ if (concertError.value) {
   throw createError({ statusCode: concertError.value.statusCode || 500, statusMessage: t('Concerts could not be loaded') })
 }
 const approvedSubjectQuery = computed(() => concertSite.subjectDiscovery && isSubjectDiscoveryQuery(route.query))
-// Keep resolved labels across refreshes, but only use them for matching selections.
-const lastDisplayPage = shallowRef(concertPage.value)
-watch(concertPage, page => {
-  if (!page) return
-  lastDisplayPage.value = page
-}, { immediate: true, flush: 'sync' })
 const presentation = computed(() => {
   if (!concertSite.subjectDiscovery) return null
   const query = requestParams.value
-  const page = lastDisplayPage.value
+  const page = displayPage.value
   const sameLocation = concertLocationKey(query) === concertLocationKey(page?.displayQuery)
   const fixedCity = props.cityPage && !radius.value && !unresolvedArea.value
     ? { label: props.cityPage.name, countryCode: props.cityPage.countryCode } : null
@@ -282,15 +220,9 @@ const paginationItems = computed(() => {
   return items
 })
 
-const updateFilter = async ({ key, value, changes }) => {
-  await updateQuery(changes || { [key]: value })
-}
-
-const changeCityRadius = async ({ city, radius }) => { await router.push(cityRadiusLocation(concertQuery.value, city, radius)) }
-
-const clearFilters = async () => {
-  await router.push({ query: {} })
-}
+const updateFilter = ({ key, value, changes }) => updateQuery(changes || { [key]: value })
+const changeCityRadius = ({ city, radius }) => router.push(cityRadiusLocation(concertQuery.value, city, radius))
+const clearFilters = () => router.push({ query: {} })
 
 const pageHref = page => discoveryMeta.value ? subjectListingPath(
   props.cityPage?.path || props.canonicalPath || route.path, concertPage.value.discovery.subject, page,

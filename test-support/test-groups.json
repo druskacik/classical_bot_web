@@ -20,6 +20,7 @@
     "concert-discovery.test.js",
     "concert-filters.test.js",
     "concert-list-presentation.test.js",
+    "concert-listing.test.js",
     "concert-map-navigation.test.js",
     "concert-map.test.js",
     "concert-programme.test.js",

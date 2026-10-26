@@ -3,6 +3,7 @@ import { useConcertDateFilter } from '../layers/concerts/app/composables/useConc
 import { compileComponent, renderer } from '../test-support/vue.js'
 import * as queryHelpers from '../layers/concerts/shared/utils/concert-query.js'
 import { useConcertQuery } from '../layers/concerts/app/composables/useConcertQuery.js'
+import { useConcertListing } from '../layers/concerts/app/composables/useConcertListing.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as Vue from 'vue'
@@ -30,8 +31,14 @@ async function mount(path, props, route = Vue.reactive({ query: {} }), fetcher =
       return mediaQueries.get(query)
     },
   }
+  const previous = { useAsyncData: globalThis.useAsyncData, $fetch: globalThis.$fetch }
+  globalThis.$fetch = fetcher
+  globalThis.useAsyncData = (key, handler) => {
+    dataRequests.push({ key, handler })
+    return { data: Vue.ref(key === 'countries' ? [] : { items: [] }), status: Vue.ref('success'), error: Vue.ref(null), refresh() {} }
+  }
   const component = compileComponent(path, {
-    ...discovery, ...subjectDiscovery, ...presentation, ...area, ...map, ...dates, ...queryHelpers, useConcertQuery, useConcertMapNavigation, useConcertDateFilter,
+    ...discovery, ...subjectDiscovery, ...presentation, ...area, ...map, ...dates, ...queryHelpers, useConcertQuery, useConcertListing, useConcertMapNavigation, useConcertDateFilter,
     onMounted: callback => mounted.push(callback), window: browserWindow, $fetch: fetcher,
     useRoute: () => route,
     useRouter: () => ({ push: location => { route.query = location.query }, replace: location => { route.query = location.query },
@@ -39,17 +46,17 @@ async function mount(path, props, route = Vue.reactive({ query: {} }), fetcher =
     useAppConfig: () => ({ concertSite: site }),
     definePageMeta() {}, useConcertListSeo() {}, useRequestEvent: () => undefined,
     useCountries: () => Promise.resolve({ data: Vue.ref([]) }),
-    useAsyncData: (key, handler) => {
-      dataRequests.push({ key, handler })
-      return { data: Vue.ref({ items: [] }), status: Vue.ref('success'), error: Vue.ref(null), refresh() {} }
-    },
+    useAsyncData: globalThis.useAsyncData,
   })
   let result
   const app = renderer.createApp({ setup() { result = component.setup(props, { emit() {}, expose() {} }); return () => null } })
   app.mount({ children: [] })
   const state = await result
   const ready = Promise.all(mounted.map(callback => callback()))
-  return { state, ready, dataRequests, unmount: () => app.unmount() }
+  return { state, ready, dataRequests, unmount: () => {
+    app.unmount()
+    for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete globalThis[key]; else globalThis[key] = value }
+  } }
 }
 
 test('music autocomplete retains coordinate and city areas with the canonical radius format', async () => {
@@ -226,23 +233,6 @@ test('coordinate and unresolved city selections can be cleared back to the lates
     } finally { view.unmount() }
   }
   assert.equal(createConcertText('sk-SK').t('Selected area ({radius} km radius)', { radius: 50 }), 'Vybraná oblasť (okruh 50 km)')
-})
-
-test('fixed-city radius requests use the page origin and omit the exact-country constraint', async () => {
-  for (const cityPage of [{ id: '25', countryCode: 'AT', path: '/austria/vienna' }, { id: '2', countryCode: 'SK', path: '/Bratislava' }]) {
-    const route = Vue.reactive({ path: cityPage.path, query: { radius: '50', page: '2', composers: 'Bach' } })
-    const requests = []
-    assert.equal(discovery.normalizeAreaLocation(route.path, route.query), null)
-    const view = await mount('../layers/concerts/app/components/concert-list-page.vue', { title: 'City concerts', countryCode: cityPage.countryCode, cityPage }, route, async (url, { params }) => { requests.push({ url, params }); return { items: [] } })
-    try {
-      await view.dataRequests[0].handler()
-      assert.deepEqual(requests, [{ url: '/api/get-concerts', params: {
-        radius: '50', bounds: undefined, country: undefined, city: cityPage.id,
-        dateFrom: undefined, dateTo: undefined, composers: 'Bach', works: undefined, page: '2',
-      } }])
-      assert.deepEqual(parseConcertFilters(requests[0].params, cityPage.countryCode === 'SK' ? 'SK' : null).area, { origin: cityPage.id, radiusKm: 50 })
-    } finally { view.unmount() }
-  }
 })
 
 test('map page sends country to markers and programme and exposes it to music facets', async () => {
