@@ -5,7 +5,7 @@ export const CITY_SITEMAP_MIN_CONCERTS = 1
 
 // Counts include only public upcoming concerts, grouped by resolved country/city.
 export function buildSitemapInventory(catalogue, counts, composers = [], subjects = []) {
-  const paths = new Set(['/', '/about', '/api', '/blog', '/contact', '/sources', '/composers', ...composers.map(composer => composer.path)])
+  const paths = new Set(['/', '/about', '/api', '/api/docs', '/blog', '/contact', '/sources', '/composers', ...composers.map(composer => composer.path)])
   for (const row of counts) {
     const countryPath = getCountryPath(row.country_code_resolved)
     if (Number(row.count) > 0 && countryPath) paths.add(countryPath)

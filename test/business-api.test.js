@@ -137,7 +137,7 @@ test('OpenAPI field names and ordering match the shared concert contract', () =>
   for (const name of ['performers', 'programme_items', 'composers', 'price_items', 'source_event_urls']) {
     assert.equal(spec.components.schemas.Concert.properties[name].type, 'array')
   }
-  assert.ok(spec.paths['/api/v1/concerts'].get.responses['200'].content['text/csv'])
+  assert.deepEqual(Object.keys(spec.paths['/api/v1/concerts'].get.responses['200'].content), ['application/json'])
   assert.equal(spec.paths['/api/v1/concerts'].get.parameters.find(p => p.name === 'url').required, false)
   assert.deepEqual(spec.components.schemas.ConcertResponse.properties.source.type, ['object', 'null'])
   for (const [path, schema] of [['cities', 'CityResponse'], ['performers', 'PerformerResponse'], ['venues', 'VenueResponse']]) {

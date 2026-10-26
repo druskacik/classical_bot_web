@@ -11,7 +11,7 @@ curl --get 'https://classicalbot.com/api/v1/concerts' \
   --data 'format=csv' --data 'all=true' --output concerts.csv
 ```
 
-For local testing replace the origin with `http://localhost:3000`. The machine-readable contract is [openapi.json](./openapi.json), kept in this repository rather than served publicly. Share the file directly with the customer when needed.
+For local testing replace the origin with `http://localhost:3000`. The machine-readable contract is [openapi.json](./openapi.json), also served at `/openapi.json`. Public integration documentation is available at `/api/docs`.
 
 ## Parameters and responses
 
@@ -119,7 +119,7 @@ Errors always use JSON: `{ "error": { "code": "...", "message": "...", "details"
 | 422 | `invalid_website`, `ambiguous_source`, `export_too_large` |
 | 429 | `rate_limited`, `submission_limit` (with Retry-After seconds) |
 | 500 | `internal_error` |
-| 503 | `dns_unavailable` |
+| 503 | `catalogue_unavailable` (including temporary DNS validation failures) |
 
 An active organisation with no upcoming concerts returns 200 and an empty collection/header-only CSV. Other registry statuses follow the onboarding rules below. GET and OPTIONS allow public CORS without credentials; pagination/download headers are exposed.
 

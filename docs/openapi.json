@@ -3,7 +3,7 @@
   "info": {
     "title": "ClassicalBot Concert API",
     "version": "1.1.0",
-    "description": "Unauthenticated concert discovery by organisation, country, city, performer and venue. Filters combine with AND. Entity lookup returns canonical ID strings. JSON and CSV use identical concert fields. CSV detail arrays are JSON text inside cells. Upcoming means today onward in UTC. State is currently unavailable."
+    "description": "Unauthenticated concert discovery by organisation, country, city, performer and venue. Filters combine with AND. Entity lookup returns canonical ID strings. Upcoming means today onward in UTC. State is currently unavailable."
   },
   "servers": [
     {
@@ -76,33 +76,19 @@
               "type": "string",
               "maxLength": 4096
             },
-            "description": "Organisation HTTP(S) URL. Bare hostnames are accepted. At least one of url, country_code, city_id, performer_id or venue_id is required."
+            "description": "Source URL."
           },
           { "$ref": "#/components/parameters/CountryCode" },
           { "$ref": "#/components/parameters/CityId" },
           {
             "in": "query", "name": "performer_id", "required": false,
             "schema": { "$ref": "#/components/schemas/EntityId" },
-            "description": "Exact credited performer ID; includes people and ensembles without inferred membership."
+            "description": "ClassicalBot performer ID."
           },
           {
             "in": "query", "name": "venue_id", "required": false,
             "schema": { "$ref": "#/components/schemas/EntityId" },
-            "description": "Exact venue or hall ID. Parent buildings do not implicitly include their halls."
-          },
-          {
-            "in": "query",
-            "name": "format",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "json",
-                "csv"
-              ],
-              "default": "json"
-            },
-            "description": "Response representation; does not change selected records."
+            "description": "ClassicalBot venue ID."
           },
           {
             "in": "query",
@@ -114,7 +100,7 @@
               "maximum": 1000000,
               "default": 1
             },
-            "description": "Page number. Incompatible with all=true."
+            "description": "Page number, starting at 1."
           },
           {
             "in": "query",
@@ -126,7 +112,7 @@
               "maximum": 100,
               "default": 50
             },
-            "description": "Records per page. Incompatible with all=true."
+            "description": "Results per page, from 1 to 100."
           },
           {
             "in": "query",
@@ -136,12 +122,12 @@
               "type": "boolean",
               "default": false
             },
-            "description": "Complete export, maximum 10000 concerts. Serialized responses are capped at 20 MiB."
+            "description": "Return all matching concerts."
           }
         ],
         "responses": {
           "200": {
-            "description": "Concerts or an empty collection. CSV is UTF-8 with BOM, quoted comma-separated fields and CRLF. Nulls are blank; arrays are JSON cells. Formula-like scalar text is prefixed with an apostrophe. CSV headers exactly follow Concert property order. Blocked, disabled or needs-attention sources with zero concerts return JSON with a message even when CSV is requested.",
+            "description": "Concerts or an empty collection. Sources with no concerts may include a status message.",
             "headers": {
               "X-Total-Count": {
                 "schema": {
@@ -155,12 +141,6 @@
                 },
                 "description": "Relative next-page URL, when available"
               },
-              "Content-Disposition": {
-                "schema": {
-                  "type": "string"
-                },
-                "description": "attachment; filename=\"concerts.csv\" for CSV"
-              },
               "X-Source-Status": {
                 "schema": {
                   "type": "string"
@@ -173,17 +153,11 @@
                 "schema": {
                   "$ref": "#/components/schemas/ConcertResponse"
                 }
-              },
-              "text/csv": {
-                "schema": {
-                  "type": "string"
-                },
-                "example": "\"artists\",\"date\",\"time\",\"venue_name\",\"city\",\"state\",\"country\",\"venue_address\",\"buy_url\",\"id\",\"title\",\"event_url\",\"end_time\",\"event_status\",\"last_verified_at\",\"country_code\",\"city_id\",\"venue_id\",\"venue_url\",\"parent_venue_name\",\"latitude\",\"longitude\",\"programme\",\"programme_items\",\"composers\",\"performers\",\"prices\",\"price_items\",\"admission_type\",\"booking_kind\",\"booking_status\",\"on_sale_at\",\"source_id\",\"source_name\",\"source_url\",\"source_event_urls\"\r\n"
               }
             }
           },
           "400": {
-            "description": "JSON error, including when format=csv.",
+            "description": "JSON error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -193,7 +167,7 @@
             }
           },
           "404": {
-            "description": "Unknown source while registration is disabled. JSON even for format=csv.",
+            "description": "Unknown source while registration is disabled.",
             "content": {
               "application/json": {
                 "schema": {
@@ -203,7 +177,7 @@
             }
           },
           "422": {
-            "description": "Invalid/non-public website, ambiguous source, or oversized export. JSON even for format=csv.",
+            "description": "Invalid/non-public website, ambiguous source, or oversized export.",
             "content": {
               "application/json": {
                 "schema": {
@@ -213,7 +187,7 @@
             }
           },
           "429": {
-            "description": "JSON error, including when format=csv.",
+            "description": "JSON error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -231,7 +205,7 @@
             }
           },
           "500": {
-            "description": "JSON error, including when format=csv.",
+            "description": "JSON error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -241,7 +215,7 @@
             }
           },
           "202": {
-            "description": "No concerts yet; source is pending, processing, pr_open or retry_wait. Always JSON, even for format=csv. Poll the same URL.",
+            "description": "No concerts yet; source is pending, processing, pr_open or retry_wait. Poll the same URL.",
             "headers": {
               "Retry-After": {
                 "schema": {
@@ -265,7 +239,7 @@
             }
           },
           "503": {
-            "description": "Concert catalogue or DNS validation temporarily unavailable. Retry later.",
+            "description": "JSON error code catalogue_unavailable. Concert catalogue or DNS validation temporarily unavailable. Retry after 60 seconds.",
             "content": {
               "application/json": {
                 "schema": {
@@ -303,22 +277,22 @@
       "CountryCode": {
         "in": "query", "name": "country_code", "required": false,
         "schema": { "type": "string", "pattern": "^[A-Za-z]{2}$" },
-        "description": "ISO alpha-2 concert/entity location code, normalized to uppercase; not performer nationality."
+        "description": "Two-letter country code, e.g. CZ."
       },
       "CityId": {
         "in": "query", "name": "city_id", "required": false,
         "schema": { "$ref": "#/components/schemas/EntityId" },
-        "description": "Exact canonical city ID; not a GeoNames ID. No nearby-city expansion."
+        "description": "ClassicalBot city ID."
       },
       "SearchQuery": {
         "in": "query", "name": "q", "required": true,
         "schema": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "description": "Nonblank searchable text. Normalized substring search; no typo correction. Exact matches rank before prefixes and other substrings, then name and ID."
+        "description": "Name to search for."
       },
       "HasUpcoming": {
         "in": "query", "name": "has_upcoming", "required": false,
         "schema": { "type": "boolean", "default": false },
-        "description": "Restrict to identities linked to a published upcoming concert. Exact city/venue/credited-performer semantics."
+        "description": "Only return results with upcoming concerts."
       },
       "LookupPage": {
         "in": "query", "name": "page", "required": false,
@@ -332,7 +306,7 @@
     "schemas": {
       "EntityId": {
         "type": "string", "pattern": "^[1-9][0-9]{0,18}$", "maxLength": 19,
-        "description": "Positive PostgreSQL bigint ID, maximum 9223372036854775807. Preserve as a string."
+        "description": "ClassicalBot ID."
       },
       "City": {
         "type": "object", "additionalProperties": false,
@@ -345,7 +319,7 @@
           "latitude": { "type": ["number", "null"] },
           "longitude": { "type": ["number", "null"] },
           "external_source": { "type": ["string", "null"] },
-          "external_id": { "type": ["string", "null"], "description": "External identity, e.g. GeoNames; do not substitute for city_id." }
+          "external_id": { "type": ["string", "null"], "description": "ID in the external source." }
         }
       },
       "Performer": {
@@ -467,13 +441,15 @@
               "string",
               "null"
             ],
-            "description": "Semicolon-separated unique credited performer names."
+            "description": "Performer names, separated by semicolons."
           },
           "date": {
+            "description": "Concert date.",
             "type": "string",
             "format": "date"
           },
           "time": {
+            "description": "Local start time.",
             "type": [
               "string",
               "null"
@@ -485,9 +461,10 @@
               "string",
               "null"
             ],
-            "description": "Canonical hall name, falling back to the original concert venue."
+            "description": "Venue or hall name."
           },
           "city": {
+            "description": "City name.",
             "type": [
               "string",
               "null"
@@ -495,9 +472,10 @@
           },
           "state": {
             "type": "null",
-            "description": "State/region is not currently stored."
+            "description": "Currently unavailable."
           },
           "country": {
+            "description": "Country name.",
             "type": [
               "string",
               "null"
@@ -508,20 +486,22 @@
               "string",
               "null"
             ],
-            "description": "Customer Venue column provisionally means address."
+            "description": "Venue address."
           },
           "buy_url": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Stored occurrence-specific booking URL; no homepage fallback."
+            "description": "Ticket or reservation link."
           },
           "id": {
+            "description": "ClassicalBot concert ID.",
             "type": "string",
             "pattern": "^[0-9]+$"
           },
           "title": {
+            "description": "Concert title.",
             "type": [
               "string",
               "null"
@@ -532,9 +512,10 @@
               "string",
               "null"
             ],
-            "description": "Primary concert event page, potentially on another source."
+            "description": "Concert page URL."
           },
           "end_time": {
+            "description": "Local end time.",
             "type": [
               "string",
               "null"
@@ -542,6 +523,7 @@
             "pattern": "^\\d{2}:\\d{2}:\\d{2}$"
           },
           "event_status": {
+            "description": "Concert status.",
             "type": "string",
             "enum": [
               "scheduled",
@@ -551,6 +533,7 @@
             ]
           },
           "last_verified_at": {
+            "description": "When the concert was last verified.",
             "type": [
               "string",
               "null"
@@ -558,6 +541,7 @@
             "format": "date-time"
           },
           "country_code": {
+            "description": "Two-letter country code.",
             "type": [
               "string",
               "null"
@@ -567,33 +551,38 @@
           "city_id": {
             "type": ["string", "null"],
             "pattern": "^[0-9]+$",
-            "description": "Canonical city ID, distinct from any external GeoNames identifier."
+            "description": "ClassicalBot city ID."
           },
           "venue_id": {
+            "description": "ClassicalBot venue ID.",
             "type": [
               "string",
               "null"
             ]
           },
           "venue_url": {
+            "description": "Venue website.",
             "type": [
               "string",
               "null"
             ]
           },
           "parent_venue_name": {
+            "description": "Parent venue or building name.",
             "type": [
               "string",
               "null"
             ]
           },
           "latitude": {
+            "description": "Venue latitude.",
             "type": [
               "number",
               "null"
             ]
           },
           "longitude": {
+            "description": "Venue longitude.",
             "type": [
               "number",
               "null"
@@ -604,9 +593,10 @@
               "string",
               "null"
             ],
-            "description": "Readable programme summary; ordering is not performance order."
+            "description": "Programme summary."
           },
           "programme_items": {
+            "description": "Works and their composers.",
             "type": "array",
             "items": {
               "type": "object",
@@ -656,6 +646,7 @@
             }
           },
           "composers": {
+            "description": "Composers featured in the concert.",
             "type": "array",
             "items": {
               "type": "object",
@@ -676,6 +667,7 @@
             }
           },
           "performers": {
+            "description": "Performers and their roles.",
             "type": "array",
             "items": {
               "type": "object",
@@ -775,9 +767,10 @@
               "string",
               "null"
             ],
-            "description": "Readable offers with currencies, categories and conditions."
+            "description": "Price summary."
           },
           "price_items": {
+            "description": "Price offers, currencies and conditions.",
             "type": "array",
             "items": {
               "type": "object",
@@ -858,12 +851,14 @@
             }
           },
           "admission_type": {
+            "description": "Admission category.",
             "type": [
               "string",
               "null"
             ]
           },
           "booking_kind": {
+            "description": "Booking method.",
             "type": [
               "string",
               "null"
@@ -875,6 +870,7 @@
             ]
           },
           "booking_status": {
+            "description": "Booking availability.",
             "type": [
               "string",
               "null"
@@ -890,6 +886,7 @@
             ]
           },
           "on_sale_at": {
+            "description": "When booking opens.",
             "type": [
               "string",
               "null"
@@ -897,17 +894,19 @@
             "format": "date-time"
           },
           "source_id": {
-            "description": "Resolved registry ID; nullable for unregistered or ambiguous attribution on requests without url.",
+            "description": "ClassicalBot source ID.",
             "type": ["string", "null"],
             "pattern": "^[0-9]+$"
           },
           "source_name": {
+            "description": "Source name.",
             "type": [
               "string",
               "null"
             ]
           },
           "source_url": {
+            "description": "Source URL.",
             "type": [
               "string",
               "null"
@@ -918,7 +917,7 @@
             "items": {
               "type": "string"
             },
-            "description": "With url: matched organisation event links. Without url: links from all eligible occurrences of this deduplicated concert."
+            "description": "Concert links from its sources."
           }
         }
       },
@@ -933,7 +932,7 @@
         ],
         "properties": {
           "source": {
-            "description": "Resolved requested organisation when filtering by url; null otherwise.",
+            "description": "Source matching the URL filter, or null.",
             "type": ["object", "null"],
             "additionalProperties": false,
             "required": [
