@@ -1,10 +1,9 @@
-import { buildCityIdentities, resolveCitySelection } from '../../shared/utils/city-identity.js'
-import { getAreaCities, getIdentityCities } from '../utils/area-cities.js'
-import { resolveArea, publicArea } from '../utils/concert-area.js'
+import { resolveConcertFilters } from '../utils/resolve-concert-filters.js'
+import { publicArea } from '../utils/concert-area.js'
 import { concertFilterCacheInput } from '../utils/data-cache-keys.js'
 import { cachedConcertData } from '../utils/concert-data-cache.js'
 import { concertSite } from '#concert-site'
-import { concertComposers, concertWorks } from '../utils/serving-catalogue.js'
+import { concertMusic } from '../utils/serving-catalogue.js'
 import { applyFilters, parseConcertFilters, parsePage } from '../utils/concert-filters.js'
 import { getCityCatalogue } from '../utils/city-catalogue.js'
 import { groupConcertWorks } from '../utils/concert-works.js'
@@ -16,9 +15,7 @@ export default defineEventHandler(async (event) => {
   try {
     const query = getQuery(event)
     const page = parsePage(query.page)
-    const filters = parseConcertFilters(query, concertSite.country)
-    if (filters.city) filters.city = resolveCitySelection(filters.city, buildCityIdentities(await getIdentityCities()))
-    if (filters.area) filters.area = resolveArea(filters.area, await getAreaCities(), concertSite.locale)
+    const filters = await resolveConcertFilters(parseConcertFilters(query, concertSite.country))
 
     return await cachedConcertData('concerts', { filters: concertFilterCacheInput(filters), page }, async (knex) => {
       const countQuery = applyFilters(
@@ -66,22 +63,8 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 404, statusMessage: 'Concert page not found' })
       }
       const concertIds = concerts.map(concert => concert.id)
-      const [composerRows, workRows] = await Promise.all([
-        concertIds.length
-        ? concertComposers(knex, concertIds)
-        : [],
-        concertIds.length
-        ? concertWorks(knex, concertIds)
-        : [],
-      ])
-      const worksByConcert = groupConcertWorks(workRows)
-
-      const composersByConcert = composerRows.reduce((groups, composer) => {
-        const id = composer.classical_concert_id
-        if (!groups[id]) groups[id] = []
-        groups[id].push({ id: composer.id, name: composer.name })
-        return groups
-      }, {})
+      const music = await concertMusic(knex, concertIds)
+      const worksByConcert = groupConcertWorks([...music.values()].flatMap(document => document.works))
 
       return {
         ...(discovery ? { discovery } : {}),
@@ -91,7 +74,7 @@ export default defineEventHandler(async (event) => {
           city_path: (catalogue.byId.get(String(concert.city_id)) || (concertSite.cityRoutes === 'local' ? catalogue.byPath.get(`/${concert.city}`) : null))?.path || null,
           ...(concertSite.cityRoutes === 'local' ? { city: catalogue.byId.get(String(concert.city_id))?.name || concert.city } : {}),
           title: concert.title?.replace(/\s+/g, ' ') ?? null,
-          composers: composersByConcert[concert.id] || [],
+          composers: (music.get(String(concert.id))?.composers || []).map(({ id, name }) => ({ id, name })),
           works: worksByConcert.get(String(concert.id)) || [],
         })),
         ...(filters.area ? { area: publicArea(filters.area) } : {}),

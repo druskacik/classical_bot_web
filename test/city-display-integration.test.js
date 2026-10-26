@@ -299,6 +299,26 @@ test('city discovery labels and identities against disposable PostgreSQL', async
     assert.equal((await concerts({ query: { city: 'Bratislava,SK', radius: '100' } })).total, 2, 'global radius crosses the Austria/Slovakia border')
   })
 
+  await t.test('legacy facet cityId keeps country qualification and explicit city precedence', async () => {
+    const request = query => facets({ query: { type: 'work', ...query } })
+    assert.deepEqual(await request({ cityId: '7' }), await request({ country: 'SK', city: '7' }))
+    assert.deepEqual(await request({ cityId: '7', city: '4' }), await request({ country: 'SK', city: '4' }))
+    assert.deepEqual((await request({ cityId: '7', city: '4' })).items, [])
+    for (const query of [
+      { cityId: 'bad' }, { cityId: '999999' }, { cityId: '4', country: 'SK' },
+      { cityId: '7', city: '7', radius: '50' }, { cityId: '7', nearLat: '48', nearLng: '17', radius: '50' },
+    ]) await assert.rejects(request(query), { statusCode: 400 })
+    site.country = 'SK'
+    try {
+      await assert.rejects(request({ cityId: '4' }), { statusCode: 400 })
+      for (const type of ['country', 'city', 'composer', 'work']) {
+        const implicit = await facets({ query: { type, cityId: '7' } })
+        const explicit = await facets({ query: { type, city: '7', country: 'SK' } })
+        assert.deepEqual(implicit, explicit)
+      }
+    } finally { site.country = null }
+  })
+
   await t.test('exact names treat wildcard and escape characters literally in canonical and raw cities', async () => {
     assert.equal((await concerts({ query: { city: '%,US' } })).total, 0)
     for (const [offset, name] of ['%', '_', 'Back\\Slash', 'MiXeD'].entries()) {

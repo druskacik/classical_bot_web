@@ -20,7 +20,9 @@ export function withServingSnapshot(db,load) {
   },{isolationLevel:'repeatable read',readOnly:true})
 }
 
-const collection = async (db,ids,field) => ids.length
-  ? (await db('serving.current_document').whereIn('concert_id',ids).select(field)).flatMap(row=>row[field]) : []
-export const concertComposers = (db,ids) => collection(db,ids,'composers')
-export const concertWorks = (db,ids) => collection(db,ids,'works')
+export async function concertMusic(db, ids) {
+  if (!ids.length) return new Map()
+  const documents = await db('serving.current_document').whereIn('concert_id', ids)
+    .select('concert_id', 'composers', 'works')
+  return new Map(documents.map(({ concert_id, composers, works }) => [String(concert_id), { composers, works }]))
+}

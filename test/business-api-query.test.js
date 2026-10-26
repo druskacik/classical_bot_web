@@ -1,5 +1,5 @@
 import { installResolvedFixture, publishResolvedFixture } from '../test-support/resolved-fixture.js'
-import { servingPublication, withServingSnapshot, concertWorks } from '../layers/concerts/server/utils/serving-catalogue.js'
+import { servingPublication, withServingSnapshot, concertMusic } from '../layers/concerts/server/utils/serving-catalogue.js'
 import { matching, concertDetails } from '../server/utils/alerts/criteria.js'
 import { parseConcertFilters } from '../layers/concerts/server/utils/concert-filters.js'
 import test from 'node:test'
@@ -124,7 +124,15 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
     const filters=parseConcertFilters({composers:'Composer without work',works:'1,2',country:'CZ'})
     const count=await matching(trx,filters).count('* as total').first()
     assert.equal(Number(count.total),1, 'donor music filters do not multiply pages')
-    assert.match((await concertDetails(trx,filters,[1]))[0].programme,/Composer: Concerto/)
+    const documentQueries = []
+    const recordDocuments = query => { if (query.sql.includes('"serving"."current_document"')) documentQueries.push(query.sql) }
+    trx.on('query', recordDocuments)
+    try {
+      assert.match((await concertDetails(trx,filters,[1,4]))[0].programme,/Composer: Concerto/)
+      assert.equal(documentQueries.length, 1, 'Alert rendering reads both music arrays in one batch')
+      assert.deepEqual(await concertDetails(trx, filters, []), [])
+      assert.equal(documentQueries.length, 1, 'Empty alert batches do not read documents')
+    } finally { trx.off('query', recordDocuments) }
     assert.equal((await trx('serving.current_concert as cc').whereExists(trx('serving.current_concert_performer as p').select(1).whereRaw('p.concert_id=cc.id').where('p.performer_id',1))).length,1)
     await db('classical_concert').where('id',1).update({title:'Next generation'})
     await db('work').where('id',1).update({title:'New programme'})
@@ -132,7 +140,7 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
     await publishResolvedFixture(db, { concurrent:true })
     assert.equal((await trx('resolved_concert').where('id',1).first()).title,'Primary')
     assert.equal((await trx('resolved_concert_source_url').where('source_url','not a valid URL')).length,0, 'directory stays on the same publication')
-    assert.equal((await concertWorks(trx,[1])).find(w=>w.id===1).title,'Symphony')
+    assert.equal((await concertMusic(trx,[1])).get('1').works.find(w=>w.id===1).title,'Symphony')
   })
   assert.equal((await queryConcerts(db,input)).concerts[0].title,'Next generation')
   await db('resolved_concert_refresh_state').update({published_at:db.raw("now()-interval '1 hour'"),last_failure_at:db.fn.now(),last_error:'fixture failure'})

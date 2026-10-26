@@ -3,6 +3,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { registerHooks } from 'node:module'
 import knex from 'knex'
+import { buildCityIdentities } from '../layers/concerts/shared/utils/city-identity.js'
+import { parseConcertFilters } from '../layers/concerts/server/utils/concert-filters.js'
 const site = { country: null, locale: 'en-GB', cityRoutes: 'global' }
 const locations = [
   { id: '2', english_name: 'Bratislava', local_name: 'Bratislava', country_code: 'SK', latitude: 48.14816, longitude: 17.10674 },
@@ -37,6 +39,7 @@ const concerts = (await import('../layers/concerts/server/api/get-concerts.js'))
 const facets = (await import('../layers/concerts/server/api/get-concert-filter-options.js')).default
 const cities = (await import('../layers/concerts/server/api/get-area-cities.js')).default
 const map = (await import('../layers/concerts/server/api/get-concert-map.js')).default
+const { resolveConcertFilters } = await import('../layers/concerts/server/utils/resolve-concert-filters.js')
 hooks.deregister()
 
 test('real area endpoints resolve coordinates, constrain all SQL, cache repeats and isolate sites', async t => {
@@ -149,4 +152,44 @@ test('Slovak city autocomplete scopes search, restored selections and origins be
       assert.equal(response.items[0].cityQuery, 'Bratislava,SK')
     }
   } finally { site.country = null; site.locale = 'en-GB'; site.cityRoutes = 'global' }
+})
+
+test('shared resolution preserves parsed inputs and reuses caller catalogues without reads', async t => {
+  const previous = { ...site }
+  t.after(() => Object.assign(site, previous))
+  const identities = buildCityIdentities(locations)
+  const before = statements.length
+  for (const country of [null, 'SK']) {
+    Object.assign(site, { country, locale: country ? 'sk-SK' : 'en-GB' })
+    const common = { dateFrom: '2099-01-01', dateTo: '2099-12-31', bounds: '10,40,20,55', composers: 'Mozart', works: '1,2' }
+    for (const city of country ? ['25'] : ['25', 'Wien,AT']) {
+      // A foreign origin remains resolvable; the immutable site scope constrains results later.
+      const input = Object.freeze(parseConcertFilters({ ...common, city }, country))
+      const original = structuredClone(input)
+      const result = await resolveConcertFilters(input, { identities })
+      assert.notEqual(result, input)
+      assert.deepEqual(input, original)
+      assert.equal(result.city.canonicalId, '25')
+      assert.equal(result.city.countryCode, 'AT')
+      assert.deepEqual(result.composers, ['Mozart'])
+      assert.deepEqual(result.works, [1, 2])
+      assert.deepEqual(result.bounds, input.bounds)
+      assert.equal(result.siteCountry, country || undefined)
+    }
+    for (const area of [{ city: '25', radius: '100' }, { nearLat: '48.20849', nearLng: '16.37208', radius: '100' }]) {
+      const input = Object.freeze(parseConcertFilters({ ...common, ...area }, country))
+      const original = structuredClone(input)
+      const result = await resolveConcertFilters(input, { areaCities: locations })
+      assert.deepEqual(input, original)
+      assert.ok(result.area.cityIds.includes('25'))
+      assert.equal(result.area.label, area.city ? country ? 'Wien' : 'Vienna' : null)
+      assert.equal(result.siteCountry, country || undefined)
+    }
+  }
+  const untouched = Object.freeze(parseConcertFilters({ composers: 'Mozart' }))
+  assert.deepEqual(await resolveConcertFilters(untouched), untouched)
+  await assert.rejects(resolveConcertFilters(parseConcertFilters({ city: 'Vienna', radius: '25' }), {
+    areaCities: [...locations, { ...locations[1], id: '1001', country_code: 'US' }],
+  }), { statusCode: 400 })
+  assert.equal(statements.length, before, 'No catalogue reads when callers supply the required data')
 })

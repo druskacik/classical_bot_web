@@ -1,17 +1,15 @@
 import { concertSite } from '#concert-site'
 import { applyFilters, parseConcertFilters } from '../utils/concert-filters.js'
-import { buildCityIdentities, resolveCitySelection } from '../../shared/utils/city-identity.js'
-import { getAreaCities, getIdentityCities } from '../utils/area-cities.js'
-import { resolveArea } from '../utils/concert-area.js'
+import { getAreaCities } from '../utils/area-cities.js'
+import { resolveConcertFilters } from '../utils/resolve-concert-filters.js'
 import { cachedConcertData } from '../utils/concert-data-cache.js'
 import { concertFilterCacheInput } from '../utils/data-cache-keys.js'
 import { cityDisplayName } from '../../shared/utils/city-query.js'
 
 export default defineEventHandler(async event => {
-  const filters = parseConcertFilters(getQuery(event), concertSite.country)
-  if (filters.city) filters.city = resolveCitySelection(filters.city, buildCityIdentities(await getIdentityCities()))
+  const parsedFilters = parseConcertFilters(getQuery(event), concertSite.country)
   const cities = await getAreaCities()
-  if (filters.area) filters.area = resolveArea(filters.area, cities, concertSite.locale)
+  const filters = await resolveConcertFilters(parsedFilters, { areaCities: cities })
   return cachedConcertData('map-cities', concertFilterCacheInput(filters), async (knex) => {
     const rows = await applyFilters(knex('serving.current_concert as cc')
       .leftJoin('city as canonical_city', 'canonical_city.id', 'cc.city_id'), filters)

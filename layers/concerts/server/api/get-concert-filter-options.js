@@ -1,8 +1,9 @@
+import { resolveConcertFilters } from '../utils/resolve-concert-filters.js'
 import { summaryEligible, dailyCounts, rawCitySummary } from '../utils/serving-facets.js'
 import { firstQueryValue as first, composerSelections, querySelections } from '../../shared/utils/concert-query.js'
 import { buildCityIdentities, resolveCitySelection } from '../../shared/utils/city-identity.js'
 import { getAreaCities, getIdentityCities } from '../utils/area-cities.js'
-import { resolveArea, matchingAreaCities } from '../utils/concert-area.js'
+import { matchingAreaCities } from '../utils/concert-area.js'
 import { concertFilterCacheInput } from '../utils/data-cache-keys.js'
 import { cachedConcertData } from '../utils/concert-data-cache.js'
 import { concertSite } from '#concert-site'
@@ -29,8 +30,7 @@ export default defineEventHandler(async (event) => {
     if (!['country', 'city', 'composer', 'work'].includes(type)) {
       throw createError({ statusCode: 400, statusMessage: 'Type must be country, city, composer, or work' })
     }
-    const filters = parseConcertFilters(query, concertSite.country)
-    if (filters.area) filters.area = resolveArea(filters.area, await getAreaCities(), concertSite.locale)
+    const parsedFilters = parseConcertFilters(query, concertSite.country)
     // Retain the canonical-city parameter used by existing API callers.
     if (query.cityId !== undefined) {
       const id = first(query.cityId)
@@ -38,15 +38,15 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, statusMessage: 'City ID must be a positive integer' })
       }
       const city = (await getCityCatalogue()).byId.get(id)
-      if (!city || (filters.country && filters.country !== city.countryCode)) {
+      if (!city || (parsedFilters.country && parsedFilters.country !== city.countryCode)) {
         throw createError({ statusCode: 400, statusMessage: 'City must match the selected country' })
       }
-      filters.country = city.countryCode
-      if (!filters.city) filters.city = parseCity(id)
+      parsedFilters.country = city.countryCode
+      if (!parsedFilters.city) parsedFilters.city = parseCity(id)
     }
-    const identityCities = type === 'city' || filters.city ? await getIdentityCities() : []
+    const identityCities = type === 'city' || parsedFilters.city ? await getIdentityCities() : []
     const identities = buildCityIdentities(identityCities)
-    if (filters.city) filters.city = resolveCitySelection(filters.city, identities)
+    const filters = await resolveConcertFilters(parsedFilters, { identities })
     const context = facetFilters(filters, type)
     if (concertSite.country) context.country = concertSite.country
     const search = normalizeSearchText(String(first(query.q) || '').trim().slice(0, 100))
