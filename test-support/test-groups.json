@@ -32,6 +32,7 @@
     "data-cache.test.js",
     "docker-healthcheck.test.js",
     "filter-autocomplete.test.js",
+    "filter-options.test.js",
     "legacy-concert-location.test.js",
     "maintenance.test.js",
     "map-programme.test.js",

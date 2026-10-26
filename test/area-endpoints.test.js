@@ -32,7 +32,7 @@ const moduleUrl = source => `data:text/javascript,${encodeURIComponent(source)}`
 const hooks = registerHooks({ resolve(specifier, context, next) {
   if (specifier === '#concert-site') return { shortCircuit: true, url: moduleUrl('export const concertSite = globalThis.areaFixtures.site') }
   if (specifier.endsWith('/connection.js')) return { shortCircuit: true, url: moduleUrl('export default globalThis.areaFixtures.db') }
-  if (specifier.endsWith('/utils/city-catalogue.js')) return { shortCircuit: true, url: moduleUrl('export const getCityCatalogue = async () => ({ byId: new Map(), byPath: new Map() })') }
+  if (specifier.startsWith('.') && new URL(specifier, context.parentURL).href === new URL('../layers/concerts/server/utils/city-catalogue.js', import.meta.url).href) return { shortCircuit: true, url: moduleUrl('export const getCityCatalogue = async () => ({ byId: new Map(), byPath: new Map() })') }
   return next(specifier, context)
 } })
 const concerts = (await import('../layers/concerts/server/api/get-concerts.js')).default

@@ -149,6 +149,7 @@ export const applyFilters = (builder, filters) => {
   return builder
 }
 
+/** @param {Record<string, unknown>} input @param {string | null} [siteCountry] */
 export const parseConcertFilters = (input, siteCountry = null) => {
   const query = normalizeConcertQuery(input)
   let bounds
