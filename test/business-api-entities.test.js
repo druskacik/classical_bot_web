@@ -133,3 +133,70 @@ test('a shared limiter bounds lookup and concert requests together', async t => 
   for (let i = 0; i < 60; i++) assert.equal((await fetch(`${lookup}/?q=prague`)).status, 200)
   assert.equal((await fetch(`${concerts}/?city_id=1`)).status, 429)
 })
+
+test('both handler families preserve HTTP boundaries, error logs and proxy trust', async t => {
+  for (const family of ['concerts', 'cities']) await t.test(family, async t => {
+    const concert = family === 'concerts'
+    const logs = [], attempts = []
+    let loads = 0, failure
+    const env = {}
+    const base = await serve(t, (concert ? createConcertApiHandler : createEntityApiHandler)({
+      kind: family, env, log: line => logs.push(JSON.parse(line)),
+      cache: createDataCache({ enabled: () => false }),
+      limiter: { attempt: (...args) => attempts.push(args), reserve() {}, release() {} },
+      load: async input => {
+        loads++
+        if (failure) throw failure
+        return { [concert ? 'concerts' : 'items']: [], pagination: { total: 2, total_pages: 2, page: input.page } }
+      },
+    }))
+    const query = concert ? 'city_id=1' : 'q=music'
+    const preflight = await fetch(`${base}/?invalid=query`, { method: 'OPTIONS' })
+    assert.equal(preflight.status, 204)
+    assert.equal(await preflight.text(), '')
+    assert.equal(preflight.headers.get('access-control-allow-origin'), '*')
+    assert.equal(preflight.headers.get('access-control-allow-methods'), 'GET, OPTIONS')
+    assert.equal(preflight.headers.get('access-control-expose-headers'), concert
+      ? 'X-Total-Count, Link, Content-Disposition, Retry-After, X-Source-Status' : 'X-Total-Count, Link, Retry-After')
+    assert.equal(preflight.headers.get('cache-control'), 'no-store')
+    assert.deepEqual([loads, attempts.length, logs.length], [0, 0, 0])
+    const invalid = await fetch(base)
+    assert.equal(invalid.status, 400)
+    assert.equal(logs.at(-1).status, 400)
+    assert.deepEqual([loads, attempts.length], [0, 0], 'validation precedes limiting')
+    for (const hops of [undefined, '1']) {
+      env.BUSINESS_API_TRUST_PROXY_HOPS = hops
+      const response = await fetch(`${base}/?${query}`, { headers: { 'x-forwarded-for': '198.51.100.10, 203.0.113.20' } })
+      const body = await response.json()
+      assert.equal(response.headers.get('link'), `<${body.pagination.next}>; rel="next"`)
+      assert.equal(response.headers.get('x-total-count'), '2')
+      assert.equal(attempts.at(-1)[0], hops ? '203.0.113.20' : '127.0.0.1')
+      assert.equal(attempts.at(-1)[1], false)
+    }
+    for (const suffix of ['&page=2', ...(concert ? ['&all=true'] : [])]) {
+      const response = await fetch(`${base}/?${query}${suffix}`)
+      assert.equal(response.headers.get('link'), null)
+      assert.equal((await response.json()).pagination.next, null)
+    }
+    for (const [error, status, expected, retry] of [
+      [new Error('private database information'), 500, { code: 'internal_error', message: concert ? 'Unable to retrieve concerts.' : 'Unable to search entities.' }, null],
+      [Object.assign(new Error('private catalogue'), { statusCode: 503 }), 503, { code: 'catalogue_unavailable', message: 'Concert catalogue temporarily unavailable.' }, '60'],
+      [fail(429, 'rate_limited', 'Too many requests.', { retry_after: 5 }), 429, { code: 'rate_limited', message: 'Too many requests.', details: { retry_after: 5 } }, '5'],
+      [fail(429, 'rate_limited', 'Too many requests.'), 429, { code: 'rate_limited', message: 'Too many requests.' }, '60'],
+      [fail(404, 'not_found', 'No match.', { id: '1' }), 404, { code: 'not_found', message: 'No match.', details: { id: '1' } }, null],
+    ]) {
+      failure = error
+      const response = await fetch(`${base}/?${query}${concert ? '&format=csv' : ''}`)
+      assert.equal(response.status, status)
+      assert.match(response.headers.get('content-type'), /application\/json/)
+      assert.equal(response.headers.get('retry-after'), retry)
+      assert.deepEqual(await response.json(), { error: expected })
+      const entry = logs.at(-1)
+      assert.equal(entry.status, status)
+      assert.equal(entry.endpoint, `business-${family}`)
+      assert.equal(entry.count, 0)
+      assert.equal(Number.isInteger(entry.duration_ms), true)
+      if (concert) assert.equal(entry.format, 'csv')
+    }
+  })
+})
