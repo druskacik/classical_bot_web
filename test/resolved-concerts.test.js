@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import knex from 'knex'
-import { servingPublication, withServingSnapshot, displaySource, concertPrices } from '../layers/concerts/server/utils/serving-catalogue.js'
+import { servingPublication, withServingSnapshot } from '../layers/concerts/server/utils/serving-catalogue.js'
 
 function fixture() {
   const db = knex({ client: 'pg' })
@@ -9,7 +9,6 @@ function fixture() {
   db.client.runner = builder => ({ run: async () => {
     const sql=builder.toSQL().sql
     if(sql.includes('to_regclass')) return {rows:[{installed:state.installed}]}
-    if(sql.includes('current_document')) return [{prices:[{id:1,amount:'10.0000'},{id:2,amount:'10.0000'}]}]
     return state
   } })
   return { db, state }
@@ -27,10 +26,4 @@ test('staleness follows input publication; readers pin a repeatable-read generat
   db.context.transaction=async(load,options)=>{assert.deepEqual(options,{isolationLevel:'repeatable read',readOnly:true});return load(db)}
   const result=await withServingSnapshot(db,async(trx,p)=>{assert.equal(trx,db);return p})
   assert.equal(result.generation,'7');assert.equal(result.stale,true)
-})
-test('prepared offers retain decimal strings and distinct identities',async()=>{
-  const {db}=fixture()
-  assert.deepEqual(await concertPrices(db,[1]),[{id:1,amount:'10.0000'},{id:2,amount:'10.0000'}])
-  assert.match(displaySource(db,'source').toSQL().sql,/"cc"\."source"/)
-  assert.throws(()=>displaySource(db,'conflicts'))
 })

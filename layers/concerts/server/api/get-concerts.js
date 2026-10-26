@@ -4,7 +4,7 @@ import { resolveArea, publicArea } from '../utils/concert-area.js'
 import { concertFilterCacheInput } from '../utils/data-cache-keys.js'
 import { cachedConcertData } from '../utils/concert-data-cache.js'
 import { concertSite } from '#concert-site'
-import { displaySource, concertComposers, concertWorks } from '../utils/serving-catalogue.js'
+import { concertComposers, concertWorks } from '../utils/serving-catalogue.js'
 import { applyFilters, parseConcertFilters, parsePage } from '../utils/concert-filters.js'
 import { getCityCatalogue } from '../utils/city-catalogue.js'
 import { groupConcertWorks } from '../utils/concert-works.js'
@@ -43,8 +43,8 @@ export default defineEventHandler(async (event) => {
             'cc.city_id',
             knex.raw('COALESCE(canonical_city.english_name, canonical_city.local_name, cc.city_raw) as city'),
             knex.raw('COALESCE(cc.country_code_resolved, cc.country_code_raw) as country_code'),
-            displaySource(knex, 'source'),
-            displaySource(knex, 'source_url'),
+            'cc.source',
+            'cc.source_url',
             'cc.venue',
           ),
         filters,

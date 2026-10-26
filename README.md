@@ -41,8 +41,10 @@ server can start with PostgreSQL offline. No completion time is promised.
 
 This flag prevents new database work from the restarted web app. It does not
 cancel previously running work or pause the separate crawler. Resume with a
-restart so the normal database warm-up runs before accepting requests. There is
-no admin bypass or separate public maintenance route.
+restart to restore normal background recommendation warming. HTTP starts before
+that optional warm-up completes; data endpoints still require a ready database
+and published catalogue. There is no admin bypass or separate public maintenance
+route.
 
 After building, verify maintenance startup against an isolated fake database with:
 
@@ -81,8 +83,8 @@ are unchanged.
   `BrandMark`, `SiteFooter`, and `EditorialArticle` provide both sites' common
   presentation. App wrappers supply navigation items, brand names, and translated
   labels; article pages supply their content and optional metadata.
-- `layers/concerts/server/`: concert APIs, database connections/models, filtering,
-  and the cached city catalogue.
+- `layers/concerts/server/`: concert APIs, database connection and query utilities,
+  filtering, and city catalogue construction.
 - `layers/concerts/shared/`: city identity and canonical path construction.
 - Root `app/`, `content/`, and `public/`: ClassicalBot pages, navigation data,
   editorial content, and public assets.
@@ -91,10 +93,10 @@ are unchanged.
 - `apps/classical-sk/`: the Slovak application, with its own routes, content,
   navigation, metadata, analytics, and sitemap.
 
-The shared layer has no page routes or sitemap plugin. A consuming application
-defines its own pages and sets `appConfig.concertSite.name` and
-`appConfig.concertSite.origin` (see `app/app.config.ts`). The origin is required
-for concert canonical URLs; it has no fallback to another website. Nuxt's root
+The shared layer supplies the `/map` page and its layout, but no sitemap plugin.
+A consuming application defines its remaining pages and sets
+`appConfig.concertSite.name` and `appConfig.concertSite.origin` (see
+`app/app.config.ts`). The origin is required for concert canonical URLs; it has no fallback to another website. Nuxt's root
 application can override layer components and configuration.
 
 Imports of layer-owned files use relative paths. Application code can use
@@ -111,31 +113,39 @@ Facet exclusions cannot remove it. Each process has its own city cache.
 
 ## Server data cache
 
-Both builds share a bounded in-memory cache for successful endpoint results.
-It is used by browser API requests and Nuxt's internal requests during page
-rendering; it does not cache HTML or add browser/Cloudflare cache headers.
+Both builds use the same bounded in-memory cache implementation for successful
+endpoint results, with independent state in each server process. It is used by
+browser API requests and Nuxt's internal requests during page rendering; it does
+not cache HTML or add browser/Cloudflare cache headers.
 
 | Endpoint | Result lifetime |
 | --- | --- |
 | `/api/get-concerts` | 2 minutes |
+| `/api/get-concert-map` | 2 minutes |
 | `/api/get-concert-filter-options` | 2 minutes |
 | `/api/get-countries` | 5 minutes |
 | `/api/get-sources` | 5 minutes |
 | `/api/get-composers` (legacy endpoint) | 5 minutes |
+| `/api/composers` | 5 minutes |
+| `/api/composers/<id>` (base profile; recommendations are added separately) | 5 minutes |
 | classical.sk `/api/get-cities` | 2 minutes |
 
 The cache is enabled when `NODE_ENV=production` and disabled otherwise. Set
 `SERVER_DATA_CACHE_ENABLED=true` or `false` to override this at runtime. No new
 production configuration is required. To bypass these caches during local
 testing, or roll back caching in CapRover, set `SERVER_DATA_CACHE_ENABLED=false`
-and restart the application. This switch leaves the pre-existing city catalogue,
-composer-page, and sitemap caches unchanged.
+and restart the application. This switch also controls the internal composer
+directory/work/profile and city identity/area caches. Recommendation and sitemap
+caches are separate and unaffected.
 
 Validation runs before lookup. Keys include the build's country, locale, city
 route mode, and all relevant parsed filters, including pagination and selected
-autocomplete values. Ignored parameters such as tracking tags do not create new
-entries. Equivalent composer/work filter sets share entries. No request or
-result data is written to disk.
+autocomplete values. Serving-backed keys also include the active generation and
+UTC database date. Each lookup checks database readiness and pins a snapshot
+before checking the cache, including on hits. City identity/area entries use
+registry data without a serving snapshot. Ignored parameters such as tracking
+tags do not create new entries. Equivalent composer/work filter sets share
+entries. No request or result data is written to disk.
 
 Each server process retains at most 500 results and 16 MiB of serialized
 key/result data, evicting the least-recently-used entries as needed. This is a
@@ -151,12 +161,11 @@ first request after expiry waits for fresh data, and simultaneous requests for
 that key share the load. Successful empty results are cached; errors are not.
 Failed refreshes return the endpoint's normal error rather than expired data,
 and subsequent requests may retry. Restarts clear all entries; no warm-up is
-required. There is no manual purge endpoint or connection to crawler updates.
-
-The lifetime is a reuse window, not an exact end-to-end freshness guarantee:
-query duration and the existing five-minute city catalogue cache also contribute.
-Changes in `CURRENT_DATE` can remain unseen until the result expires. Existing
-composer and sitemap freshness behavior is unchanged.
+required. There is no manual purge endpoint; a newly published serving generation
+or UTC date uses new keys on the next lookup. City identity/area entries instead
+expire after five minutes. `getCityCatalogue` builds its result within the caller
+snapshot without a separate cache. Lifetimes describe result reuse, not the age
+of the upstream publication; query duration and registry caching also contribute.
 
 Every five minutes, `[server-data-cache]` logs aggregate counters by endpoint
 namespace: `hits`, `misses` (tracked loads), `shared` (joined loads),
@@ -185,21 +194,24 @@ The calculation uses included, non-duplicate concerts and public published
 composer playlists. Scores break ties by shared-source count, name and ID.
 Missing recommendation slots use the existing popularity-ranked directory.
 
-One Nitro cached function stores rankings for all composers for 24 hours, with
-stale-while-revalidate enabled. The first composer request after expiry serves
-the previous result and triggers a background refresh; idle servers do not
-refresh on a schedule. Refresh failures retain the last successful rankings.
-Names, images and concert counts still come from the five-minute directory
-cache. `SERVER_DATA_CACHE_ENABLED` does not control this separate cache.
+Each process keeps one successful ranking snapshot for 24 hours and allows one
+refresh at a time. Reads never wait for a refresh. Requests for the same serving
+publication can reuse expired rankings while refreshing; a different publication
+uses the popularity fallback until matching rankings are ready. Requests for an
+older publication do not trigger a backwards refresh. Failures retain the last
+successful snapshot and allow a demand-driven retry after 60 seconds. Idle
+servers do not refresh on a schedule. Names, images, and counts come from the
+five-minute directory/profile caches. `SERVER_DATA_CACHE_ENABLED` does not control
+the ranking cache.
 
-Every production ClassicalBot process warms this cache **before opening its
-HTTP listener**, including after deployment. The query has a 15-second statement
-timeout and transaction-local JIT disabled, inside a read-only transaction.
-Startup has a 30-second overall deadline, including connection establishment.
-A failure exits nonzero without listening; deployment health/startup allowances
-must accommodate this delay. There is no disk persistence, shared replica cache,
-scheduled task, database migration or build-time database requirement. Development
-loads recommendations on demand; the separate classical.sk server has no warm-up.
+Production ClassicalBot opens its HTTP listener before warming recommendations
+in the background. Maintenance skips this warm-up. Failure leaves HTTP running;
+static assets remain available, while data endpoints still require database
+access and a valid publication. The ranking query uses a read-only snapshot,
+a 15-second statement timeout, and transaction-local JIT disabled. There is no
+disk persistence, shared replica cache, scheduled refresh, migration, or build-time
+database requirement. Development loads recommendations on demand; the separate
+classical.sk server has no startup warm-up.
 
 `[composer-recommendations]` logs calculation duration, the number of composers
 with rankings, and failures. Validate query fixtures with

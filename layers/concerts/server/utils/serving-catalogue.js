@@ -20,22 +20,7 @@ export function withServingSnapshot(db,load) {
   },{isolationLevel:'repeatable read',readOnly:true})
 }
 
-export function displaySource(db,field,alias='cc') {
-  if (!['source','source_url'].includes(field)) throw new Error('Invalid display source field')
-  return db.raw('??.?? AS ??',[alias,field,field])
-}
-
-export async function concertDocuments(db,ids) {
-  return ids.length ? db('serving.current_document').whereIn('concert_id',ids) : []
-}
 const collection = async (db,ids,field) => ids.length
   ? (await db('serving.current_document').whereIn('concert_id',ids).select(field)).flatMap(row=>row[field]) : []
 export const concertComposers = (db,ids) => collection(db,ids,'composers')
 export const concertWorks = (db,ids) => collection(db,ids,'works')
-export const concertPrices = (db,ids) => collection(db,ids,'prices')
-export async function concertPerformers(db,ids) {
-  const credits = await collection(db,ids,'performers')
-  const ensembleIds = [...new Set(credits.map(p=>p.ensemble_id).filter(Boolean))]
-  const names = new Map((ensembleIds.length ? await db('performer').whereIn('id',ensembleIds).select('id','name') : []).map(p=>[String(p.id),p.name]))
-  return credits.map(p=>({...p,ensemble_name:names.get(String(p.ensemble_id)) || null}))
-}

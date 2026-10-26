@@ -1,5 +1,5 @@
 import { installResolvedFixture, publishResolvedFixture } from '../test-support/resolved-fixture.js'
-import { servingPublication, withServingSnapshot, concertWorks, concertPerformers } from '../layers/concerts/server/utils/serving-catalogue.js'
+import { servingPublication, withServingSnapshot, concertWorks } from '../layers/concerts/server/utils/serving-catalogue.js'
 import { matching, concertDetails } from '../server/utils/alerts/criteria.js'
 import { parseConcertFilters } from '../layers/concerts/server/utils/concert-filters.js'
 import test from 'node:test'
@@ -139,7 +139,6 @@ test('PostgreSQL query preserves source connections, primary visibility, dates a
     const filters=parseConcertFilters({composers:'Composer without work',works:'1,2',country:'CZ'})
     const count=await matching(trx,filters).count('* as total').first()
     assert.equal(Number(count.total),1, 'donor music filters do not multiply pages')
-    assert.equal((await concertPerformers(trx,[1])).length,2)
     assert.match((await concertDetails(trx,filters,[1]))[0].programme,/Composer: Concerto/)
     assert.equal((await trx('serving.current_concert as cc').whereExists(trx('serving.current_concert_performer as p').select(1).whereRaw('p.concert_id=cc.id').where('p.performer_id',1))).length,1)
     await db('classical_concert').where('id',1).update({title:'Next generation'})
