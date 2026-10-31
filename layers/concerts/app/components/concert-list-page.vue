@@ -16,6 +16,7 @@
         :countries-loading="countryOptionsStatus === 'pending'"
         :countries-error="countryOptionsStatus === 'error'"
         @retry-countries="refreshCountryOptions()"
+        @load-countries="loadCountryOptions()"
         :fixed-country="countryCode"
         :fixed-city="cityPage?.id || cityPage?.filterValue || null"
         :fixed-city-id="cityPage?.id || null"
@@ -142,7 +143,7 @@ const { query: concertQuery, update: updateQuery } = useConcertQuery(route, rout
 const {
   activeAreaQuery, unresolvedArea, radius, filters, requestParams, countries,
   concertPage, concertStatus, concertError, refreshConcerts, countryOptionsStatus, refreshCountryOptions,
-  filterCountries, displayPage, ready,
+  filterCountries, loadCountryOptions, displayPage, ready,
 } = useConcertListing(props, concertQuery)
 await ready
 

@@ -46,19 +46,25 @@ export function useConcertListing(props, concertQuery) {
   const countryOptionsRequest = useAsyncData(
     computed(() => `country-options:${JSON.stringify(countryOptionParams.value)}`),
     () => props.countryCode ? Promise.resolve({ items: [] }) : $fetch('/api/get-concert-filter-options', { params: countryOptionParams.value }),
+    { immediate: false, server: false, lazy: true },
   )
   const { data: countryOptions, status: countryOptionsStatus, refresh: refreshCountryOptions } = countryOptionsRequest
   const filterCountries = computed(() => {
     if (countryOptionsStatus.value === 'success') return (countryOptions.value?.items || []).map(item => ({ code: item.value, name: item.label, count: item.count }))
-    const selected = countries.value?.find(item => item.code === filters.value.country)
-    return selected ? [{ ...selected, count: null }] : []
+    // The country catalogue is already loaded for navigation. Keep native select
+    // options usable while contextual counts load, without showing global counts.
+    return (countries.value || []).map(item => ({ ...item, count: null }))
   })
+  const loadCountryOptions = () => {
+    if (props.countryCode || ['pending', 'success'].includes(countryOptionsStatus.value)) return
+    return refreshCountryOptions({ dedupe: 'defer' })
+  }
   // Display labels survive pending refreshes; presentation still checks selection identity.
   const displayPage = shallowRef(concertPage.value)
   watch(concertPage, page => { if (page) displayPage.value = page }, { flush: 'sync' })
   return {
     activeAreaQuery, unresolvedArea, radius, filters, requestParams, countries,
     concertPage, concertStatus, concertError, refreshConcerts, countryOptionsStatus, refreshCountryOptions,
-    filterCountries, displayPage, ready: Promise.all([countriesRequest, concertsRequest, countryOptionsRequest]),
+    filterCountries, loadCountryOptions, displayPage, ready: Promise.all([countriesRequest, concertsRequest]),
   }
 }

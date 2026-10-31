@@ -5,11 +5,15 @@
         <span class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">{{ t('Country') }}</span>
         <select
           :value="country || ''"
-          :disabled="countriesLoading || countriesError"
+          :disabled="(countriesLoading || countriesError) && !countries.length"
+          :aria-busy="countriesLoading"
+          @focus="$emit('load-countries')"
+          @pointerdown="$emit('load-countries')"
+          @keydown="$emit('load-countries')"
           class="h-11 w-full border-b border-gray-300 bg-transparent text-sm text-gray-900 outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
           @change="update('country', $event.target.value || null)"
         >
-          <option value="">{{ countriesLoading ? t('Loading countries…') : countriesError ? t('Countries unavailable') : t('All countries') }}</option>
+          <option value="">{{ countriesLoading && !countries.length ? t('Loading countries…') : countriesError && !countries.length ? t('Countries unavailable') : t('All countries') }}</option>
           <option v-for="item in countries" :key="item.code" :value="item.code">
             {{ item.name }}{{ item.count == null ? '' : ` (${item.count})` }}
           </option>
@@ -105,7 +109,7 @@ const props = defineProps({
   works: { type: Array, required: true },
 })
 
-const emit = defineEmits(['update', 'clear', 'retry-countries', 'city-radius'])
+const emit = defineEmits(['update', 'clear', 'retry-countries', 'load-countries', 'city-radius'])
 const { concertSite } = useAppConfig()
 const siteCountry = concertSite.country
 const cityControl = ref(null)

@@ -9,10 +9,10 @@ function mount(props = {}, query = {}, fetcher = async () => ({ items: [] })) {
   const requests = [], scope = effectScope(), route = reactive({ query })
   props = reactive(props)
   globalThis.$fetch = fetcher
-  globalThis.useAsyncData = (key, handler) => {
+  globalThis.useAsyncData = (key, handler, options = {}) => {
     let settle
     const request = Object.assign(new Promise(resolve => { settle = resolve }), {
-      key, data: ref(key === 'countries' ? [] : undefined), status: ref('pending'), error: ref(null), settle: () => settle(),
+      key, options, data: ref(key === 'countries' ? [] : undefined), status: ref(options.immediate === false ? 'idle' : 'pending'), error: ref(null), settle: () => settle(),
       async refresh() {
         request.status.value = 'pending'
         try { request.data.value = await handler(); request.error.value = null; request.status.value = 'success' }
@@ -63,7 +63,7 @@ test('listing projects normalized filters into listing and country-facet request
   }
 })
 
-test('all requests register synchronously and ready waits for the outstanding listing', async () => {
+test('country options stay idle and do not block the initial listing', async () => {
   let resolveListing
   const pending = new Promise(resolve => { resolveListing = resolve })
   const view = mount({}, {}, async url => url === '/api/get-concerts' ? pending : url === '/api/get-countries' ? [] : { items: [] })
@@ -73,7 +73,8 @@ test('all requests register synchronously and ready waits for the outstanding li
     view.state.ready.then(() => { ready = true })
     const loading = view.request('concerts:').refresh()
     await view.request('countries').refresh()
-    await view.request('country-options:').refresh()
+    assert.deepEqual(view.request('country-options:').options, { immediate: false, server: false, lazy: true })
+    assert.equal(view.state.countryOptionsStatus.value, 'idle')
     assert.equal(ready, false)
     resolveListing({ items: [], total: 0 })
     await loading
@@ -121,5 +122,29 @@ test('country failure restores the selected label and listing errors remain avai
     await view.state.refreshConcerts()
     assert.equal(view.state.concertError.value, null)
     assert.equal(view.state.concertStatus.value, 'success')
+  } finally { view.close() }
+})
+
+
+test('country interaction loads once, keeps fallback names usable, and allows retries', async () => {
+  let respond, calls = 0
+  const view = mount({}, { country: 'SK' }, () => { calls++; return new Promise(resolve => { respond = resolve }) })
+  try {
+    view.request('countries').data.value = [{ code: 'AT', name: 'Austria', count: 10 }, { code: 'SK', name: 'Slovakia', count: 20 }]
+    assert.deepEqual(view.state.filterCountries.value.map(x => [x.name, x.count]), [['Austria', null], ['Slovakia', null]])
+    const loading = view.state.loadCountryOptions()
+    view.state.loadCountryOptions()
+    assert.equal(calls, 1)
+    assert.equal(view.state.filterCountries.value[1].name, 'Slovakia')
+    respond({ items: [{ value: 'SK', label: 'Slovakia', count: 3 }] })
+    await loading
+    assert.deepEqual(view.state.filterCountries.value, [{ code: 'SK', name: 'Slovakia', count: 3 }])
+    view.state.loadCountryOptions()
+    assert.equal(calls, 1)
+    view.request('country-options:').status.value = 'error'
+    const retry = view.state.loadCountryOptions()
+    assert.equal(calls, 2)
+    respond({ items: [] })
+    await retry
   } finally { view.close() }
 })
